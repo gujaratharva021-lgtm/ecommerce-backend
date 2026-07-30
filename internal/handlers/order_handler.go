@@ -196,7 +196,7 @@ func CancelOrder(c *gin.Context) {
 	orderID := c.Param("id")
 
 	var order models.Order
-	if err := database.DB.Preload("Items").First(&order, orderID).Error; err != nil {
+	if err := database.DB.Preload("Items.Product").Preload("Address").First(&order, orderID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
