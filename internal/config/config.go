@@ -9,16 +9,18 @@ import (
 )
 
 type Config struct {
-	Port           string
-	GinMode        string
-	DBHost         string
-	DBPort         string
-	DBUser         string
-	DBPassword     string
-	DBName         string
-	DBSSLMode      string
-	JWTSecret      string
-	JWTExpiryHours string
+	Port              string
+	GinMode           string
+	DBHost            string
+	DBPort            string
+	DBUser            string
+	DBPassword        string
+	DBName            string
+	DBSSLMode         string
+	JWTSecret         string
+	JWTExpiryHours    string
+	RazorpayKeyID     string
+	RazorpayKeySecret string
 }
 
 var AppConfig *Config
@@ -32,16 +34,22 @@ func LoadConfig() *Config {
 	}
 
 	cfg := &Config{
-		Port:           getEnv("PORT", "8080"),
-		GinMode:        getEnv("GIN_MODE", "debug"),
-		DBHost:         getEnv("DB_HOST", "localhost"),
-		DBPort:         getEnv("DB_PORT", "5432"),
-		DBUser:         getEnv("DB_USER", "postgres"),
-		DBPassword:     getEnv("DB_PASSWORD", "postgres"),
-		DBName:         getEnv("DB_NAME", "ecommerce_db"),
-		DBSSLMode:      getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:      getEnv("JWT_SECRET", "default_secret_change_me"),
-		JWTExpiryHours: getEnv("JWT_EXPIRY_HOURS", "72"),
+		Port:              getEnv("PORT", "8080"),
+		GinMode:           getEnv("GIN_MODE", "debug"),
+		DBHost:            getEnv("DB_HOST", "localhost"),
+		DBPort:            getEnv("DB_PORT", "5432"),
+		DBUser:            getEnv("DB_USER", "postgres"),
+		DBPassword:        getEnv("DB_PASSWORD", "postgres"),
+		DBName:            getEnv("DB_NAME", "ecommerce_db"),
+		DBSSLMode:         getEnv("DB_SSLMODE", "disable"),
+		JWTSecret:         getEnv("JWT_SECRET", "default_secret_change_me"),
+		JWTExpiryHours:    getEnv("JWT_EXPIRY_HOURS", "72"),
+		RazorpayKeyID:     getEnv("RAZORPAY_KEY_ID", ""),
+		RazorpayKeySecret: getEnv("RAZORPAY_KEY_SECRET", ""),
+	}
+
+	if cfg.RazorpayKeyID == "" || cfg.RazorpayKeySecret == "" {
+		log.Println("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set — online payment endpoints will return an error until configured. COD checkout is unaffected.")
 	}
 
 	AppConfig = cfg

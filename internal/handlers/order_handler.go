@@ -29,8 +29,13 @@ func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
 	var req models.CheckoutRequest
-	// Body is optional — an empty/missing body just means "use default address".
+	// Body is optional — an empty/missing body just means "use default address + COD".
 	_ = c.ShouldBindJSON(&req)
+
+	paymentMethod := req.PaymentMethod
+	if paymentMethod == "" {
+		paymentMethod = models.PaymentMethodCOD
+	}
 
 	// Resolve the delivery address: explicit address_id, else the user's default.
 	var address models.Address
@@ -107,6 +112,8 @@ func Checkout(c *gin.Context) {
 			DeliveryCharge: deliveryCharge,
 			TotalAmount:    itemsAmount + deliveryCharge,
 			Status:         models.OrderStatusPending,
+			PaymentMethod:  paymentMethod,
+			PaymentStatus:  models.OrderPaymentStatusPending,
 			Items:          orderItems,
 		}
 		if err := tx.Create(&order).Error; err != nil {

@@ -62,10 +62,12 @@ func SetupRoutes(router *gin.Engine) {
 		orders := api.Group("/orders")
 		orders.Use(middleware.AuthMiddleware())
 		{
-			orders.POST("/checkout", handlers.Checkout)
+			orders.POST("/checkout", handlers.Checkout) // body: { address_id?, payment_method?: "cod"|"online" }
 			orders.GET("", handlers.GetOrders)
 			orders.GET("/:id", handlers.GetOrderByID)
 			orders.PUT("/:id/cancel", handlers.CancelOrder)
+			orders.POST("/:id/payment", handlers.CreatePaymentOrder)   // creates Razorpay order (payment_method: online only)
+			orders.POST("/:id/payment/verify", handlers.VerifyPayment) // verifies signature, marks order paid
 		}
 
 		// ---- Upload routes (protected, structure ready for product/category images) ----

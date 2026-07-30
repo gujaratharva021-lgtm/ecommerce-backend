@@ -12,6 +12,16 @@ const (
 	OrderStatusCancelled = "cancelled"
 )
 
+// Payment method chosen at checkout, and the resulting payment lifecycle.
+const (
+	PaymentMethodCOD    = "cod"
+	PaymentMethodOnline = "online"
+
+	OrderPaymentStatusPending = "pending"
+	OrderPaymentStatusPaid    = "paid"
+	OrderPaymentStatusFailed  = "failed"
+)
+
 type Order struct {
 	ID             uint        `gorm:"primaryKey" json:"id"`
 	UserID         uint        `gorm:"not null;index" json:"user_id"`
@@ -21,7 +31,9 @@ type Order struct {
 	ItemsAmount    float64     `gorm:"not null" json:"items_amount"`
 	DeliveryCharge float64     `gorm:"not null;default:0" json:"delivery_charge"`
 	TotalAmount    float64     `gorm:"not null" json:"total_amount"`
-	Status         string      `gorm:"default:pending" json:"status"` // pending/confirmed/shipped/delivered/cancelled
+	Status         string      `gorm:"default:pending" json:"status"`         // pending/confirmed/shipped/delivered/cancelled
+	PaymentMethod  string      `gorm:"default:cod" json:"payment_method"`     // cod/online
+	PaymentStatus  string      `gorm:"default:pending" json:"payment_status"` // pending/paid/failed
 	Items          []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 	CreatedAt      time.Time   `json:"created_at"`
 	UpdatedAt      time.Time   `json:"updated_at"`
@@ -39,8 +51,11 @@ type OrderItem struct {
 
 // CheckoutRequest is the body for POST /orders/checkout.
 // AddressID is optional — if omitted, the user's default address is used.
+// PaymentMethod is optional — defaults to "cod" if omitted; "online" starts
+// the Razorpay flow (see POST /orders/:id/payment).
 type CheckoutRequest struct {
-	AddressID uint `json:"address_id"`
+	AddressID     uint   `json:"address_id"`
+	PaymentMethod string `json:"payment_method" binding:"omitempty,oneof=cod online"`
 }
 
 // OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).

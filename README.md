@@ -415,6 +415,54 @@ Any other transition returns `400`. Cancelling from `pending`/`confirmed` restor
 - [x] Order admin APIs — list all orders (with status filter), update status with enforced transition rules + stock restore on cancel
 - [x] Routes wired under `/admin`, protected by `AuthMiddleware` + `AdminOnly`
 - [x] API documentation updated (this file)
-- [ ] Test APIs using Postman (do this after `go run` — see admin-user note above)
+- [x] Test APIs using Postman (do this after `go run` — see admin-user note above)
+- [x] Push to GitHub
+- [ ] Share new APIs with Flutter Developer
+
+## Day 5 — Payments (Razorpay)
+
+Two payment methods are now supported at checkout: **COD** (default, no gateway involved) and **online** (Razorpay Checkout flow below). Implemented with `net/http` + `crypto/hmac` directly against Razorpay's REST API — no `razorpay-go` SDK dependency added.
+
+### Setup
+Get test-mode keys from the [Razorpay Dashboard](https://dashboard.razorpay.com/app/keys) and add to `.env`:
+```
+RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxxx
+RAZORPAY_KEY_SECRET=your_test_key_secret
+```
+Without these, the server still starts fine (a warning is logged) — COD checkout is unaffected, only the online-payment endpoints return an error until configured.
+
+### Flow
+1. **Checkout** — `POST /orders/checkout` now takes an optional `payment_method` field:
+   ```json
+   { "address_id": 1, "payment_method": "online" }
+   ```
+   Omit it (or send `"cod"`) for Cash on Delivery — behaves exactly as before. Every order now also carries `payment_method` and `payment_status` (`pending` / `paid` / `failed`).
+
+2. **Create Razorpay order** (online only) — `POST /orders/:id/payment`
+   Returns what the frontend needs to open Razorpay Checkout (web) or the Flutter Razorpay SDK:
+   ```json
+   { "razorpay_order_id": "order_xxx", "amount": 5000, "currency": "INR", "key_id": "rzp_test_xxx", "order_id": 12 }
+   ```
+   `amount` is in **paise** (Razorpay's unit), matching `order.total_amount * 100`.
+
+3. **Verify payment** — after the user completes payment, Checkout hands the frontend three values; forward them as-is:
+   `POST /orders/:id/payment/verify`
+   ```json
+   { "razorpay_order_id": "order_xxx", "razorpay_payment_id": "pay_xxx", "razorpay_signature": "..." }
+   ```
+   The backend re-derives the HMAC-SHA256 signature server-side and compares it — this is what actually proves the payment is genuine (the frontend values alone can't be trusted). On match: `Payment.status` and `Order.payment_status` become `paid`, and a still-`pending` order auto-advances to `confirmed`. On mismatch: `400`, payment marked `failed`, safe to retry via step 2.
+
+### Known limitation
+Cancelling a **paid online order** doesn't trigger an automatic Razorpay refund yet — `CancelOrder`/admin cancel currently only restores stock and flips status, same as COD. Refund-on-cancel is a good Day 6+ candidate if online payments go live for real.
+
+## Day 5 Checklist
+- [x] `Payment` model + migration (one row per order, tracks Razorpay order/payment/signature + status)
+- [x] `Order.payment_method` (`cod`/`online`) and `Order.payment_status` (`pending`/`paid`/`failed`) fields
+- [x] Checkout accepts optional `payment_method`, defaults to `cod` (fully backward compatible)
+- [x] Razorpay order creation — `POST /orders/:id/payment`
+- [x] Razorpay signature verification — `POST /orders/:id/payment/verify`
+- [x] Config wired for `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`, non-fatal if unset
+- [x] API documentation updated (this file)
+- [ ] Test APIs using Postman with real Razorpay test keys (do this after `go run`)
 - [ ] Push to GitHub
 - [ ] Share new APIs with Flutter Developer
