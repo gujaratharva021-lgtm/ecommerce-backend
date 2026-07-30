@@ -27,7 +27,7 @@ func ConnectDatabase(cfg *config.Config) {
 
 // AutoMigrate creates/updates all tables based on the models.
 // This covers: Users, OTPs, Categories, Products, Inventory, Cart,
-// CartItems, Orders, OrderItems.
+// CartItems, Addresses, Orders, OrderItems.
 func AutoMigrate() {
 	err := DB.AutoMigrate(
 		&models.User{},
@@ -37,6 +37,7 @@ func AutoMigrate() {
 		&models.Inventory{},
 		&models.Cart{},
 		&models.CartItem{},
+		&models.Address{},
 		&models.Order{},
 		&models.OrderItem{},
 	)

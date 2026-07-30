@@ -119,7 +119,7 @@ Response `200 OK`:
   }
 }
 ```
-`name` is blank until the user sets it via a future "update profile" endpoint (Day 3).
+`name` is blank until the user sets it via `PUT /auth/me` (Day 3).
 
 Error responses:
 - `400 Bad Request` — validation failed (phone not 10 digits, OTP not 6 digits)
@@ -136,6 +136,21 @@ Authorization: Bearer <token>
 Response `200 OK`: the `user` object shown above.
 
 Error responses:
+- `401 Unauthorized` — missing/invalid/expired token
+
+#### 4. Update profile (protected)
+`PUT /auth/me`
+
+Request body:
+```json
+{ "name": "Harva Gujarat" }
+```
+Only `name` is editable here — phone is the login identity and isn't changed through this endpoint.
+
+Response `200 OK`: the updated `user` object.
+
+Error responses:
+- `400 Bad Request` — `name` missing
 - `401 Unauthorized` — missing/invalid/expired token
 
 ### Product APIs
@@ -202,10 +217,81 @@ Request body:
 ```json
 { "quantity": 3 }
 ```
-Returns `200 OK` with the updated cart. `403 Forbidden` if the cart item doesn't belong to the logged-in user.
+Returns `200 OK` with the updated cart. `400 Bad Request` if the new quantity exceeds available stock. `403 Forbidden` if the cart item doesn't belong to the logged-in user.
 
 #### 4. Remove item from cart
 `DELETE /cart/:item_id` → `200 OK` with the updated cart. `403 Forbidden` if it isn't your cart item.
+
+### Address APIs (all protected — require `Authorization: Bearer <token>`)
+
+#### 1. List saved addresses
+`GET /addresses` → `200 OK` → `{ "addresses": [...] }`, default address first.
+
+#### 2. Add a new address
+`POST /addresses`
+
+Request body:
+```json
+{
+  "label": "Home",
+  "full_name": "Harva Gujarat",
+  "phone": "9999999999",
+  "line1": "221B Baker Society",
+  "line2": "Near City Mall",
+  "city": "Ahmedabad",
+  "state": "Gujarat",
+  "pincode": "380001",
+  "is_default": false
+}
+```
+Returns `201 Created` with the saved address. The very first address a user adds is automatically marked default regardless of `is_default`.
+
+#### 3. Update an address
+`PUT /addresses/:id` — same body as above. `200 OK` with the updated address, `403 Forbidden` if it isn't yours.
+
+#### 4. Delete an address
+`DELETE /addresses/:id` → `200 OK`. If the deleted address was the default, the most recently added remaining address is auto-promoted to default.
+
+#### 5. Set an address as default
+`PUT /addresses/:id/default` → `200 OK` with the updated address.
+
+### Order APIs (all protected — require `Authorization: Bearer <token>`)
+
+#### 1. Checkout (cart → order)
+`POST /orders/checkout`
+
+Request body (optional):
+```json
+{ "address_id": 3 }
+```
+If `address_id` is omitted, the user's default address is used; `400 Bad Request` if none is set. Validates stock for every cart item, snapshots current prices, deducts inventory, creates the order, and empties the cart — all inside one DB transaction, so a failure partway through (e.g. one item out of stock) leaves nothing partially applied.
+
+Delivery is a flat ₹50, free above ₹500 in item total (`freeDeliveryThreshold` / `flatDeliveryCharge` in `order_handler.go` — swap for a real rate-card later).
+
+Response `201 Created`:
+```json
+{
+  "id": 12,
+  "user_id": 1,
+  "address_id": 3,
+  "address": { "id": 3, "city": "Ahmedabad", "...": "..." },
+  "items_amount": 450.0,
+  "delivery_charge": 50.0,
+  "total_amount": 500.0,
+  "status": "pending",
+  "items": [ { "product_id": 2, "quantity": 3, "price": 150.0 } ]
+}
+```
+Error responses: `400` — empty cart, no address available, or insufficient stock; `403` — address belongs to another user; `404` — address not found.
+
+#### 2. List my orders
+`GET /orders` — `?page=&limit=` (defaults `1` / `20`) → `200 OK`, paginated, newest first, same shape as the products list response.
+
+#### 3. Get order details
+`GET /orders/:id` → `200 OK` with items + address. `403 Forbidden` if it isn't your order.
+
+#### 4. Cancel an order
+`PUT /orders/:id/cancel` → `200 OK`, restores stock for every item. Only `pending` or `confirmed` orders can be cancelled — `400 Bad Request` otherwise.
 
 ### Upload API (protected)
 
@@ -222,7 +308,7 @@ Use the returned `image_url` when creating/updating a Product or Category (Day 6
 
 ---
 
-## Database Tables (Day 1)
+## Database Tables (Day 1–3)
 - `users` — id, name, phone (unique), role, timestamps
 - `otps` — id, phone, code, expires_at, verified, created_at
 - `categories` — id, name, image_url, timestamps
@@ -230,7 +316,8 @@ Use the returned `image_url` when creating/updating a Product or Category (Day 6
 - `inventories` — id, product_id, stock, in_stock, timestamps
 - `carts` — id, user_id, timestamps
 - `cart_items` — id, cart_id, product_id, quantity, timestamps
-- `orders` — id, user_id, total_amount, status, timestamps
+- `addresses` — id, user_id, label, full_name, phone, line1, line2, city, state, pincode, is_default, timestamps
+- `orders` — id, user_id, address_id, items_amount, delivery_charge, total_amount, status, timestamps
 - `order_items` — id, order_id, product_id, quantity, price, created_at
 
 Tables are auto-created via GORM `AutoMigrate` on server start — no manual SQL needed.
@@ -261,6 +348,17 @@ Tables are auto-created via GORM `AutoMigrate` on server start — no manual SQL
 - [x] Image upload structure (local disk, ready to swap for S3/GCS)
 - [x] Cart module — add / update quantity / remove / get, with per-user ownership checks
 - [x] Stock validation on add-to-cart (checks `inventories.in_stock` + `inventories.stock`)
+- [x] API documentation updated (this file)
+- [ ] Test APIs using Postman (do this after `go run`)
+- [ ] Push to GitHub
+- [ ] Share new APIs with Flutter Developer
+
+## Day 3 Checklist
+- [x] Address module — add / list / update / delete / set default, with per-user ownership checks and auto-default logic
+- [x] Order Management — checkout (cart → order in a DB transaction), list (paginated), detail, cancel (restores stock)
+- [x] Checkout — stock validation + deduction per item, price snapshotting, flat/free delivery-charge rule, cart cleared on success
+- [x] Cart validation — stock now also checked on quantity update, not just add
+- [x] Profile API — update name (`PUT /auth/me`)
 - [x] API documentation updated (this file)
 - [ ] Test APIs using Postman (do this after `go run`)
 - [ ] Push to GitHub

@@ -159,6 +159,15 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
+	// Check stock if inventory record exists (same rule as AddToCart)
+	var inventory models.Inventory
+	if err := database.DB.Where("product_id = ?", item.ProductID).First(&inventory).Error; err == nil {
+		if !inventory.InStock || inventory.Stock < req.Quantity {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+			return
+		}
+	}
+
 	item.Quantity = req.Quantity
 	if err := database.DB.Save(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})

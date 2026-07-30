@@ -31,3 +31,10 @@ type AuthResponse struct {
 	Token string `json:"token"`
 	User  User   `json:"user"`
 }
+
+// UpdateProfileRequest is the body for PUT /auth/me. Phone is intentionally
+// excluded — it's the login identity, so changing it goes through a
+// separate OTP-verified flow, not a plain profile edit.
+type UpdateProfileRequest struct {
+	Name string `json:"name" binding:"required"`
+}

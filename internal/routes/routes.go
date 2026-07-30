@@ -21,6 +21,7 @@ func SetupRoutes(router *gin.Engine) {
 			auth.POST("/send-otp", handlers.SendOTP)
 			auth.POST("/verify-otp", handlers.VerifyOTP)
 			auth.GET("/me", middleware.AuthMiddleware(), handlers.Me)
+			auth.PUT("/me", middleware.AuthMiddleware(), handlers.UpdateProfile)
 		}
 
 		// ---- Product routes (public) ----
@@ -44,6 +45,27 @@ func SetupRoutes(router *gin.Engine) {
 			cart.POST("", handlers.AddToCart)
 			cart.PUT("/:item_id", handlers.UpdateCartItem)
 			cart.DELETE("/:item_id", handlers.RemoveFromCart)
+		}
+
+		// ---- Address routes (protected) ----
+		addresses := api.Group("/addresses")
+		addresses.Use(middleware.AuthMiddleware())
+		{
+			addresses.GET("", handlers.ListAddresses)
+			addresses.POST("", handlers.CreateAddress)
+			addresses.PUT("/:id", handlers.UpdateAddress)
+			addresses.DELETE("/:id", handlers.DeleteAddress)
+			addresses.PUT("/:id/default", handlers.SetDefaultAddress)
+		}
+
+		// ---- Order routes (protected) ----
+		orders := api.Group("/orders")
+		orders.Use(middleware.AuthMiddleware())
+		{
+			orders.POST("/checkout", handlers.Checkout)
+			orders.GET("", handlers.GetOrders)
+			orders.GET("/:id", handlers.GetOrderByID)
+			orders.PUT("/:id/cancel", handlers.CancelOrder)
 		}
 
 		// ---- Upload routes (protected, structure ready for product/category images) ----

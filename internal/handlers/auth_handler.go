@@ -145,3 +145,29 @@ func Me(c *gin.Context) {
 
 	c.JSON(http.StatusOK, user)
 }
+
+// UpdateProfile godoc - updates the logged-in user's editable profile fields
+// PUT /api/v1/auth/me (protected)
+func UpdateProfile(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+
+	var req models.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user models.User
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	user.Name = req.Name
+	if err := database.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
