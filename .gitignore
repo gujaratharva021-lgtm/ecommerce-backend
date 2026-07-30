@@ -21,3 +21,7 @@ vendor/
 # Build
 /bin/
 /tmp/
+
+# Uploaded images (local dev storage)
+/uploads/*
+!/uploads/.gitkeep
