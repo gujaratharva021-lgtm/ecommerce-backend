@@ -70,6 +70,14 @@ func SetupRoutes(router *gin.Engine) {
 			orders.POST("/:id/payment/verify", handlers.VerifyPayment) // verifies signature, marks order paid
 		}
 
+
+                // ---- Coupon routes (protected) ----
+                coupons := api.Group("/coupons")
+                coupons.Use(middleware.AuthMiddleware())
+                {
+                        coupons.POST("/validate", handlers.ValidateCouponHandler)
+                }
+
 		// ---- Upload routes (protected, structure ready for product/category images) ----
 		upload := api.Group("/upload")
 		upload.Use(middleware.AuthMiddleware())
@@ -101,6 +109,13 @@ func SetupRoutes(router *gin.Engine) {
 				adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
 				adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
 			}
+
+                        adminCoupons := admin.Group("/coupons")
+                        {
+                                adminCoupons.POST("", handlers.CreateCoupon)
+                                adminCoupons.GET("", handlers.GetCoupons)
+                                adminCoupons.PUT("/:id/status", handlers.UpdateCouponStatus)
+                        }
 		}
 	}
 }

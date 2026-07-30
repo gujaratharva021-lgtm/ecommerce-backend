@@ -41,9 +41,12 @@ func AutoMigrate() {
 		&models.Order{},
 		&models.OrderItem{},
 		&models.Payment{},
+                &models.Coupon{},
+                &models.OrderCoupon{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 	log.Println("Database migration completed")
 }
+

@@ -22,9 +22,10 @@ const (
 // Checkout godoc
 // POST /api/v1/orders/checkout (protected)
 // Converts the user's current cart into an order: validates stock for every
-// item, snapshots prices, deducts inventory, creates the order + order
-// items, and empties the cart — all inside a single DB transaction so a
-// failure partway through never leaves stock or the cart in a bad state.
+// item, snapshots prices, deducts inventory, applies a coupon if given,
+// creates the order + order items, and empties the cart — all inside a
+// single DB transaction so a failure partway through never leaves stock,
+// coupon usage, or the cart in a bad state.
 func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
@@ -105,12 +106,26 @@ func Checkout(c *gin.Context) {
 			deliveryCharge = 0
 		}
 
+		// Coupon: validated against itemsAmount (before delivery charge),
+		// using the transaction so the read is consistent with everything
+		// else happening in this checkout.
+		var appliedCoupon *models.Coupon
+		var discount float64
+		if req.CouponCode != "" {
+			coupon, d, err := ValidateCoupon(tx, req.CouponCode, itemsAmount)
+			if err != nil {
+				return err
+			}
+			appliedCoupon = coupon
+			discount = d
+		}
+
 		order = models.Order{
 			UserID:         userID,
 			AddressID:      address.ID,
 			ItemsAmount:    itemsAmount,
 			DeliveryCharge: deliveryCharge,
-			TotalAmount:    itemsAmount + deliveryCharge,
+			TotalAmount:    itemsAmount + deliveryCharge - discount,
 			Status:         models.OrderStatusPending,
 			PaymentMethod:  paymentMethod,
 			PaymentStatus:  models.OrderPaymentStatusPending,
@@ -118,6 +133,15 @@ func Checkout(c *gin.Context) {
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err
+		}
+
+		// Record coupon usage only after the order is successfully created,
+		// inside the same transaction — if anything above fails, the coupon
+		// use rolls back too, so it never gets burned on a failed checkout.
+		if appliedCoupon != nil {
+			if err := ApplyCoupon(tx, appliedCoupon, order.ID, discount); err != nil {
+				return err
+			}
 		}
 
 		if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err != nil {
