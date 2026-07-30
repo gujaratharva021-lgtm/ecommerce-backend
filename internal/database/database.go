@@ -1,4 +1,4 @@
-package database
+﻿package database
 
 import (
 	"log"
@@ -44,10 +44,12 @@ func AutoMigrate() {
                 &models.Coupon{},
                 &models.OrderCoupon{},
 		&models.Notification{},
+		&models.DeviceToken{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 	log.Println("Database migration completed")
 }
+
 

@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 "fmt"
@@ -18,6 +18,7 @@ DBUser            string
 DBPassword        string
 DBName            string
 DBSSLMode         string
+	FirebaseCredentialsPath string
 JWTSecret         string
 JWTExpiryHours    string
 RazorpayKeyID     string
@@ -41,6 +42,7 @@ DBUser:            getEnv("DB_USER", "postgres"),
 DBPassword:        getEnv("DB_PASSWORD", "postgres"),
 DBName:            getEnv("DB_NAME", "ecommerce_db"),
 DBSSLMode:         getEnv("DB_SSLMODE", "disable"),
+		FirebaseCredentialsPath: getEnv("FIREBASE_CREDENTIALS_PATH", "secrets/firebase-service-account.json"),
 JWTSecret:         getEnv("JWT_SECRET", "default_secret_change_me"),
 JWTExpiryHours:    getEnv("JWT_EXPIRY_HOURS", "72"),
 RazorpayKeyID:     getEnv("RAZORPAY_KEY_ID", ""),
@@ -91,3 +93,5 @@ return fmt.Sprintf(
 c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode,
 )
 }
+
+
