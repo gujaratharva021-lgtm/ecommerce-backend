@@ -8,7 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // freeDeliveryThreshold and flatDeliveryCharge implement a simple, common
@@ -80,17 +82,23 @@ func Checkout(c *gin.Context) {
 
 		for _, ci := range cartItems {
 			var inventory models.Inventory
-			if err := tx.Where("product_id = ?", ci.ProductID).First(&inventory).Error; err == nil {
-				if !inventory.InStock || inventory.Stock < ci.Quantity {
-					return errors.New("insufficient stock for " + ci.Product.Name)
-				}
-				inventory.Stock -= ci.Quantity
-				if inventory.Stock <= 0 {
-					inventory.InStock = false
-				}
-				if err := tx.Save(&inventory).Error; err != nil {
-					return err
-				}
+			// Lock this product's inventory row for the rest of the transaction
+			// so two concurrent checkouts on the same product can't both read
+			// the same stock, both pass the check, and both deduct — oversell.
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("product_id = ?", ci.ProductID).
+				First(&inventory).Error; err != nil {
+				return errors.New("this product is not available for purchase: " + ci.Product.Name)
+			}
+			if !inventory.InStock || inventory.Stock < ci.Quantity {
+				return errors.New("insufficient stock for " + ci.Product.Name)
+			}
+			inventory.Stock -= ci.Quantity
+			if inventory.Stock <= 0 {
+				inventory.InStock = false
+			}
+			if err := tx.Save(&inventory).Error; err != nil {
+				return err
 			}
 
 			itemsAmount += ci.Product.Price * float64(ci.Quantity)
@@ -157,6 +165,10 @@ func Checkout(c *gin.Context) {
 	}
 
 	database.DB.Preload("Items.Product").Preload("Address").First(&order, order.ID)
+
+	message := "Your order #" + strconv.Itoa(int(order.ID)) + " has been placed successfully!"
+	utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
+
 	c.JSON(http.StatusCreated, order)
 }
 
@@ -260,5 +272,8 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	order.Status = models.OrderStatusCancelled
+
+	message := "Your order #" + orderID + " has been cancelled."
+	utils.SendNotification(order.Address.Phone, message, "order_cancelled", &order.ID)
 	c.JSON(http.StatusOK, order)
 }

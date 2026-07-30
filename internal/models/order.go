@@ -56,7 +56,7 @@ type OrderItem struct {
 type CheckoutRequest struct {
 	AddressID     uint   `json:"address_id"`
 	PaymentMethod string `json:"payment_method" binding:"omitempty,oneof=cod online"`
-        CouponCode    string `json:"coupon_code"`
+	CouponCode    string `json:"coupon_code"`
 }
 
 // OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).

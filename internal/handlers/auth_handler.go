@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -66,11 +67,17 @@ func SendOTP(c *gin.Context) {
 	// Dev-only: log instead of actually sending an SMS.
 	log.Printf("[DEV OTP] phone=%s code=%s (valid %d min)", req.Phone, code, otpValidityMinutes)
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"message":            "OTP sent successfully",
-		"otp":                code, // DEV ONLY — remove once a real SMS gateway is integrated
 		"expires_in_minutes": otpValidityMinutes,
-	})
+	}
+	// DEV ONLY: echo the OTP back so the flow is testable without a real SMS
+	// gateway wired up. Gated on GIN_MODE so this can never accidentally ship
+	// to production — set GIN_MODE=release and it disappears automatically.
+	if config.AppConfig.GinMode != "release" {
+		resp["otp"] = code
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // VerifyOTP godoc

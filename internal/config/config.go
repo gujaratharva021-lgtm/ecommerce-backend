@@ -52,6 +52,12 @@ func LoadConfig() *Config {
 		log.Println("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set — online payment endpoints will return an error until configured. COD checkout is unaffected.")
 	}
 
+	// Refuse to start in production with the placeholder JWT secret — running
+	// with it silently would mean anyone could forge valid tokens.
+	if cfg.GinMode == "release" && cfg.JWTSecret == "default_secret_change_me" {
+		log.Fatal("JWT_SECRET must be set to a strong random value before running with GIN_MODE=release")
+	}
+
 	AppConfig = cfg
 	return cfg
 }

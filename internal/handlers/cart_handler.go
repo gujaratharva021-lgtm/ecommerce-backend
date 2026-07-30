@@ -90,13 +90,17 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
-	// Check stock if inventory record exists
+	// Check stock — every product should have an Inventory row (CreateProduct
+	// always makes one). If none exists, treat it as unavailable rather than
+	// silently allowing an unlimited-quantity add.
 	var inventory models.Inventory
-	if err := database.DB.Where("product_id = ?", req.ProductID).First(&inventory).Error; err == nil {
-		if !inventory.InStock || inventory.Stock < req.Quantity {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
-			return
-		}
+	if err := database.DB.Where("product_id = ?", req.ProductID).First(&inventory).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available for purchase"})
+		return
+	}
+	if !inventory.InStock || inventory.Stock < req.Quantity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+		return
 	}
 
 	cart, err := getOrCreateCart(userID)
@@ -159,13 +163,15 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
-	// Check stock if inventory record exists (same rule as AddToCart)
+	// Check stock (same rule as AddToCart) — missing inventory row means unavailable.
 	var inventory models.Inventory
-	if err := database.DB.Where("product_id = ?", item.ProductID).First(&inventory).Error; err == nil {
-		if !inventory.InStock || inventory.Stock < req.Quantity {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
-			return
-		}
+	if err := database.DB.Where("product_id = ?", item.ProductID).First(&inventory).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available for purchase"})
+		return
+	}
+	if !inventory.InStock || inventory.Stock < req.Quantity {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+		return
 	}
 
 	item.Quantity = req.Quantity

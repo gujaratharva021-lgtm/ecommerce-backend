@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/handlers"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/middleware"
@@ -8,6 +10,8 @@ import (
 
 // SetupRoutes defines every API endpoint for the application.
 func SetupRoutes(router *gin.Engine) {
+	router.Use(middleware.CORS())
+
 	router.GET("/health", handlers.HealthCheck)
 
 	// Serve uploaded images (e.g. /uploads/169999.jpg)
@@ -18,8 +22,9 @@ func SetupRoutes(router *gin.Engine) {
 		// ---- Auth routes (public) ----
 		auth := api.Group("/auth")
 		{
-			auth.POST("/send-otp", handlers.SendOTP)
-			auth.POST("/verify-otp", handlers.VerifyOTP)
+			// Rate-limited — OTP endpoints are otherwise open to spam and brute force.
+			auth.POST("/send-otp", middleware.RateLimit(5, time.Minute), handlers.SendOTP)
+			auth.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyOTP)
 			auth.GET("/me", middleware.AuthMiddleware(), handlers.Me)
 			auth.PUT("/me", middleware.AuthMiddleware(), handlers.UpdateProfile)
 		}
@@ -70,13 +75,12 @@ func SetupRoutes(router *gin.Engine) {
 			orders.POST("/:id/payment/verify", handlers.VerifyPayment) // verifies signature, marks order paid
 		}
 
-
-                // ---- Coupon routes (protected) ----
-                coupons := api.Group("/coupons")
-                coupons.Use(middleware.AuthMiddleware())
-                {
-                        coupons.POST("/validate", handlers.ValidateCouponHandler)
-                }
+		// ---- Coupon routes (protected) ----
+		coupons := api.Group("/coupons")
+		coupons.Use(middleware.AuthMiddleware())
+		{
+			coupons.POST("/validate", handlers.ValidateCouponHandler)
+		}
 
 		// ---- Upload routes (protected, structure ready for product/category images) ----
 		upload := api.Group("/upload")
@@ -110,12 +114,12 @@ func SetupRoutes(router *gin.Engine) {
 				adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
 			}
 
-                        adminCoupons := admin.Group("/coupons")
-                        {
-                                adminCoupons.POST("", handlers.CreateCoupon)
-                                adminCoupons.GET("", handlers.GetCoupons)
-                                adminCoupons.PUT("/:id/status", handlers.UpdateCouponStatus)
-                        }
+			adminCoupons := admin.Group("/coupons")
+			{
+				adminCoupons.POST("", handlers.CreateCoupon)
+				adminCoupons.GET("", handlers.GetCoupons)
+				adminCoupons.PUT("/:id/status", handlers.UpdateCouponStatus)
+			}
 		}
 	}
 }

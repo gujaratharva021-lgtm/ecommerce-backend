@@ -43,9 +43,12 @@ func ValidateJWT(tokenString string) (*Claims, error) {
 	cfg := config.AppConfig
 	claims := &Claims{}
 
+	// WithValidMethods pins parsing to HS256 — without it, a token crafted
+	// with a different algorithm (e.g. "none") could bypass verification,
+	// since the keyfunc alone doesn't constrain which algorithm is accepted.
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
 		return nil, err
 	}

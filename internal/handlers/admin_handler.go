@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -341,5 +342,9 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	order.Status = req.Status
+
+	message := "Your order #" + orderID + " status is now: " + req.Status
+	utils.SendNotification(order.Address.Phone, message, "order_status_"+req.Status, &order.ID)
+
 	c.JSON(http.StatusOK, order)
 }

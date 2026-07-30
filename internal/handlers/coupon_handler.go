@@ -64,17 +64,26 @@ func ValidateCoupon(db *gorm.DB, code string, orderAmount float64) (*models.Coup
 // row is saved, only when a coupon was actually used for that order — this
 // way a failed/rolled-back checkout never burns a coupon use.
 func ApplyCoupon(db *gorm.DB, coupon *models.Coupon, orderID uint, discount float64) error {
+	// Atomically increment used_count only if the limit hasn't been reached
+	// in the meantime — guards against two concurrent checkouts both passing
+	// ValidateCoupon before either has committed (a plain read-then-write
+	// increment could let usage exceed usage_limit under concurrent load).
+	result := db.Model(&models.Coupon{}).
+		Where("id = ? AND used_count < usage_limit", coupon.ID).
+		UpdateColumn("used_count", gorm.Expr("used_count + 1"))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrCouponUsedUp
+	}
+
 	oc := models.OrderCoupon{
 		OrderID:        orderID,
 		CouponID:       coupon.ID,
 		DiscountAmount: discount,
 	}
-	if err := db.Create(&oc).Error; err != nil {
-		return err
-	}
-	return db.Model(&models.Coupon{}).
-		Where("id = ?", coupon.ID).
-		UpdateColumn("used_count", coupon.UsedCount+1).Error
+	return db.Create(&oc).Error
 }
 
 // ValidateCouponHandler godoc
