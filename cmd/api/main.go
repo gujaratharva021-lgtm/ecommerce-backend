@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"log"
@@ -16,8 +16,12 @@ func main() {
 	// 2. Connect to PostgreSQL
 	database.ConnectDatabase(cfg)
 
-	// 3. Run auto-migration to create tables
-	database.AutoMigrate()
+	// 3. Run auto-migration to create tables (dev/debug only;
+	// In production (GIN_MODE=release), schema changes must go through
+	// versioned migrations in migrations/ using the migrate CLI.
+	if cfg.GinMode != gin.ReleaseMode {
+		database.AutoMigrate()
+	}
 
 	// 4. Setup Gin router
 	gin.SetMode(cfg.GinMode)
@@ -32,3 +36,4 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
+
