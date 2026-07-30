@@ -15,6 +15,18 @@ type Product struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+// ProductRequest is the body for POST/PUT /admin/products (admin only).
+// Stock is only used on create, to seed the product's Inventory row —
+// use PUT /admin/products/:id/inventory to adjust stock afterwards.
+type ProductRequest struct {
+	Name        string  `json:"name" binding:"required"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price" binding:"required,gt=0"`
+	ImageURL    string  `json:"image_url"`
+	CategoryID  uint    `json:"category_id" binding:"required"`
+	Stock       int     `json:"stock" binding:"gte=0"`
+}
+
 // ProductListQuery binds query params for GET /products (filter, sort, search, paginate).
 type ProductListQuery struct {
 	Search     string  `form:"search"`

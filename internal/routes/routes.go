@@ -74,5 +74,31 @@ func SetupRoutes(router *gin.Engine) {
 		{
 			upload.POST("", handlers.UploadImage)
 		}
+
+		// ---- Admin routes (protected, admin role only) ----
+		admin := api.Group("/admin")
+		admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
+		{
+			adminCategories := admin.Group("/categories")
+			{
+				adminCategories.POST("", handlers.CreateCategory)
+				adminCategories.PUT("/:id", handlers.UpdateCategory)
+				adminCategories.DELETE("/:id", handlers.DeleteCategory)
+			}
+
+			adminProducts := admin.Group("/products")
+			{
+				adminProducts.POST("", handlers.CreateProduct)
+				adminProducts.PUT("/:id", handlers.UpdateProduct)
+				adminProducts.DELETE("/:id", handlers.DeleteProduct)
+				adminProducts.PUT("/:id/inventory", handlers.UpdateInventory)
+			}
+
+			adminOrders := admin.Group("/orders")
+			{
+				adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
+				adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
+			}
+		}
 	}
 }

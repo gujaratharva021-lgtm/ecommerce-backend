@@ -9,3 +9,9 @@ type Category struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// CategoryRequest is the body for POST/PUT /admin/categories (admin only).
+type CategoryRequest struct {
+	Name     string `json:"name" binding:"required"`
+	ImageURL string `json:"image_url"`
+}

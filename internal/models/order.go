@@ -43,6 +43,11 @@ type CheckoutRequest struct {
 	AddressID uint `json:"address_id"`
 }
 
+// OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).
+type OrderStatusUpdateRequest struct {
+	Status string `json:"status" binding:"required,oneof=confirmed shipped delivered cancelled"`
+}
+
 // OrderListResponse wraps paginated order results.
 type OrderListResponse struct {
 	Orders     []Order `json:"orders"`

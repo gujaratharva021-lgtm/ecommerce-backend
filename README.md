@@ -360,6 +360,61 @@ Tables are auto-created via GORM `AutoMigrate` on server start — no manual SQL
 - [x] Cart validation — stock now also checked on quantity update, not just add
 - [x] Profile API — update name (`PUT /auth/me`)
 - [x] API documentation updated (this file)
-- [ ] Test APIs using Postman (do this after `go run`)
+- [x] Test APIs using Postman (do this after `go run`)
+- [x] Push to GitHub
+- [ ] Share new APIs with Flutter Developer
+
+## Day 4 — Admin APIs
+
+All routes below are under `/api/v1/admin`, require `Authorization: Bearer <token>`, **and** require the logged-in user's `role` to be `admin` (enforced by `AdminOnly` middleware). A normal `customer` token gets `403 Forbidden`.
+
+### How to get an admin user (dev only)
+There's no admin signup flow yet — role defaults to `customer`. For local testing, log in normally via OTP, then flip the role directly in Postgres:
+```sql
+UPDATE users SET role = 'admin' WHERE phone = '9999999999';
+```
+Then re-run `POST /auth/verify-otp` (or `send-otp` + `verify-otp` again) to get a fresh token — the role is baked into the JWT claims at login time, so an old token won't pick up the change.
+
+### Categories
+| Method | Endpoint | Body |
+|---|---|---|
+| POST | `/admin/categories` | `{ "name": "Snacks", "image_url": "" }` |
+| PUT | `/admin/categories/:id` | same as above |
+| DELETE | `/admin/categories/:id` | — (blocked with `400` if products still reference it) |
+
+### Products
+| Method | Endpoint | Body |
+|---|---|---|
+| POST | `/admin/products` | `{ "name": "Lays 52g", "description": "...", "price": 20, "image_url": "", "category_id": 1, "stock": 100 }` |
+| PUT | `/admin/products/:id` | same fields except `stock` (product info only) |
+| DELETE | `/admin/products/:id` | — |
+| PUT | `/admin/products/:id/inventory` | `{ "stock": 50 }` — sets **absolute** stock, recomputes `in_stock` |
+
+`POST /admin/products` creates the product's `Inventory` row in the same transaction, seeded from `stock` (default `0` if omitted). Upload the image first via the existing `POST /upload` to get an `image_url`.
+
+### Orders
+| Method | Endpoint | Body |
+|---|---|---|
+| GET | `/admin/orders?status=&page=&limit=` | — lists **all** users' orders (vs. `GET /orders` which is scoped to the logged-in user) |
+| PUT | `/admin/orders/:id/status` | `{ "status": "confirmed" }` — one of `confirmed`, `shipped`, `delivered`, `cancelled` |
+
+Status transitions are enforced server-side:
+```
+pending   -> confirmed | cancelled
+confirmed -> shipped   | cancelled
+shipped   -> delivered
+delivered -> (final)
+cancelled -> (final)
+```
+Any other transition returns `400`. Cancelling from `pending`/`confirmed` restores stock for every item, same logic as the customer's own `PUT /orders/:id/cancel`.
+
+## Day 4 Checklist
+- [x] Category admin APIs — create / update / delete (blocked if products reference it)
+- [x] Product admin APIs — create / update / delete
+- [x] Inventory admin API — set absolute stock, auto-recompute `in_stock`
+- [x] Order admin APIs — list all orders (with status filter), update status with enforced transition rules + stock restore on cancel
+- [x] Routes wired under `/admin`, protected by `AuthMiddleware` + `AdminOnly`
+- [x] API documentation updated (this file)
+- [ ] Test APIs using Postman (do this after `go run` — see admin-user note above)
 - [ ] Push to GitHub
 - [ ] Share new APIs with Flutter Developer
