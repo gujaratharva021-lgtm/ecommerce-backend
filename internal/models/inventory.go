@@ -11,3 +11,9 @@ type Inventory struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// InventoryUpdateRequest is the body for PUT /admin/products/:id/inventory (admin only).
+// Stock is an absolute value (not a delta) — it replaces the current stock count.
+type InventoryUpdateRequest struct {
+	Stock int `json:"stock" binding:"required,gte=0"`
+}

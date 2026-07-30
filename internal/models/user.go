@@ -2,32 +2,39 @@ package models
 
 import "time"
 
+// User is identified by phone number only — no email/password.
+// Login happens via OTP sent to the phone (see OTP model + auth handlers).
 type User struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"not null" json:"name"`
-	Email     string    `gorm:"uniqueIndex;not null" json:"email"`
-	Password  string    `gorm:"not null" json:"-"` // never expose hash in JSON
-	Phone     string    `json:"phone"`
+	Name      string    `json:"name"`
+	Phone     string    `gorm:"uniqueIndex;not null" json:"phone"`
 	Role      string    `gorm:"default:customer" json:"role"` // customer / admin
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Request/response DTOs (kept here for simplicity on Day 1)
+// Request/response DTOs
 
-type SignupRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-	Phone    string `json:"phone"`
+// SendOTPRequest is the body for POST /auth/send-otp
+// Phone is expected as a 10-digit Indian mobile number (no country code, no spaces).
+type SendOTPRequest struct {
+	Phone string `json:"phone" binding:"required,len=10,numeric"`
 }
 
-type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+// VerifyOTPRequest is the body for POST /auth/verify-otp
+type VerifyOTPRequest struct {
+	Phone string `json:"phone" binding:"required,len=10,numeric"`
+	OTP   string `json:"otp" binding:"required,len=6,numeric"`
 }
 
 type AuthResponse struct {
 	Token string `json:"token"`
 	User  User   `json:"user"`
+}
+
+// UpdateProfileRequest is the body for PUT /auth/me. Phone is intentionally
+// excluded — it's the login identity, so changing it goes through a
+// separate OTP-verified flow, not a plain profile edit.
+type UpdateProfileRequest struct {
+	Name string `json:"name" binding:"required"`
 }

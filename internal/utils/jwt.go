@@ -11,13 +11,13 @@ import (
 
 type Claims struct {
 	UserID uint   `json:"user_id"`
-	Email  string `json:"email"`
+	Phone  string `json:"phone"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT creates a signed JWT token for the given user.
-func GenerateJWT(userID uint, email, role string) (string, error) {
+func GenerateJWT(userID uint, phone, role string) (string, error) {
 	cfg := config.AppConfig
 	expiryHours, err := strconv.Atoi(cfg.JWTExpiryHours)
 	if err != nil {
@@ -26,7 +26,7 @@ func GenerateJWT(userID uint, email, role string) (string, error) {
 
 	claims := Claims{
 		UserID: userID,
-		Email:  email,
+		Phone:  phone,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryHours) * time.Hour)),
@@ -43,9 +43,12 @@ func ValidateJWT(tokenString string) (*Claims, error) {
 	cfg := config.AppConfig
 	claims := &Claims{}
 
+	// WithValidMethods pins parsing to HS256 — without it, a token crafted
+	// with a different algorithm (e.g. "none") could bypass verification,
+	// since the keyfunc alone doesn't constrain which algorithm is accepted.
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(cfg.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
 		return nil, err
 	}
