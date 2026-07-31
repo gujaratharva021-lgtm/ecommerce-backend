@@ -52,3 +52,16 @@ func AdminOnly() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// DeliveryPartnerOnly restricts access to users with role "delivery_partner". Must run after AuthMiddleware.
+func DeliveryPartnerOnly() gin.HandlerFunc {
+return func(c *gin.Context) {
+role, exists := c.Get("role")
+if !exists || role != "delivery_partner" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Delivery partner access required"})
+c.Abort()
+return
+}
+c.Next()
+}
+}
