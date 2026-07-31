@@ -82,24 +82,48 @@ func Checkout(c *gin.Context) {
 		orderItems := make([]models.OrderItem, 0, len(cartItems))
 
 		for _, ci := range cartItems {
-			var inventory models.Inventory
-			// Lock this product's inventory row for the rest of the transaction
-			// so two concurrent checkouts on the same product can't both read
-			// the same stock, both pass the check, and both deduct Ã¢â‚¬â€ oversell.
+			var inventories []models.Inventory
+			// Lock all of this product's inventory rows across warehouses for the
+			// rest of the transaction, so two concurrent checkouts on the same
+			// product can't both read the same stock, both pass the check, and
+			// both deduct beyond what's available.
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("product_id = ?", ci.ProductID).
-				First(&inventory).Error; err != nil {
+				Order("id").
+				Find(&inventories).Error; err != nil || len(inventories) == 0 {
 				return errors.New("this product is not available for purchase: " + ci.Product.Name)
 			}
-			if !inventory.InStock || inventory.Stock < ci.Quantity {
+
+			totalAvailable := 0
+			for _, inv := range inventories {
+				if inv.InStock {
+					totalAvailable += inv.Stock
+				}
+			}
+			if totalAvailable < ci.Quantity {
 				return errors.New("insufficient stock for " + ci.Product.Name)
 			}
-			inventory.Stock -= ci.Quantity
-			if inventory.Stock <= 0 {
-				inventory.InStock = false
-			}
-			if err := tx.Save(&inventory).Error; err != nil {
-				return err
+
+			remaining := ci.Quantity
+			for i := range inventories {
+				if remaining <= 0 {
+					break
+				}
+				if !inventories[i].InStock || inventories[i].Stock <= 0 {
+					continue
+				}
+				deduct := inventories[i].Stock
+				if deduct > remaining {
+					deduct = remaining
+				}
+				inventories[i].Stock -= deduct
+				remaining -= deduct
+				if inventories[i].Stock <= 0 {
+					inventories[i].InStock = false
+				}
+				if err := tx.Save(&inventories[i]).Error; err != nil {
+					return err
+				}
 			}
 
 			itemsAmount += ci.Product.Price * float64(ci.Quantity)
@@ -257,7 +281,11 @@ func CancelOrder(c *gin.Context) {
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		for _, item := range order.Items {
 			var inventory models.Inventory
-			if err := tx.Where("product_id = ?", item.ProductID).First(&inventory).Error; err == nil {
+			// Phase 3 note: we don't yet track which warehouse an item's stock was
+			// deducted from at checkout, so restore to the first available row for
+			// this product - the combined total across warehouses ends up correct
+			// either way. Per-warehouse restore comes with order routing (Phase 5).
+			if err := tx.Where("product_id = ?", item.ProductID).Order("id").First(&inventory).Error; err == nil {
 				inventory.Stock += item.Quantity
 				inventory.InStock = true
 				if err := tx.Save(&inventory).Error; err != nil {
@@ -280,5 +308,3 @@ func CancelOrder(c *gin.Context) {
 	services.SendPushToUser(order.UserID, "Order Cancelled", message)
 	c.JSON(http.StatusOK, order)
 }
-
-

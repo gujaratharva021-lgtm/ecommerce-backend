@@ -65,3 +65,16 @@ return
 c.Next()
 }
 }
+
+// WarehouseStaffOnly restricts access to users with role "warehouse_staff". Must run after AuthMiddleware.
+func WarehouseStaffOnly() gin.HandlerFunc {
+return func(c *gin.Context) {
+role, exists := c.Get("role")
+if !exists || role != "warehouse_staff" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Warehouse staff access required"})
+c.Abort()
+return
+}
+c.Next()
+}
+}

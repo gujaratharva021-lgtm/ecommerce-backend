@@ -30,7 +30,7 @@ func buildCartResponse(cart *models.Cart) (models.CartResponse, error) {
 	if err := database.DB.
 		Preload("Product").
 		Preload("Product.Category").
-		Preload("Product.Inventory").
+		Preload("Product.Inventories").
 		Where("cart_id = ?", cart.ID).
 		Find(&items).Error; err != nil {
 		return models.CartResponse{}, err
@@ -90,15 +90,13 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
-	// Check stock — every product should have an Inventory row (CreateProduct
-	// always makes one). If none exists, treat it as unavailable rather than
-	// silently allowing an unlimited-quantity add.
-	var inventory models.Inventory
-	if err := database.DB.Where("product_id = ?", req.ProductID).First(&inventory).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available for purchase"})
+	// Check combined stock across all warehouses.
+	totalStock, err := database.GetTotalStock(req.ProductID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
 		return
 	}
-	if !inventory.InStock || inventory.Stock < req.Quantity {
+	if totalStock < req.Quantity {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
 		return
 	}
@@ -112,7 +110,7 @@ func AddToCart(c *gin.Context) {
 	var existingItem models.CartItem
 	err = database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error
 	if err == nil {
-		// Item already in cart — increment quantity
+		// Item already in cart Ã¢â‚¬â€ increment quantity
 		existingItem.Quantity += req.Quantity
 		if err := database.DB.Save(&existingItem).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
@@ -156,20 +154,20 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
-	// Ownership check — item's cart must belong to the requesting user
+	// Ownership check Ã¢â‚¬â€ item's cart must belong to the requesting user
 	var cart models.Cart
 	if err := database.DB.First(&cart, item.CartID).Error; err != nil || cart.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this cart item"})
 		return
 	}
 
-	// Check stock (same rule as AddToCart) — missing inventory row means unavailable.
-	var inventory models.Inventory
-	if err := database.DB.Where("product_id = ?", item.ProductID).First(&inventory).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available for purchase"})
+	// Check combined stock across all warehouses (same rule as AddToCart).
+	totalStock, err := database.GetTotalStock(item.ProductID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
 		return
 	}
-	if !inventory.InStock || inventory.Stock < req.Quantity {
+	if totalStock < req.Quantity {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
 		return
 	}

@@ -27,7 +27,7 @@ func GetProducts(c *gin.Context) {
 		query.Limit = 20
 	}
 
-	db := database.DB.Model(&models.Product{}).Preload("Category").Preload("Inventory")
+	db := database.DB.Model(&models.Product{}).Preload("Category").Preload("Inventories")
 
 	// Search by name or description
 	if strings.TrimSpace(query.Search) != "" {
@@ -102,7 +102,7 @@ func GetProductByID(c *gin.Context) {
 	id := c.Param("id")
 
 	var product models.Product
-	if err := database.DB.Preload("Category").Preload("Inventory").First(&product, id).Error; err != nil {
+	if err := database.DB.Preload("Category").Preload("Inventories").First(&product, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}

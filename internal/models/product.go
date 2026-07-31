@@ -14,14 +14,14 @@ type Product struct {
 	ImageURL    string     `json:"image_url"`
 	CategoryID  uint       `gorm:"index" json:"category_id"`
 	Category    Category   `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Inventory   *Inventory `gorm:"foreignKey:ProductID" json:"inventory,omitempty"`
+	Inventories []Inventory `gorm:"foreignKey:ProductID" json:"inventories,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // ProductRequest is the body for POST/PUT /admin/products (admin only).
-// Stock is only used on create, to seed the product's Inventory row â€”
+// Stock is only used on create, to seed the product's Inventory row Ã¢â‚¬â€
 // use PUT /admin/products/:id/inventory to adjust stock afterwards.
 type ProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
