@@ -22,7 +22,7 @@ func SetupRoutes(router *gin.Engine) {
 		// ---- Auth routes (public) ----
 		auth := api.Group("/auth")
 		{
-			// Rate-limited ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â OTP endpoints are otherwise open to spam and brute force.
+			// Rate-limited ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â OTP endpoints are otherwise open to spam and brute force.
 			auth.POST("/send-otp", middleware.RateLimit(5, time.Minute), handlers.SendOTP)
 			auth.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyOTP)
 			auth.GET("/me", middleware.AuthMiddleware(), handlers.Me)
@@ -132,9 +132,11 @@ func SetupRoutes(router *gin.Engine) {
 				adminCoupons.GET("", handlers.GetCoupons)
 				adminCoupons.PUT("/:id/status", handlers.UpdateCouponStatus)
 			}
+			adminAnalytics := admin.Group("/analytics")
+			{
+				adminAnalytics.GET("/summary", handlers.GetAnalyticsSummary)
+				adminAnalytics.GET("/products", handlers.GetProductPerformance)
+			}
 		}
 	}
 }
-
-
-
