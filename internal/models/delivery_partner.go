@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // DeliveryPartner is a delivery person the admin can create/manage.
 // The partner logs in via phone + OTP (same flow as customers) and can
@@ -16,6 +20,7 @@ CurrentLng         *float64   `json:"current_lng,omitempty"`
 LastLocationUpdate *time.Time `json:"last_location_update,omitempty"`
 CreatedAt          time.Time  `json:"created_at"`
 UpdatedAt          time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // DeliveryPartnerRequest is the body for POST/PUT /admin/delivery-partners
@@ -36,3 +41,4 @@ type UpdateLocationRequest struct {
 Lat float64 `json:"lat" binding:"required"`
 Lng float64 `json:"lng" binding:"required"`
 }
+

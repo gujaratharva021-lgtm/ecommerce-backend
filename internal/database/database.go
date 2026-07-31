@@ -48,12 +48,14 @@ func AutoMigrate() {
 		&models.Wishlist{},
 		&models.Review{},
 		&models.DeliveryPartner{},
+		&models.AuditLog{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 	log.Println("Database migration completed")
 }
+
 
 
 
