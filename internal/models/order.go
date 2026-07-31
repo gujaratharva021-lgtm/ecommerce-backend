@@ -9,6 +9,7 @@ OrderStatusPending   = "pending"
 OrderStatusConfirmed = "confirmed"
 OrderStatusShipped   = "shipped"
 OrderStatusDelivered = "delivered"
+OrderStatusReturned  = "returned"
 OrderStatusCancelled = "cancelled"
 )
 
