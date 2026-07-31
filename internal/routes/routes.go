@@ -22,7 +22,7 @@ func SetupRoutes(router *gin.Engine) {
 		// ---- Auth routes (public) ----
 		auth := api.Group("/auth")
 		{
-			// Rate-limited â€” OTP endpoints are otherwise open to spam and brute force.
+			// Rate-limited ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â OTP endpoints are otherwise open to spam and brute force.
 			auth.POST("/send-otp", middleware.RateLimit(5, time.Minute), handlers.SendOTP)
 			auth.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyOTP)
 			auth.GET("/me", middleware.AuthMiddleware(), handlers.Me)
@@ -64,6 +64,16 @@ func SetupRoutes(router *gin.Engine) {
 			addresses.DELETE("/:id", handlers.DeleteAddress)
 			addresses.PUT("/:id/default", handlers.SetDefaultAddress)
 		}
+
+		// ---- Wishlist routes (protected) ----
+			wishlist := api.Group("/wishlist")
+			wishlist.Use(middleware.AuthMiddleware())
+			{
+				wishlist.GET("", handlers.GetWishlist)
+				wishlist.POST("", handlers.AddToWishlist)
+				wishlist.DELETE("/:product_id", handlers.RemoveFromWishlist)
+			}
+
 
 		// ---- Order routes (protected) ----
 		orders := api.Group("/orders")
@@ -125,4 +135,6 @@ func SetupRoutes(router *gin.Engine) {
 		}
 	}
 }
+
+
 
