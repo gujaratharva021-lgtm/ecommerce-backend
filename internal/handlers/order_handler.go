@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -25,14 +26,14 @@ const (
 // POST /api/v1/orders/checkout (protected)
 // Converts the user's current cart into an order: validates stock for every
 // item, snapshots prices, deducts inventory, applies a coupon if given,
-// creates the order + order items, and empties the cart — all inside a
+// creates the order + order items, and empties the cart Ã¢â‚¬â€ all inside a
 // single DB transaction so a failure partway through never leaves stock,
 // coupon usage, or the cart in a bad state.
 func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
 	var req models.CheckoutRequest
-	// Body is optional — an empty/missing body just means "use default address + COD".
+	// Body is optional Ã¢â‚¬â€ an empty/missing body just means "use default address + COD".
 	_ = c.ShouldBindJSON(&req)
 
 	paymentMethod := req.PaymentMethod
@@ -84,7 +85,7 @@ func Checkout(c *gin.Context) {
 			var inventory models.Inventory
 			// Lock this product's inventory row for the rest of the transaction
 			// so two concurrent checkouts on the same product can't both read
-			// the same stock, both pass the check, and both deduct — oversell.
+			// the same stock, both pass the check, and both deduct Ã¢â‚¬â€ oversell.
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("product_id = ?", ci.ProductID).
 				First(&inventory).Error; err != nil {
@@ -144,7 +145,7 @@ func Checkout(c *gin.Context) {
 		}
 
 		// Record coupon usage only after the order is successfully created,
-		// inside the same transaction — if anything above fails, the coupon
+		// inside the same transaction Ã¢â‚¬â€ if anything above fails, the coupon
 		// use rolls back too, so it never gets burned on a failed checkout.
 		if appliedCoupon != nil {
 			if err := ApplyCoupon(tx, appliedCoupon, order.ID, discount); err != nil {
@@ -168,12 +169,13 @@ func Checkout(c *gin.Context) {
 
 	message := "Your order #" + strconv.Itoa(int(order.ID)) + " has been placed successfully!"
 	utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
+	services.SendPushToUser(order.UserID, "Order Placed", message)
 
 	c.JSON(http.StatusCreated, order)
 }
 
 // GetOrders godoc
-// GET /api/v1/orders (protected) — ?page=&limit=
+// GET /api/v1/orders (protected) Ã¢â‚¬â€ ?page=&limit=
 func GetOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
@@ -275,5 +277,8 @@ func CancelOrder(c *gin.Context) {
 
 	message := "Your order #" + orderID + " has been cancelled."
 	utils.SendNotification(order.Address.Phone, message, "order_cancelled", &order.ID)
+	services.SendPushToUser(order.UserID, "Order Cancelled", message)
 	c.JSON(http.StatusOK, order)
 }
+
+

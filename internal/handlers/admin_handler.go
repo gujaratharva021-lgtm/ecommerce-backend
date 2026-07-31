@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 )
@@ -139,7 +140,7 @@ func CreateProduct(c *gin.Context) {
 
 // UpdateProduct godoc
 // PUT /api/v1/admin/products/:id (admin only)
-// Updates product fields only — use PUT /admin/products/:id/inventory for stock.
+// Updates product fields only Ã¢â‚¬â€ use PUT /admin/products/:id/inventory for stock.
 func UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
 
@@ -223,7 +224,7 @@ func UpdateInventory(c *gin.Context) {
 	var inventory models.Inventory
 	if err := database.DB.Where("product_id = ?", product.ID).First(&inventory).Error; err != nil {
 		// Product predates the inventory row (shouldn't normally happen since
-		// CreateProduct always creates one) — create it now instead of failing.
+		// CreateProduct always creates one) Ã¢â‚¬â€ create it now instead of failing.
 		inventory = models.Inventory{ProductID: product.ID}
 	}
 
@@ -251,7 +252,7 @@ var validOrderTransitions = map[string]map[string]bool{
 }
 
 // GetAllOrders godoc
-// GET /api/v1/admin/orders (admin only) — ?status=&page=&limit=
+// GET /api/v1/admin/orders (admin only) Ã¢â‚¬â€ ?status=&page=&limit=
 func GetAllOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -345,6 +346,9 @@ func UpdateOrderStatus(c *gin.Context) {
 
 	message := "Your order #" + orderID + " status is now: " + req.Status
 	utils.SendNotification(order.Address.Phone, message, "order_status_"+req.Status, &order.ID)
+	services.SendPushToUser(order.UserID, "Order Update", message)
 
 	c.JSON(http.StatusOK, order)
 }
+
+
