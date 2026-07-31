@@ -26,14 +26,14 @@ const (
 // POST /api/v1/orders/checkout (protected)
 // Converts the user's current cart into an order: validates stock for every
 // item, snapshots prices, deducts inventory, applies a coupon if given,
-// creates the order + order items, and empties the cart Ã¢â‚¬â€ all inside a
+// creates the order + order items, and empties the cart ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â all inside a
 // single DB transaction so a failure partway through never leaves stock,
 // coupon usage, or the cart in a bad state.
 func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
 	var req models.CheckoutRequest
-	// Body is optional Ã¢â‚¬â€ an empty/missing body just means "use default address + COD".
+	// Body is optional ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â an empty/missing body just means "use default address + COD".
 	_ = c.ShouldBindJSON(&req)
 
 	paymentMethod := req.PaymentMethod
@@ -153,23 +153,53 @@ func Checkout(c *gin.Context) {
 			discount = d
 		}
 
+		totalBeforeWallet := itemsAmount + deliveryCharge - discount
+		walletUsed := 0.0
+		if req.UseWallet {
+			userWallet, werr := utils.GetOrCreateWallet(tx, userID)
+			if werr != nil {
+				return werr
+			}
+			if userWallet.Balance > 0 {
+				walletUsed = userWallet.Balance
+				if walletUsed > totalBeforeWallet {
+					walletUsed = totalBeforeWallet
+				}
+			}
+		}
+		finalTotal := totalBeforeWallet - walletUsed
+		orderStatus := models.OrderStatusPending
+		paymentStatus := models.OrderPaymentStatusPending
+		if finalTotal <= 0 {
+			paymentStatus = models.OrderPaymentStatusPaid
+			orderStatus = models.OrderStatusConfirmed
+		}
+
 		order = models.Order{
 			UserID:         userID,
 			AddressID:      address.ID,
 			ItemsAmount:    itemsAmount,
 			DeliveryCharge: deliveryCharge,
-			TotalAmount:    itemsAmount + deliveryCharge - discount,
-			Status:         models.OrderStatusPending,
+			WalletAmountUsed: walletUsed,
+                        TotalAmount:      finalTotal,
+			Status:         orderStatus,
 			PaymentMethod:  paymentMethod,
-			PaymentStatus:  models.OrderPaymentStatusPending,
+			PaymentStatus: paymentStatus,
 			Items:          orderItems,
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err
 		}
 
+                if walletUsed > 0 {
+                        refID := order.ID
+                        if err := utils.DebitWallet(tx, userID, walletUsed, models.WalletReasonCheckoutUse, "order", &refID, ""); err != nil {
+                                return err
+                        }
+                }
+
 		// Record coupon usage only after the order is successfully created,
-		// inside the same transaction Ã¢â‚¬â€ if anything above fails, the coupon
+		// inside the same transaction ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â if anything above fails, the coupon
 		// use rolls back too, so it never gets burned on a failed checkout.
 		if appliedCoupon != nil {
 			if err := ApplyCoupon(tx, appliedCoupon, order.ID, discount); err != nil {
@@ -199,7 +229,7 @@ func Checkout(c *gin.Context) {
 }
 
 // GetOrders godoc
-// GET /api/v1/orders (protected) Ã¢â‚¬â€ ?page=&limit=
+// GET /api/v1/orders (protected) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ?page=&limit=
 func GetOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
@@ -293,7 +323,14 @@ func CancelOrder(c *gin.Context) {
 				}
 			}
 		}
-		return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
+		if order.WalletAmountUsed > 0 {
+                        refID := order.ID
+                        if err := utils.CreditWallet(tx, userID, order.WalletAmountUsed, models.WalletReasonOrderRefund, "order", &refID, "Refund for cancelled order"); err != nil {
+                                return err
+                        }
+                }
+
+                return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
 	})
 
 	if txErr != nil {

@@ -51,6 +51,8 @@ err := DB.AutoMigrate(
 &models.Warehouse{},
 &models.WarehouseStaff{},
 &models.StockTransfer{},
+&models.Wallet{},
+&models.WalletTransaction{},
 )
 if err != nil {
 log.Fatalf("Failed to auto-migrate database: %v", err)
