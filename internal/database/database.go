@@ -47,12 +47,14 @@ func AutoMigrate() {
 		&models.DeviceToken{},
 		&models.Wishlist{},
 		&models.Review{},
+		&models.DeliveryPartner{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 	log.Println("Database migration completed")
 }
+
 
 
 
