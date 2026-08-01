@@ -30,6 +30,14 @@ func RequestReturn(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this order"})
 		return
 	}
+	if order.Status == models.OrderStatusReturned {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This order has already been returned"})
+		return
+	}
+	if order.Status == models.OrderStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cancelled orders cannot be returned"})
+		return
+	}
 	if order.Status != models.OrderStatusDelivered {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Only delivered orders can be returned"})
 		return
