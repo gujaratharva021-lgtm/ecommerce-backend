@@ -134,10 +134,11 @@ func CreateProduct(c *gin.Context) {
 			return err
 		}
 		inventory := models.Inventory{
-			ProductID: product.ID,
-			Stock:     req.Stock,
-			InStock:   req.Stock > 0,
-		}
+ProductID:   product.ID,
+WarehouseID: 1, // TODO: support multiple warehouses; defaults to the primary warehouse for now
+Stock:       req.Stock,
+InStock:     req.Stock > 0,
+}
 		return tx.Create(&inventory).Error
 	})
 
