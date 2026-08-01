@@ -54,6 +54,7 @@ func AutoMigrate() {
 		&models.Wallet{},
 		&models.WalletTransaction{},
 		&models.ReturnRequest{},
+		&models.ReturnRequestItem{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
