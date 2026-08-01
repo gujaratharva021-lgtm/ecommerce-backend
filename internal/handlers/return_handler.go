@@ -44,7 +44,7 @@ func RequestReturn(c *gin.Context) {
 	}
 
 	var existing models.ReturnRequest
-	if err := database.DB.Where("order_id = ?", order.ID).First(&existing).Error; err == nil {
+	if err := database.DB.Where("order_id = ? AND status IN ?", order.ID, []string{models.ReturnStatusPending, models.ReturnStatusApproved}).First(&existing).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "A return request already exists for this order"})
 		return
 	}
