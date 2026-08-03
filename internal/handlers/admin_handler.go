@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 )
@@ -29,6 +31,9 @@ func CreateCategory(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Category already exists or could not be created"})
 		return
 	}
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "create_category", "category", fmt.Sprint(category.ID), "name: "+category.Name)
 
 	c.JSON(http.StatusCreated, category)
 }
@@ -57,6 +62,10 @@ func UpdateCategory(c *gin.Context) {
 		return
 	}
 
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "update_category", "category", id, "name: "+category.Name)
+
 	c.JSON(http.StatusOK, category)
 }
 
@@ -84,6 +93,10 @@ func DeleteCategory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
 		return
 	}
+
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "delete_category", "category", id, "name: "+category.Name)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Category deleted"})
 }
@@ -121,10 +134,11 @@ func CreateProduct(c *gin.Context) {
 			return err
 		}
 		inventory := models.Inventory{
-			ProductID: product.ID,
-			Stock:     req.Stock,
-			InStock:   req.Stock > 0,
-		}
+ProductID:   product.ID,
+WarehouseID: 1, // TODO: support multiple warehouses; defaults to the primary warehouse for now
+Stock:       req.Stock,
+InStock:     req.Stock > 0,
+}
 		return tx.Create(&inventory).Error
 	})
 
@@ -133,13 +147,17 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
-	database.DB.Preload("Category").Preload("Inventory").First(&product, product.ID)
+	database.DB.Preload("Category").Preload("Inventories").First(&product, product.ID)
+
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "create_product", "product", fmt.Sprint(product.ID), "name: "+product.Name)
 	c.JSON(http.StatusCreated, product)
 }
 
 // UpdateProduct godoc
 // PUT /api/v1/admin/products/:id (admin only)
-// Updates product fields only — use PUT /admin/products/:id/inventory for stock.
+// Updates product fields only
 func UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
 
@@ -172,7 +190,11 @@ func UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	database.DB.Preload("Category").Preload("Inventory").First(&product, product.ID)
+	database.DB.Preload("Category").Preload("Inventories").First(&product, product.ID)
+
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "update_product", "product", id, "name: "+product.Name)
 	c.JSON(http.StatusOK, product)
 }
 
@@ -199,6 +221,10 @@ func DeleteProduct(c *gin.Context) {
 		return
 	}
 
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "delete_product", "product", id, "name: "+product.Name)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted"})
 }
 
@@ -220,11 +246,15 @@ func UpdateInventory(c *gin.Context) {
 		return
 	}
 
+	var warehouse models.Warehouse
+	if err := database.DB.First(&warehouse, req.WarehouseID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
+		return
+	}
+
 	var inventory models.Inventory
-	if err := database.DB.Where("product_id = ?", product.ID).First(&inventory).Error; err != nil {
-		// Product predates the inventory row (shouldn't normally happen since
-		// CreateProduct always creates one) — create it now instead of failing.
-		inventory = models.Inventory{ProductID: product.ID}
+	if err := database.DB.Where("product_id = ? AND warehouse_id = ?", product.ID, req.WarehouseID).First(&inventory).Error; err != nil {
+		inventory = models.Inventory{ProductID: product.ID, WarehouseID: req.WarehouseID}
 	}
 
 	inventory.Stock = req.Stock
@@ -234,6 +264,10 @@ func UpdateInventory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update inventory"})
 		return
 	}
+
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "update_inventory", "product", id, fmt.Sprintf("stock: %d", inventory.Stock))
 
 	c.JSON(http.StatusOK, inventory)
 }
@@ -251,7 +285,7 @@ var validOrderTransitions = map[string]map[string]bool{
 }
 
 // GetAllOrders godoc
-// GET /api/v1/admin/orders (admin only) — ?status=&page=&limit=
+// GET /api/v1/admin/orders (admin only)
 func GetAllOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -324,7 +358,7 @@ func UpdateOrderStatus(c *gin.Context) {
 		if req.Status == models.OrderStatusCancelled {
 			for _, item := range order.Items {
 				var inventory models.Inventory
-				if err := tx.Where("product_id = ?", item.ProductID).First(&inventory).Error; err == nil {
+				if err := tx.Where("product_id = ?", item.ProductID).Order("id").First(&inventory).Error; err == nil {
 					inventory.Stock += item.Quantity
 					inventory.InStock = true
 					if err := tx.Save(&inventory).Error; err != nil {
@@ -342,9 +376,17 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	order.Status = req.Status
+        if req.Status == models.OrderStatusConfirmed {
+                go services.AutoAssignDeliveryPartner(order.ID)
+        }
 
 	message := "Your order #" + orderID + " status is now: " + req.Status
 	utils.SendNotification(order.Address.Phone, message, "order_status_"+req.Status, &order.ID)
+	services.SendPushToUser(order.UserID, "Order Update", message)
+
+	adminID := c.MustGet("user_id").(uint)
+	adminPhone := c.MustGet("phone").(string)
+	utils.LogAudit(adminID, adminPhone, "update_order_status", "order", orderID, "new status: "+req.Status)
 
 	c.JSON(http.StatusOK, order)
 }

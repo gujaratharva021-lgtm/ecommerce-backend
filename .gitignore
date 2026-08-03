@@ -25,3 +25,5 @@ vendor/
 # Uploaded images (local dev storage)
 /uploads/*
 !/uploads/.gitkeep
+secrets/
+/ecommerce-backend

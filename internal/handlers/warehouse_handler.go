@@ -1,0 +1,128 @@
+package handlers
+
+import (
+"net/http"
+
+"github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+)
+
+// ---------------------------------------------------------------------------
+// Warehouses (admin only)
+// ---------------------------------------------------------------------------
+
+// CreateWarehouse godoc
+// POST /api/v1/admin/warehouses (admin only)
+func CreateWarehouse(c *gin.Context) {
+var req models.WarehouseRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+radius := req.ServiceRadiusKm
+if radius <= 0 {
+radius = 5
+}
+
+warehouse := models.Warehouse{
+Name:            req.Name,
+City:            req.City,
+Address:         req.Address,
+Lat:             req.Lat,
+Lng:             req.Lng,
+ServiceRadiusKm: radius,
+IsActive:        true,
+}
+if req.IsActive != nil {
+warehouse.IsActive = *req.IsActive
+}
+
+if err := database.DB.Create(&warehouse).Error; err != nil {
+c.JSON(http.StatusConflict, gin.H{"error": "Warehouse could not be created"})
+return
+}
+
+c.JSON(http.StatusCreated, gin.H{"warehouse": warehouse})
+}
+
+// GetWarehouses godoc
+// GET /api/v1/admin/warehouses (admin only)
+func GetWarehouses(c *gin.Context) {
+var warehouses []models.Warehouse
+if err := database.DB.Order("created_at DESC").Find(&warehouses).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load warehouses"})
+return
+}
+c.JSON(http.StatusOK, gin.H{"warehouses": warehouses})
+}
+
+// GetWarehouse godoc
+// GET /api/v1/admin/warehouses/:id (admin only)
+func GetWarehouse(c *gin.Context) {
+id := c.Param("id")
+
+var warehouse models.Warehouse
+if err := database.DB.First(&warehouse, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"warehouse": warehouse})
+}
+
+// UpdateWarehouse godoc
+// PUT /api/v1/admin/warehouses/:id (admin only)
+func UpdateWarehouse(c *gin.Context) {
+id := c.Param("id")
+
+var warehouse models.Warehouse
+if err := database.DB.First(&warehouse, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
+return
+}
+
+var req models.WarehouseRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+warehouse.Name = req.Name
+warehouse.City = req.City
+warehouse.Address = req.Address
+warehouse.Lat = req.Lat
+warehouse.Lng = req.Lng
+if req.ServiceRadiusKm > 0 {
+warehouse.ServiceRadiusKm = req.ServiceRadiusKm
+}
+if req.IsActive != nil {
+warehouse.IsActive = *req.IsActive
+}
+
+if err := database.DB.Save(&warehouse).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update warehouse"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"warehouse": warehouse})
+}
+
+// DeleteWarehouse godoc
+// DELETE /api/v1/admin/warehouses/:id (admin only)
+func DeleteWarehouse(c *gin.Context) {
+id := c.Param("id")
+
+result := database.DB.Delete(&models.Warehouse{}, id)
+if result.Error != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete warehouse"})
+return
+}
+if result.RowsAffected == 0 {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"message": "Warehouse deleted"})
+}

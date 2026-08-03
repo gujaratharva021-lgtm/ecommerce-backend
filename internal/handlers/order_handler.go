@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -25,14 +26,14 @@ const (
 // POST /api/v1/orders/checkout (protected)
 // Converts the user's current cart into an order: validates stock for every
 // item, snapshots prices, deducts inventory, applies a coupon if given,
-// creates the order + order items, and empties the cart — all inside a
+// creates the order + order items, and empties the cart ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â all inside a
 // single DB transaction so a failure partway through never leaves stock,
 // coupon usage, or the cart in a bad state.
 func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
 	var req models.CheckoutRequest
-	// Body is optional — an empty/missing body just means "use default address + COD".
+	// Body is optional ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â an empty/missing body just means "use default address + COD".
 	_ = c.ShouldBindJSON(&req)
 
 	paymentMethod := req.PaymentMethod
@@ -81,24 +82,48 @@ func Checkout(c *gin.Context) {
 		orderItems := make([]models.OrderItem, 0, len(cartItems))
 
 		for _, ci := range cartItems {
-			var inventory models.Inventory
-			// Lock this product's inventory row for the rest of the transaction
-			// so two concurrent checkouts on the same product can't both read
-			// the same stock, both pass the check, and both deduct — oversell.
+			var inventories []models.Inventory
+			// Lock all of this product's inventory rows across warehouses for the
+			// rest of the transaction, so two concurrent checkouts on the same
+			// product can't both read the same stock, both pass the check, and
+			// both deduct beyond what's available.
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("product_id = ?", ci.ProductID).
-				First(&inventory).Error; err != nil {
+				Order("id").
+				Find(&inventories).Error; err != nil || len(inventories) == 0 {
 				return errors.New("this product is not available for purchase: " + ci.Product.Name)
 			}
-			if !inventory.InStock || inventory.Stock < ci.Quantity {
+
+			totalAvailable := 0
+			for _, inv := range inventories {
+				if inv.InStock {
+					totalAvailable += inv.Stock
+				}
+			}
+			if totalAvailable < ci.Quantity {
 				return errors.New("insufficient stock for " + ci.Product.Name)
 			}
-			inventory.Stock -= ci.Quantity
-			if inventory.Stock <= 0 {
-				inventory.InStock = false
-			}
-			if err := tx.Save(&inventory).Error; err != nil {
-				return err
+
+			remaining := ci.Quantity
+			for i := range inventories {
+				if remaining <= 0 {
+					break
+				}
+				if !inventories[i].InStock || inventories[i].Stock <= 0 {
+					continue
+				}
+				deduct := inventories[i].Stock
+				if deduct > remaining {
+					deduct = remaining
+				}
+				inventories[i].Stock -= deduct
+				remaining -= deduct
+				if inventories[i].Stock <= 0 {
+					inventories[i].InStock = false
+				}
+				if err := tx.Save(&inventories[i]).Error; err != nil {
+					return err
+				}
 			}
 
 			itemsAmount += ci.Product.Price * float64(ci.Quantity)
@@ -109,7 +134,7 @@ func Checkout(c *gin.Context) {
 			})
 		}
 
-		deliveryCharge := flatDeliveryCharge
+		deliveryCharge := services.CalculateDeliveryCharge(address.Lat, address.Lng)
 		if itemsAmount >= freeDeliveryThreshold {
 			deliveryCharge = 0
 		}
@@ -128,23 +153,53 @@ func Checkout(c *gin.Context) {
 			discount = d
 		}
 
+		totalBeforeWallet := itemsAmount + deliveryCharge - discount
+		walletUsed := 0.0
+		if req.UseWallet {
+			userWallet, werr := utils.GetOrCreateWallet(tx, userID)
+			if werr != nil {
+				return werr
+			}
+			if userWallet.Balance > 0 {
+				walletUsed = userWallet.Balance
+				if walletUsed > totalBeforeWallet {
+					walletUsed = totalBeforeWallet
+				}
+			}
+		}
+		finalTotal := totalBeforeWallet - walletUsed
+		orderStatus := models.OrderStatusPending
+		paymentStatus := models.OrderPaymentStatusPending
+		if finalTotal <= 0 {
+			paymentStatus = models.OrderPaymentStatusPaid
+			orderStatus = models.OrderStatusConfirmed
+		}
+
 		order = models.Order{
 			UserID:         userID,
 			AddressID:      address.ID,
 			ItemsAmount:    itemsAmount,
 			DeliveryCharge: deliveryCharge,
-			TotalAmount:    itemsAmount + deliveryCharge - discount,
-			Status:         models.OrderStatusPending,
+			WalletAmountUsed: walletUsed,
+                        TotalAmount:      finalTotal,
+			Status:         orderStatus,
 			PaymentMethod:  paymentMethod,
-			PaymentStatus:  models.OrderPaymentStatusPending,
+			PaymentStatus: paymentStatus,
 			Items:          orderItems,
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err
 		}
 
+                if walletUsed > 0 {
+                        refID := order.ID
+                        if err := utils.DebitWallet(tx, userID, walletUsed, models.WalletReasonCheckoutUse, "order", &refID, ""); err != nil {
+                                return err
+                        }
+                }
+
 		// Record coupon usage only after the order is successfully created,
-		// inside the same transaction — if anything above fails, the coupon
+		// inside the same transaction ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â if anything above fails, the coupon
 		// use rolls back too, so it never gets burned on a failed checkout.
 		if appliedCoupon != nil {
 			if err := ApplyCoupon(tx, appliedCoupon, order.ID, discount); err != nil {
@@ -168,12 +223,16 @@ func Checkout(c *gin.Context) {
 
 	message := "Your order #" + strconv.Itoa(int(order.ID)) + " has been placed successfully!"
 	utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
+	services.SendPushToUser(order.UserID, "Order Placed", message)
+        if order.Status == models.OrderStatusConfirmed {
+                go services.AutoAssignDeliveryPartner(order.ID)
+        }
 
 	c.JSON(http.StatusCreated, order)
 }
 
 // GetOrders godoc
-// GET /api/v1/orders (protected) — ?page=&limit=
+// GET /api/v1/orders (protected) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ?page=&limit=
 func GetOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
@@ -255,7 +314,11 @@ func CancelOrder(c *gin.Context) {
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		for _, item := range order.Items {
 			var inventory models.Inventory
-			if err := tx.Where("product_id = ?", item.ProductID).First(&inventory).Error; err == nil {
+			// Phase 3 note: we don't yet track which warehouse an item's stock was
+			// deducted from at checkout, so restore to the first available row for
+			// this product - the combined total across warehouses ends up correct
+			// either way. Per-warehouse restore comes with order routing (Phase 5).
+			if err := tx.Where("product_id = ?", item.ProductID).Order("id").First(&inventory).Error; err == nil {
 				inventory.Stock += item.Quantity
 				inventory.InStock = true
 				if err := tx.Save(&inventory).Error; err != nil {
@@ -263,7 +326,14 @@ func CancelOrder(c *gin.Context) {
 				}
 			}
 		}
-		return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
+		if order.WalletAmountUsed > 0 {
+                        refID := order.ID
+                        if err := utils.CreditWallet(tx, userID, order.WalletAmountUsed, models.WalletReasonOrderRefund, "order", &refID, "Refund for cancelled order"); err != nil {
+                                return err
+                        }
+                }
+
+                return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
 	})
 
 	if txErr != nil {
@@ -275,5 +345,6 @@ func CancelOrder(c *gin.Context) {
 
 	message := "Your order #" + orderID + " has been cancelled."
 	utils.SendNotification(order.Address.Phone, message, "order_cancelled", &order.ID)
+	services.SendPushToUser(order.UserID, "Order Cancelled", message)
 	c.JSON(http.StatusOK, order)
 }

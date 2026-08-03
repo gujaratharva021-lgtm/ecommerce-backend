@@ -20,7 +20,6 @@ func ConnectDatabase(cfg *config.Config) {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-
 	DB = db
 	log.Println("Database connected successfully")
 }
@@ -41,13 +40,24 @@ func AutoMigrate() {
 		&models.Order{},
 		&models.OrderItem{},
 		&models.Payment{},
-                &models.Coupon{},
-                &models.OrderCoupon{},
+		&models.Coupon{},
+		&models.OrderCoupon{},
 		&models.Notification{},
+		&models.DeviceToken{},
+		&models.Wishlist{},
+		&models.Review{},
+		&models.DeliveryPartner{},
+		&models.AuditLog{},
+		&models.Warehouse{},
+		&models.WarehouseStaff{},
+		&models.StockTransfer{},
+		&models.Wallet{},
+		&models.WalletTransaction{},
+		&models.ReturnRequest{},
+		&models.ReturnRequestItem{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 	log.Println("Database migration completed")
 }
-
