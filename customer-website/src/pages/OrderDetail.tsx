@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getOrder, requestReturn } from '../api/orders'
+import { getOrder, requestReturn, getOrderTracking } from '../api/orders'
 import { IMAGE_ORIGIN } from '../api/client'
-import type { Order } from '../types'
+import type { Order, OrderTracking } from '../types'
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>()
@@ -12,6 +12,8 @@ export default function OrderDetail() {
   const [selectedItems, setSelectedItems] = useState<Record<number, number>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [tracking, setTracking] = useState<OrderTracking | null>(null)
+  const [isLoadingTracking, setIsLoadingTracking] = useState(false)
 
   function load() {
     if (!id) return
@@ -21,6 +23,19 @@ export default function OrderDetail() {
   useEffect(() => {
     load()
   }, [id])
+
+  useEffect(() => {
+    if (!order || !id) return
+    if (!['confirmed', 'shipped'].includes(order.status)) {
+      setTracking(null)
+      return
+    }
+    setIsLoadingTracking(true)
+    getOrderTracking(parseInt(id, 10))
+      .then(setTracking)
+      .catch(() => setTracking(null))
+      .finally(() => setIsLoadingTracking(false))
+  }, [order?.status, id])
 
   function imageUrl(path: string) {
     if (!path) return ''
@@ -93,6 +108,42 @@ export default function OrderDetail() {
           </div>
         ))}
       </section>
+
+      {['confirmed', 'shipped'].includes(order.status) && (
+        <section className="mb-6 border border-line rounded-xl p-4 bg-leaf/5">
+          <h2 className="font-medium mb-2">Live tracking</h2>
+          {isLoadingTracking ? (
+            <p className="text-sm text-ink/50">Loading tracking...</p>
+          ) : !tracking ? (
+            <p className="text-sm text-ink/50">No delivery partner assigned yet.</p>
+          ) : (
+            <div className="text-sm space-y-1">
+              <p>
+                <span className="text-ink/60">Delivery partner:</span>{' '}
+                <span className="font-medium">{tracking.delivery_partner_name}</span>
+              </p>
+              {tracking.vehicle_number && (
+                <p>
+                  <span className="text-ink/60">Vehicle:</span>{' '}
+                  <span className="font-mono">{tracking.vehicle_number}</span>
+                </p>
+              )}
+              {tracking.current_lat != null && tracking.current_lng != null ? (
+                <p className="text-ink/60">
+                  📍 Current location: {tracking.current_lat.toFixed(4)}, {tracking.current_lng.toFixed(4)}
+                </p>
+              ) : (
+                <p className="text-ink/50">Location not available yet.</p>
+              )}
+              {tracking.last_updated && (
+                <p className="text-xs text-ink/40">
+                  Updated {new Date(tracking.last_updated).toLocaleString('en-IN')}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {order.address && (
         <section className="mb-6">

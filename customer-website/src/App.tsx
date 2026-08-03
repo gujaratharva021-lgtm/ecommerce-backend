@@ -13,6 +13,8 @@ import Addresses from './pages/Addresses'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import Wallet from './pages/Wallet'
+import Wishlist from './pages/Wishlist'
+import Profile from './pages/Profile'
 import Login from './pages/Login'
 
 function App() {
@@ -71,6 +73,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Wallet />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/wishlist"
+                element={
+                  <ProtectedRoute>
+                    <Wishlist />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
                   </ProtectedRoute>
                 }
               />

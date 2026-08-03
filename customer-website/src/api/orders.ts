@@ -2,6 +2,7 @@
 import type {
   Order,
   OrderListResponse,
+  OrderTracking,
   CheckoutRequest,
   CreatePaymentOrderResponse,
   VerifyPaymentRequest,
@@ -18,7 +19,9 @@ export const getOrder = (id: number) =>
   apiClient.get<Order>(`/orders/${id}`).then((r) => r.data)
 
 export const getOrderTracking = (id: number) =>
-  apiClient.get(`/orders/${id}/tracking`).then((r) => r.data)
+  apiClient
+    .get<{ message?: string; tracking: OrderTracking | null }>(`/orders/${id}/tracking`)
+    .then((r) => r.data.tracking)
 
 export const cancelOrder = (id: number) =>
   apiClient.put<Order>(`/orders/${id}/cancel`, {}).then((r) => r.data)

@@ -99,6 +99,8 @@ export interface Address {
   state: string
   pincode: string
   is_default: boolean
+  lat?: number | null
+  lng?: number | null
   created_at: string
   updated_at: string
 }
@@ -113,6 +115,8 @@ export interface AddressRequest {
   state: string
   pincode: string
   is_default: boolean
+  lat?: number | null
+  lng?: number | null
 }
 
 export interface OrderItem {
@@ -141,6 +145,15 @@ export interface Order {
   items?: OrderItem[]
   created_at: string
   updated_at: string
+}
+
+export interface OrderTracking {
+  delivery_partner_name: string
+  vehicle_number: string
+  current_lat: number | null
+  current_lng: number | null
+  last_updated: string | null
+  order_status: string
 }
 
 export interface OrderListResponse {

@@ -37,6 +37,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                 Wallet
               </Link>
             )}
+            {user && (
+              <Link to="/wishlist" className="hover:text-marigold transition-colors">
+                Wishlist
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-4">
@@ -54,7 +59,12 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             {user ? (
               <div className="flex items-center gap-3 text-sm">
-                <span className="hidden sm:inline text-ink/60">Hi, {user.name || user.phone}</span>
+                <Link
+                  to="/profile"
+                  className="hidden sm:inline text-ink/60 hover:text-marigold transition-colors"
+                >
+                  Hi, {user.name || user.phone}
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="px-3 py-1.5 rounded-full border border-line hover:border-ink transition-colors"

@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getProduct, getProductReviews, upsertReview } from '../api/products'
+import { getWishlist, addToWishlist, removeFromWishlist } from '../api/misc'
 import { IMAGE_ORIGIN } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
@@ -23,12 +24,48 @@ export default function ProductDetail() {
   const [myComment, setMyComment] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
+  const [isWishlisted, setIsWishlisted] = useState(false)
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false)
+
   useEffect(() => {
     if (!id) return
     const productId = parseInt(id, 10)
     getProduct(productId).then(setProduct)
     getProductReviews(productId).then((r) => setReviews(Array.isArray(r) ? r : []))
   }, [id])
+
+  useEffect(() => {
+    if (!user || !id) {
+      setIsWishlisted(false)
+      return
+    }
+    const productId = parseInt(id, 10)
+    getWishlist()
+      .then((items) => setIsWishlisted(items.some((w) => w.product_id === productId)))
+      .catch(() => setIsWishlisted(false))
+  }, [user, id])
+
+  async function handleToggleWishlist() {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    if (!product) return
+    setIsTogglingWishlist(true)
+    try {
+      if (isWishlisted) {
+        await removeFromWishlist(product.id)
+        setIsWishlisted(false)
+      } else {
+        await addToWishlist(product.id)
+        setIsWishlisted(true)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error ?? 'Failed to update wishlist.')
+    } finally {
+      setIsTogglingWishlist(false)
+    }
+  }
 
   function imageUrl(path: string) {
     if (!path) return ''
@@ -101,7 +138,17 @@ export default function ProductDetail() {
               {product.category.name}
             </p>
           )}
-          <h1 className="font-display text-3xl font-600 mb-3">{product.name}</h1>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h1 className="font-display text-3xl font-600">{product.name}</h1>
+            <button
+              onClick={handleToggleWishlist}
+              disabled={isTogglingWishlist}
+              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              className="shrink-0 text-2xl leading-none mt-1 disabled:opacity-50 transition-transform hover:scale-110"
+            >
+              {isWishlisted ? '❤️' : '🤍'}
+            </button>
+          </div>
 
           {avgRating !== null && (
             <p className="text-sm text-ink/60 mb-3">

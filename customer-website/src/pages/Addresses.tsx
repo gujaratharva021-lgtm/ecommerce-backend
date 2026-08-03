@@ -12,6 +12,8 @@ const emptyForm: AddressRequest = {
   state: '',
   pincode: '',
   is_default: false,
+  lat: null,
+  lng: null,
 }
 
 export default function Addresses() {
@@ -21,6 +23,8 @@ export default function Addresses() {
   const [form, setForm] = useState<AddressRequest>(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   function load() {
     setIsLoading(true)
@@ -47,6 +51,34 @@ export default function Addresses() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handleUseCurrentLocation() {
+    setLocationError(null)
+    if (!navigator.geolocation) {
+      setLocationError('Location is not supported on this device.')
+      return
+    }
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((f) => ({
+          ...f,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }))
+        setIsLocating(false)
+      },
+      (err) => {
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission denied. Please allow access and try again.'
+            : 'Could not fetch your location. Please try again.'
+        )
+        setIsLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   async function handleDelete(id: number) {
@@ -133,6 +165,24 @@ export default function Addresses() {
               required
             />
           </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={isLocating}
+              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-line hover:border-ink transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              📍 {isLocating ? 'Locating...' : 'Use my current location'}
+            </button>
+            {form.lat != null && form.lng != null && (
+              <span className="text-xs font-mono text-leaf">
+                Location captured ({form.lat.toFixed(4)}, {form.lng.toFixed(4)})
+              </span>
+            )}
+          </div>
+          {locationError && <p className="text-clay text-xs">{locationError}</p>}
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -185,6 +235,9 @@ export default function Addresses() {
                   {a.line1}, {a.line2 ? `${a.line2}, ` : ''}
                   {a.city}, {a.state} - {a.pincode}
                 </p>
+                {a.lat != null && a.lng != null && (
+                  <p className="text-xs font-mono text-leaf mt-1">📍 GPS location saved</p>
+                )}
               </div>
               <div className="flex flex-col gap-1 items-end shrink-0 ml-4">
                 {!a.is_default && (
