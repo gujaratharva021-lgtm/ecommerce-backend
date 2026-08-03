@@ -140,3 +140,101 @@ return
 database.DB.Preload("DeliveryPartner").First(&order, order.ID)
 c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
 }
+
+// ---------------------------------------------------------------------------
+// Delivery Partner order actions (delivery partner only)
+// ---------------------------------------------------------------------------
+
+// GetMyDeliveries godoc
+// GET /api/v1/delivery/orders (delivery partner only)
+// Returns orders assigned to the logged-in delivery partner.
+// Optional ?status= filter (e.g. confirmed, shipped, delivered).
+func GetMyDeliveries(c *gin.Context) {
+	partnerID := c.MustGet("user_id").(uint)
+
+	query := database.DB.
+		Preload("Address").
+		Preload("Items.Product").
+		Where("delivery_partner_id = ?", partnerID)
+
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	var orders []models.Order
+	if err := query.Order("created_at DESC").Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load assigned orders"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// UpdateDeliveryOrderStatus godoc
+// PUT /api/v1/delivery/orders/:id/status (delivery partner only)
+// Lets the assigned partner move an order from confirmed -> shipped
+// (picked up and out for delivery). Partners cannot set "delivered"
+// here — see ConfirmDelivery below, which also handles COD collection.
+func UpdateDeliveryOrderStatus(c *gin.Context) {
+	partnerID := c.MustGet("user_id").(uint)
+	orderID := c.Param("id")
+
+	var req struct {
+		Status string `json:"status" binding:"required,oneof=shipped"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order models.Order
+	if err := database.DB.Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+		return
+	}
+
+	if order.Status != models.OrderStatusConfirmed {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be confirmed before it can be marked shipped"})
+		return
+	}
+
+	order.Status = req.Status
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
+}
+
+// ConfirmDelivery godoc
+// PUT /api/v1/delivery/orders/:id/deliver (delivery partner only)
+// Marks the order delivered. For COD orders this also marks payment as
+// paid, since cash is collected at the same time.
+func ConfirmDelivery(c *gin.Context) {
+	partnerID := c.MustGet("user_id").(uint)
+	orderID := c.Param("id")
+
+	var order models.Order
+	if err := database.DB.Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+		return
+	}
+
+	if order.Status != models.OrderStatusShipped {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be shipped before it can be marked delivered"})
+		return
+	}
+
+	order.Status = models.OrderStatusDelivered
+	if order.PaymentMethod == models.PaymentMethodCOD {
+		order.PaymentStatus = models.OrderPaymentStatusPaid
+	}
+
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm delivery"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Delivery confirmed", "order": order})
+}
