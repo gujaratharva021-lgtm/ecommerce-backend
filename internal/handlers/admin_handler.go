@@ -376,6 +376,9 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	order.Status = req.Status
+        if req.Status == models.OrderStatusConfirmed {
+                go services.AutoAssignDeliveryPartner(order.ID)
+        }
 
 	message := "Your order #" + orderID + " status is now: " + req.Status
 	utils.SendNotification(order.Address.Phone, message, "order_status_"+req.Status, &order.ID)

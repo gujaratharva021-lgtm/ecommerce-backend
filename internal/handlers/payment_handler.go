@@ -132,6 +132,7 @@ func VerifyPayment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order â€” contact support"})
 		return
 	}
+        go services.AutoAssignDeliveryPartner(order.ID)
 
 	var addr models.Address
 	database.DB.First(&addr, order.AddressID)

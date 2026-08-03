@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -6,10 +6,11 @@ import "time"
 // device (via the Flutter app), so the backend can send push notifications
 // (e.g. daily engagement messages, order updates) to that device.
 type DeviceToken struct {
-ID        uint      `json:"id" gorm:"primaryKey"`
-UserID    *uint     `json:"user_id,omitempty"`
-Token     string    `json:"token" gorm:"uniqueIndex;not null"`
-Platform  string    `json:"platform"` // "android" or "ios"
-CreatedAt time.Time `json:"created_at"`
-UpdatedAt time.Time `json:"updated_at"`
+	ID                uint      `json:"id" gorm:"primaryKey"`
+	UserID            *uint     `json:"user_id,omitempty"`
+	DeliveryPartnerID *uint     `json:"delivery_partner_id,omitempty"`
+	Token             string    `json:"token" gorm:"uniqueIndex;not null"`
+	Platform          string    `json:"platform"` // "android" or "ios"
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
