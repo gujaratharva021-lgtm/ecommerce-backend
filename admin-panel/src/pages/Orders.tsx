@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import { listOrders, updateOrderStatus, assignDeliveryPartner, listDeliveryPartners } from '../api/admin'
 import type { Order, DeliveryPartner } from '../types/admin'
@@ -149,21 +149,25 @@ export default function Orders() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        defaultValue=""
-                        disabled={assigningId === o.id}
-                        onChange={(e) => handleAssignDelivery(o.id, e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs disabled:opacity-50"
-                      >
-                        <option value="">
-                          {assigningId === o.id ? 'Assigning...' : 'Assign partner...'}
-                        </option>
-                        {partners.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.phone})
+                      {(o.status === 'confirmed' || o.status === 'shipped') ? (
+                        <select
+                          defaultValue=""
+                          disabled={assigningId === o.id}
+                          onChange={(e) => handleAssignDelivery(o.id, e.target.value)}
+                          className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs disabled:opacity-50"
+                        >
+                          <option value="">
+                            {assigningId === o.id ? 'Assigning...' : 'Assign partner...'}
                           </option>
-                        ))}
-                      </select>
+                          {partners.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.phone})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-slate-500">Confirm order first</span>
+                      )}
                     </td>
                   </tr>
                 ))}

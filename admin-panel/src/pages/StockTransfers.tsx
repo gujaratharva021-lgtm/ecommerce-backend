@@ -1,9 +1,10 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import {
   listStockTransfers,
   approveStockTransfer,
   rejectStockTransfer,
+  cancelStockTransfer,
 } from '../api/admin'
 import type { StockTransfer } from '../types/admin'
 
@@ -35,7 +36,7 @@ export default function StockTransfers() {
     try {
       await approveStockTransfer(id)
       setTransfers((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: 'approved' } : t))
+        prev.map((t) => (t.id === id ? { ...t, status: 'in_transit' } : t))
       )
     } catch (err: any) {
       alert(err.response?.data?.error ?? 'Failed to approve transfer.')
@@ -58,8 +59,25 @@ export default function StockTransfers() {
     }
   }
 
+  async function handleCancel(id: number) {
+    if (!confirm('Cancel this transfer? Stock will be restored to the source warehouse.')) return
+    setActingId(id)
+    try {
+      await cancelStockTransfer(id)
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: 'cancelled' } : t))
+      )
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Failed to cancel transfer.')
+    } finally {
+      setActingId(null)
+    }
+  }
+
   function statusColor(status: string) {
-    if (status === 'approved') return 'bg-emerald-500/15 text-emerald-400'
+    if (status === 'in_transit') return 'bg-blue-500/15 text-blue-400'
+    if (status === 'received') return 'bg-emerald-500/15 text-emerald-400'
+    if (status === 'cancelled') return 'bg-slate-500/15 text-slate-400'
     if (status === 'rejected') return 'bg-red-500/15 text-red-400'
     return 'bg-amber-500/15 text-amber-400'
   }
@@ -126,6 +144,15 @@ export default function StockTransfers() {
                             Reject
                           </button>
                         </>
+                      )}
+                      {t.status === 'in_transit' && (
+                        <button
+                          onClick={() => handleCancel(t.id)}
+                          disabled={actingId === t.id}
+                          className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
                       )}
                     </td>
                   </tr>

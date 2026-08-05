@@ -7,6 +7,7 @@ StockTransferPending   = "pending"
 StockTransferInTransit = "in_transit"
 StockTransferReceived  = "received"
 StockTransferRejected  = "rejected"
+	StockTransferCancelled = "cancelled"
 )
 
 // StockTransfer moves stock from one warehouse to another. A warehouse

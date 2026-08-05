@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'http://13.233.160.70:8081/api/v1';
+const BASE_URL = 'http://localhost:8081/api/v1';
 
 function parseArgs() {
   const args = process.argv.slice(2);

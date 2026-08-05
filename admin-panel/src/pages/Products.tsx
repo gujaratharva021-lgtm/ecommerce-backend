@@ -40,11 +40,18 @@ export default function Products() {
     setIsLoading(true)
     setError(null)
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
-        listProducts({ limit: 50 }),
-        listCategories(),
-      ])
-      setProducts(productsRes.products ?? [])
+      let allProducts: Product[] = []
+      let page = 1
+      while (true) {
+        const res = await listProducts({ limit: 200, page })
+        const batch = res.products ?? []
+        allProducts = allProducts.concat(batch)
+        if (batch.length === 0 || batch.length < 20) break
+        page++
+        if (page > 100) break
+      }
+      const categoriesRes = await listCategories()
+      setProducts(allProducts)
       setCategories(categoriesRes.categories ?? categoriesRes ?? [])
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Failed to load products.')
@@ -379,3 +386,5 @@ export default function Products() {
     </Layout>
   )
 }
+
+
