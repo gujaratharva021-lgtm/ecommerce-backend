@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { listProducts, listCategories } from '../api/products'
 import { IMAGE_ORIGIN } from '../api/client'
@@ -43,6 +43,8 @@ export default function Products() {
       .then((res) => {
         setProducts(res.products ?? [])
         setTotalPages(res.total_pages ?? 1)
+      })
+      .catch((err) => {
       })
       .finally(() => setIsLoading(false))
   }, [search, categoryId, sort, page])
@@ -126,7 +128,7 @@ export default function Products() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl">📦</div>
+                      <div className="w-full h-full flex items-center justify-center text-3xl">??</div>
                     )}
                     {!inStock && (
                       <div className="absolute inset-0 bg-paper/70 flex items-center justify-center">
@@ -138,7 +140,7 @@ export default function Products() {
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="font-mono text-marigold font-semibold mt-1">₹{p.price}</p>
+                    <p className="font-mono text-marigold font-semibold mt-1">?{p.price}</p>
                   </div>
                 </Link>
               )
@@ -167,4 +169,5 @@ export default function Products() {
     </div>
   )
 }
+
 

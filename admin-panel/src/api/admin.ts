@@ -134,3 +134,6 @@ export const creditWallet = (userId: number, amount: number, note?: string) =>
   apiClient.post(`/admin/wallet/credit/${userId}`, { amount, note }).then((r) => r.data)
 
 
+
+export const cancelStockTransfer = (id: number) =>
+  apiClient.put("/admin/stock-transfers/${id}/cancel").then((r) => r.data)

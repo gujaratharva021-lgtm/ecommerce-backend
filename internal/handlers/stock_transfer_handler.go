@@ -357,3 +357,49 @@ return
 
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
+// CancelStockTransfer godoc
+// PUT /api/v1/admin/stock-transfers/:id/cancel (admin only)
+// Cancels an in-transit transfer and restores the deducted stock back to
+// the source warehouse. Use this when goods are lost, damaged, or the
+// transfer needs to be undone after approval.
+func CancelStockTransfer(c *gin.Context) {
+id := c.Param("id")
+
+var transfer models.StockTransfer
+if err := database.DB.First(&transfer, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Stock transfer not found"})
+return
+}
+
+if transfer.Status != models.StockTransferInTransit {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only in-transit transfers can be cancelled"})
+return
+}
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+var inventory models.Inventory
+err := tx.Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.FromWarehouseID).
+First(&inventory).Error
+if err != nil {
+inventory = models.Inventory{
+ProductID:   transfer.ProductID,
+WarehouseID: transfer.FromWarehouseID,
+}
+}
+inventory.Stock += transfer.Quantity
+inventory.InStock = inventory.Stock > 0
+if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+transfer.Status = models.StockTransferCancelled
+return tx.Save(&transfer).Error
+})
+
+if txErr != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel stock transfer"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
+}

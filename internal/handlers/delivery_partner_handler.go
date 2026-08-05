@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "fmt"
@@ -118,6 +118,11 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 return
 }
 
+if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusShipped {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner can only be assigned to confirmed or shipped orders"})
+return
+}
+
 var req models.AssignDeliveryPartnerRequest
 if err := c.ShouldBindJSON(&req); err != nil {
 c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -185,7 +190,7 @@ c.JSON(http.StatusOK, gin.H{"orders": orders})
 // PUT /api/v1/delivery/orders/:id/status (delivery partner only)
 // Lets the assigned partner move an order from confirmed -> shipped
 // (picked up and out for delivery). Partners cannot set "delivered"
-// here — see ConfirmDelivery below, which also handles COD collection.
+// here - see ConfirmDelivery below, which also handles COD collection.
 func UpdateDeliveryOrderStatus(c *gin.Context) {
 partnerID := c.MustGet("user_id").(uint)
 orderID := c.Param("id")
