@@ -1,4 +1,4 @@
-﻿import apiClient from './client'
+import apiClient from './client'
 import type { Product, ProductCreateRequest, CreateCouponRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
@@ -136,4 +136,4 @@ export const creditWallet = (userId: number, amount: number, note?: string) =>
 
 
 export const cancelStockTransfer = (id: number) =>
-  apiClient.put("/admin/stock-transfers/${id}/cancel").then((r) => r.data)
+  apiClient.put(`/admin/stock-transfers/${id}/cancel`).then((r) => r.data)
