@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.18:8081/api/v1';
+  static const String baseUrl = 'https://ecommerce-backend-dd4u.onrender.com/api/v1';
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
