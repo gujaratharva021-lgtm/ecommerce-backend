@@ -44,7 +44,7 @@ export default function Products() {
         setProducts(res.products ?? [])
         setTotalPages(res.total_pages ?? 1)
       })
-      .catch((err) => {
+      .catch(() => {
       })
       .finally(() => setIsLoading(false))
   }, [search, categoryId, sort, page])
