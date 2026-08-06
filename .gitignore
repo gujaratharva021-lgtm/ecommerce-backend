@@ -27,3 +27,5 @@ vendor/
 !/uploads/.gitkeep
 secrets/
 /ecommerce-backend
+
+secrets/

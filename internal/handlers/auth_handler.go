@@ -3,40 +3,43 @@ package handlers
 import (
 	"crypto/rand"
 	"fmt"
-	"log"
 	"math/big"
 	"net/http"
-	"time"
+	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
+
+	twilio "github.com/twilio/twilio-go"
+	twilioApi "github.com/twilio/twilio-go/rest/verify/v2"
 )
 
 const otpValidityMinutes = 5
 
 // generateOTP returns a random 6-digit numeric code, e.g. "042917".
 func generateOTP() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+if err != nil {
+return "", err
+}
+return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+// getTwilioClient builds a Twilio REST client using TWILIO_ACCOUNT_SID and
+// TWILIO_AUTH_TOKEN from the environment (set in .env / Render env vars).
+func getTwilioClient() *twilio.RestClient {
+	return twilio.NewRestClientWithParams(twilio.ClientParams{
+		Username: os.Getenv("TWILIO_ACCOUNT_SID"),
+		Password: os.Getenv("TWILIO_AUTH_TOKEN"),
+	})
 }
 
 // SendOTP godoc
 // POST /api/v1/auth/send-otp
-// Generates a 6-digit OTP for the phone number and "sends" it.
-//
-// NOTE (dev only): There is no SMS gateway wired up yet, so the OTP is
-// returned directly in the JSON response and logged to the server console
-// so you can test the flow end-to-end locally. Before this goes anywhere
-// near production, plug in a real SMS provider (e.g. MSG91, Fast2SMS,
-// Twilio) here and DELETE the "otp" field from the response — returning
-// the code in the API response is a placeholder for local testing only
-// and must never ship like this.
+// Uses Twilio Verify to generate and send a real SMS OTP to the phone number.
+// Twilio stores and expires the code itself — no local OTP table needed.
 func SendOTP(c *gin.Context) {
 	var req models.SendOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -44,47 +47,28 @@ func SendOTP(c *gin.Context) {
 		return
 	}
 
-	code, err := generateOTP()
+	client := getTwilioClient()
+	verifySid := os.Getenv("TWILIO_VERIFY_SID")
+
+	params := &twilioApi.CreateVerificationParams{}
+	params.SetTo(req.Phone)
+	params.SetChannel("sms")
+
+	_, err := client.VerifyV2.CreateVerification(verifySid, params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate OTP"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send OTP: " + err.Error()})
 		return
 	}
 
-	// Invalidate any previous unverified OTPs for this phone before issuing a new one.
-	database.DB.Where("phone = ? AND verified = ?", req.Phone, false).Delete(&models.OTP{})
-
-	otp := models.OTP{
-		Phone:     req.Phone,
-		Code:      code,
-		ExpiresAt: time.Now().Add(otpValidityMinutes * time.Minute),
-		Verified:  false,
-	}
-	if err := database.DB.Create(&otp).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create OTP"})
-		return
-	}
-
-	// Dev-only: log instead of actually sending an SMS.
-	log.Printf("[DEV OTP] phone=%s code=%s (valid %d min)", req.Phone, code, otpValidityMinutes)
-
-	resp := gin.H{
-		"message":            "OTP sent successfully",
-		"expires_in_minutes": otpValidityMinutes,
-	}
-	// DEV ONLY: echo the OTP back so the flow is testable without a real SMS
-	// gateway wired up. Gated on GIN_MODE so this can never accidentally ship
-	// to production — set GIN_MODE=release and it disappears automatically.
-	if config.AppConfig.GinMode != "release" {
-		resp["otp"] = code
-	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "OTP sent successfully",
+	})
 }
 
 // VerifyOTP godoc
 // POST /api/v1/auth/verify-otp
-// Verifies the OTP; creates the user on first login, logs them in on repeat
-// visits. Returns a JWT either way — this single endpoint covers both
-// "signup" and "login" since phone + OTP is the only credential.
+// Verifies the OTP via Twilio Verify; creates the user on first login, logs
+// them in on repeat visits. Returns a JWT either way.
 func VerifyOTP(c *gin.Context) {
 	var req models.VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,23 +76,18 @@ func VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	var otp models.OTP
-	err := database.DB.
-		Where("phone = ? AND code = ? AND verified = ?", req.Phone, req.OTP, false).
-		Order("created_at DESC").
-		First(&otp).Error
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP"})
+	client := getTwilioClient()
+	verifySid := os.Getenv("TWILIO_VERIFY_SID")
+
+	params := &twilioApi.CreateVerificationCheckParams{}
+	params.SetTo(req.Phone)
+	params.SetCode(req.OTP)
+
+	resp, err := client.VerifyV2.CreateVerificationCheck(verifySid, params)
+	if err != nil || resp.Status == nil || *resp.Status != "approved" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired OTP"})
 		return
 	}
-
-	if time.Now().After(otp.ExpiresAt) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "OTP has expired, please request a new one"})
-		return
-	}
-
-	// Mark this OTP as used so it can't be replayed.
-	database.DB.Model(&otp).Update("verified", true)
 
 	// Find or create the user — first successful OTP verification = signup.
 	var user models.User

@@ -157,6 +157,7 @@ c.JSON(http.StatusOK, gin.H{
 "tracking": gin.H{
 "delivery_partner_name": order.DeliveryPartner.Name,
 "vehicle_number":        order.DeliveryPartner.VehicleNumber,
+"phone":                 order.DeliveryPartner.Phone,
 "current_lat":           order.DeliveryPartner.CurrentLat,
 "current_lng":           order.DeliveryPartner.CurrentLng,
 "last_updated":          order.DeliveryPartner.LastLocationUpdate,
