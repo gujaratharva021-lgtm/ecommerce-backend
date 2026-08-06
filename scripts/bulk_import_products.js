@@ -20,22 +20,23 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'http://localhost:8081/api/v1';
+const BASE_URL = 'https://ecommerce-backend-dd4u.onrender.com/api/v1';
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const out = {};
+  const out = { dataFile: 'blinkit_products.json' };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--token') out.token = args[++i];
     if (args[i] === '--images') out.imagesDir = args[++i];
+    if (args[i] === '--data') out.dataFile = args[++i];
   }
   return out;
 }
 
 async function main() {
-  const { token, imagesDir } = parseArgs();
+  const { token, imagesDir, dataFile } = parseArgs();
   if (!token || !imagesDir) {
-    console.error('Usage: node bulk_import_products.js --token YOUR_ADMIN_TOKEN --images "path\\to\\Blinkit\\assets"');
+    console.error('Usage: node bulk_import_products.js --token YOUR_ADMIN_TOKEN --images "path\\to\\Blinkit\\assets" [--data other_products.json]');
     process.exit(1);
   }
   if (!fs.existsSync(imagesDir)) {
@@ -43,8 +44,8 @@ async function main() {
     process.exit(1);
   }
 
-  const products = JSON.parse(fs.readFileSync(path.join(__dirname, 'blinkit_products.json'), 'utf-8'));
-  console.log(`Loaded ${products.length} products from blinkit_products.json`);
+  const products = JSON.parse(fs.readFileSync(path.join(__dirname, dataFile), 'utf-8'));
+  console.log(`Loaded ${products.length} products from ${dataFile}`);
 
   const headers = { Authorization: `Bearer ${token}` };
 

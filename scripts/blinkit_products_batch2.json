@@ -1,0 +1,93 @@
+[
+  {"name": "Aashirvaad Atta", "price": 250, "unit": "5kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/AashirvaadAtta.png"},
+  {"name": "Basmati Rice", "price": 120, "unit": "1kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/BasmatiRice.png"},
+  {"name": "Toor Dal", "price": 140, "unit": "1kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/ToorDal.png"},
+  {"name": "Moong Dal", "price": 130, "unit": "1kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/MoongDal.png"},
+  {"name": "Chana Dal", "price": 110, "unit": "1kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/ChanaDal.png"},
+  {"name": "Sugar", "price": 45, "unit": "1kg", "category": "Atta & Rice", "image": "assets/images/AttaRice/Sugar.png"},
+
+  {"name": "Sunflower Oil", "price": 150, "unit": "1L", "category": "Oil & Spices", "image": "assets/images/OilSpices/SunflowerOil.png"},
+  {"name": "Mustard Oil", "price": 160, "unit": "1L", "category": "Oil & Spices", "image": "assets/images/OilSpices/MustardOil.png"},
+  {"name": "Ghee", "price": 320, "unit": "500ml", "category": "Oil & Spices", "image": "assets/images/OilSpices/Ghee.png"},
+  {"name": "Turmeric Powder", "price": 40, "unit": "100g", "category": "Oil & Spices", "image": "assets/images/OilSpices/TurmericPowder.png"},
+  {"name": "Red Chilli Powder", "price": 45, "unit": "100g", "category": "Oil & Spices", "image": "assets/images/OilSpices/RedChilliPowder.png"},
+  {"name": "Garam Masala", "price": 60, "unit": "100g", "category": "Oil & Spices", "image": "assets/images/OilSpices/GaramMasala.png"},
+
+  {"name": "Amul Milk", "price": 30, "unit": "500ml", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/AmulMilk.png"},
+  {"name": "Farm Eggs", "price": 60, "unit": "6 pcs", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/FarmEggs.png"},
+  {"name": "Bread", "price": 40, "unit": "400g", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/Bread.png"},
+  {"name": "Butter", "price": 55, "unit": "100g", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/Butter.png"},
+  {"name": "Paneer", "price": 90, "unit": "200g", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/Paneer.png"},
+  {"name": "Cheese Slices", "price": 120, "unit": "10 pcs", "category": "Dairy & Eggs", "image": "assets/images/DairyEggs/CheeseSlices.png"},
+
+  {"name": "Almonds", "price": 200, "unit": "250g", "category": "Dry Fruits", "image": "assets/images/DryFruits/Almonds.png"},
+  {"name": "Cashews", "price": 220, "unit": "250g", "category": "Dry Fruits", "image": "assets/images/DryFruits/Cashews.png"},
+  {"name": "Raisins", "price": 90, "unit": "200g", "category": "Dry Fruits", "image": "assets/images/DryFruits/Raisins.png"},
+  {"name": "Dates", "price": 110, "unit": "250g", "category": "Dry Fruits", "image": "assets/images/DryFruits/Dates.png"},
+  {"name": "Walnuts", "price": 210, "unit": "200g", "category": "Dry Fruits", "image": "assets/images/DryFruits/Walnuts.png"},
+
+  {"name": "Non-Stick Tawa", "price": 450, "unit": "1 pc", "category": "Kitchenware", "image": "assets/images/Kitchenware/Tawa.png"},
+  {"name": "Steel Water Bottle", "price": 250, "unit": "1L", "category": "Kitchenware", "image": "assets/images/Kitchenware/WaterBottle.png"},
+  {"name": "Plastic Container Set", "price": 180, "unit": "3 pcs", "category": "Kitchenware", "image": "assets/images/Kitchenware/ContainerSet.png"},
+  {"name": "Kitchen Scissors", "price": 120, "unit": "1 pc", "category": "Kitchenware", "image": "assets/images/Kitchenware/Scissors.png"},
+  {"name": "Chopping Board", "price": 150, "unit": "1 pc", "category": "Kitchenware", "image": "assets/images/Kitchenware/ChoppingBoard.png"},
+
+  {"name": "Chicken Breast", "price": 220, "unit": "500g", "category": "Meat & Fish", "image": "assets/images/MeatFish/ChickenBreast.png"},
+  {"name": "Chicken Curry Cut", "price": 200, "unit": "500g", "category": "Meat & Fish", "image": "assets/images/MeatFish/ChickenCurryCut.png"},
+  {"name": "Mutton Curry Cut", "price": 450, "unit": "500g", "category": "Meat & Fish", "image": "assets/images/MeatFish/MuttonCurryCut.png"},
+  {"name": "Rohu Fish", "price": 180, "unit": "500g", "category": "Meat & Fish", "image": "assets/images/MeatFish/RohuFish.png"},
+  {"name": "Prawns", "price": 250, "unit": "250g", "category": "Meat & Fish", "image": "assets/images/MeatFish/Prawns.png"},
+
+  {"name": "Tata Tea", "price": 130, "unit": "250g", "category": "Tea & Coffee", "image": "assets/images/TeaCoffee/TataTea.png"},
+  {"name": "Nescafe Coffee", "price": 220, "unit": "100g", "category": "Tea & Coffee", "image": "assets/images/TeaCoffee/NescafeCoffee.png"},
+  {"name": "Green Tea", "price": 150, "unit": "25 bags", "category": "Tea & Coffee", "image": "assets/images/TeaCoffee/GreenTea.png"},
+  {"name": "Bournvita", "price": 210, "unit": "500g", "category": "Tea & Coffee", "image": "assets/images/TeaCoffee/Bournvita.png"},
+  {"name": "Horlicks", "price": 220, "unit": "500g", "category": "Tea & Coffee", "image": "assets/images/TeaCoffee/Horlicks.png"},
+
+  {"name": "Maggi Noodles", "price": 60, "unit": "4 pack", "category": "Instant Food", "image": "assets/images/InstantFood/MaggiNoodles.png"},
+  {"name": "Instant Pasta", "price": 55, "unit": "1 pack", "category": "Instant Food", "image": "assets/images/InstantFood/InstantPasta.png"},
+  {"name": "Ready to Eat Pulao", "price": 90, "unit": "1 pack", "category": "Instant Food", "image": "assets/images/InstantFood/ReadyPulao.png"},
+  {"name": "Instant Soup", "price": 45, "unit": "1 pack", "category": "Instant Food", "image": "assets/images/InstantFood/InstantSoup.png"},
+  {"name": "Frozen Paratha", "price": 110, "unit": "5 pcs", "category": "Instant Food", "image": "assets/images/InstantFood/FrozenParatha.png"},
+
+  {"name": "Elaichi", "price": 40, "unit": "50g", "category": "Mouth Fresheners", "image": "assets/images/MouthFresheners/Elaichi.png"},
+  {"name": "Saunf", "price": 35, "unit": "100g", "category": "Mouth Fresheners", "image": "assets/images/MouthFresheners/Saunf.png"},
+  {"name": "Pan Masala", "price": 30, "unit": "50g", "category": "Mouth Fresheners", "image": "assets/images/MouthFresheners/PanMasala.png"},
+  {"name": "Mints", "price": 20, "unit": "1 pack", "category": "Mouth Fresheners", "image": "assets/images/MouthFresheners/Mints.png"},
+  {"name": "Supari", "price": 45, "unit": "100g", "category": "Mouth Fresheners", "image": "assets/images/MouthFresheners/Supari.png"},
+
+  {"name": "Face Wash", "price": 150, "unit": "100ml", "category": "Skin Care", "image": "assets/images/SkinCare/FaceWash.png"},
+  {"name": "Moisturizer", "price": 200, "unit": "100ml", "category": "Skin Care", "image": "assets/images/SkinCare/Moisturizer.png"},
+  {"name": "Sunscreen SPF50", "price": 250, "unit": "50ml", "category": "Skin Care", "image": "assets/images/SkinCare/Sunscreen.png"},
+  {"name": "Face Mask", "price": 60, "unit": "1 pc", "category": "Skin Care", "image": "assets/images/SkinCare/FaceMask.png"},
+  {"name": "Lip Balm", "price": 80, "unit": "1 pc", "category": "Skin Care", "image": "assets/images/SkinCare/LipBalm.png"},
+
+  {"name": "Sanitary Pads", "price": 90, "unit": "1 pack", "category": "Feminine Hygiene", "image": "assets/images/FeminineHygiene/SanitaryPads.png"},
+  {"name": "Intimate Wash", "price": 150, "unit": "100ml", "category": "Feminine Hygiene", "image": "assets/images/FeminineHygiene/IntimateWash.png"},
+  {"name": "Panty Liners", "price": 60, "unit": "1 pack", "category": "Feminine Hygiene", "image": "assets/images/FeminineHygiene/PantyLiners.png"},
+  {"name": "Menstrual Cup", "price": 350, "unit": "1 pc", "category": "Feminine Hygiene", "image": "assets/images/FeminineHygiene/MenstrualCup.png"},
+
+  {"name": "Diapers", "price": 450, "unit": "1 pack", "category": "Baby Care", "image": "assets/images/BabyCare/Diapers.png"},
+  {"name": "Baby Wipes", "price": 120, "unit": "1 pack", "category": "Baby Care", "image": "assets/images/BabyCare/BabyWipes.png"},
+  {"name": "Baby Lotion", "price": 180, "unit": "200ml", "category": "Baby Care", "image": "assets/images/BabyCare/BabyLotion.png"},
+  {"name": "Baby Shampoo", "price": 160, "unit": "200ml", "category": "Baby Care", "image": "assets/images/BabyCare/BabyShampoo.png"},
+  {"name": "Baby Food", "price": 140, "unit": "200g", "category": "Baby Care", "image": "assets/images/BabyCare/BabyFood.png"},
+
+  {"name": "Paracetamol", "price": 25, "unit": "1 strip", "category": "Health Care", "image": "assets/images/HealthCare/Paracetamol.png"},
+  {"name": "Multivitamin", "price": 250, "unit": "1 bottle", "category": "Health Care", "image": "assets/images/HealthCare/Multivitamin.png"},
+  {"name": "First Aid Kit", "price": 300, "unit": "1 pc", "category": "Health Care", "image": "assets/images/HealthCare/FirstAidKit.png"},
+  {"name": "Protein Powder", "price": 900, "unit": "500g", "category": "Health Care", "image": "assets/images/HealthCare/ProteinPowder.png"},
+  {"name": "Hand Sanitizer", "price": 90, "unit": "200ml", "category": "Health Care", "image": "assets/images/HealthCare/HandSanitizer.png"},
+
+  {"name": "Floor Cleaner", "price": 130, "unit": "1L", "category": "Cleaning Supplies", "image": "assets/images/CleaningSupplies/FloorCleaner.png"},
+  {"name": "Detergent Powder", "price": 150, "unit": "1kg", "category": "Cleaning Supplies", "image": "assets/images/CleaningSupplies/DetergentPowder.png"},
+  {"name": "Dishwash Liquid", "price": 110, "unit": "500ml", "category": "Cleaning Supplies", "image": "assets/images/CleaningSupplies/DishwashLiquid.png"},
+  {"name": "Mosquito Repellent", "price": 90, "unit": "1 pc", "category": "Cleaning Supplies", "image": "assets/images/CleaningSupplies/MosquitoRepellent.png"},
+  {"name": "Toilet Cleaner", "price": 100, "unit": "500ml", "category": "Cleaning Supplies", "image": "assets/images/CleaningSupplies/ToiletCleaner.png"},
+
+  {"name": "Earphones", "price": 350, "unit": "1 pc", "category": "Electronics", "image": "assets/images/Electronics/Earphones.png"},
+  {"name": "USB Cable", "price": 150, "unit": "1 pc", "category": "Electronics", "image": "assets/images/Electronics/USBCable.png"},
+  {"name": "Power Bank", "price": 900, "unit": "10000mAh", "category": "Electronics", "image": "assets/images/Electronics/PowerBank.png"},
+  {"name": "LED Bulb", "price": 90, "unit": "1 pc", "category": "Electronics", "image": "assets/images/Electronics/LEDBulb.png"},
+  {"name": "Mobile Charger", "price": 250, "unit": "1 pc", "category": "Electronics", "image": "assets/images/Electronics/MobileCharger.png"}
+]
