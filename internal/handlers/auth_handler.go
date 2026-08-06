@@ -51,7 +51,7 @@ func SendOTP(c *gin.Context) {
 	verifySid := os.Getenv("TWILIO_VERIFY_SID")
 
 	params := &twilioApi.CreateVerificationParams{}
-	params.SetTo(req.Phone)
+	params.SetTo("+91" + req.Phone)
 	params.SetChannel("sms")
 
 	_, err := client.VerifyV2.CreateVerification(verifySid, params)
@@ -80,7 +80,7 @@ func VerifyOTP(c *gin.Context) {
 	verifySid := os.Getenv("TWILIO_VERIFY_SID")
 
 	params := &twilioApi.CreateVerificationCheckParams{}
-	params.SetTo(req.Phone)
+	params.SetTo("+91" + req.Phone)
 	params.SetCode(req.OTP)
 
 	resp, err := client.VerifyV2.CreateVerificationCheck(verifySid, params)
