@@ -180,7 +180,7 @@ func GetMyReturns(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 // GetReturns godoc
-// GET /api/v1/admin/returns (admin only) — optional ?status=
+// GET /api/v1/admin/returns (admin only) â€” optional ?status=
 func GetReturns(c *gin.Context) {
 	var returns []models.ReturnRequest
 	query := database.DB.Preload("Order").Preload("Items.OrderItem.Product").Order("created_at DESC")
@@ -200,8 +200,8 @@ func GetReturns(c *gin.Context) {
 // ApproveReturn godoc
 // PUT /api/v1/admin/returns/:id/approve (admin only)
 // Restores stock for each returned line item, refunds the pre-computed
-// amount to the customer's wallet, and — only if every item on the order
-// has now been fully returned across all approved requests — marks the
+// amount to the customer's wallet, and â€” only if every item on the order
+// has now been fully returned across all approved requests â€” marks the
 // order "returned".
 func ApproveReturn(c *gin.Context) {
 	adminID := c.MustGet("user_id").(uint)
@@ -236,7 +236,11 @@ func ApproveReturn(c *gin.Context) {
 				continue
 			}
 			var inventory models.Inventory
-			if err := tx.Where("product_id = ?", orderItem.ProductID).Order("id").First(&inventory).Error; err == nil {
+			q := tx.Where("product_id = ?", orderItem.ProductID)
+			if order.WarehouseID != nil {
+				q = q.Where("warehouse_id = ?", *order.WarehouseID)
+			}
+			if err := q.Order("id").First(&inventory).Error; err == nil {
 				inventory.Stock += ri.Quantity
 				inventory.InStock = true
 				if err := tx.Save(&inventory).Error; err != nil {
