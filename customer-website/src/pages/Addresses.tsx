@@ -37,6 +37,12 @@ export default function Addresses() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (showForm) {
+      handleUseCurrentLocation()
+    }
+  }, [showForm])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -262,3 +268,6 @@ export default function Addresses() {
     </div>
   )
 }
+
+
+
