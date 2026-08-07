@@ -1,0 +1,31 @@
+# Environment
+.env
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Build
+/bin/
+/tmp/
+
+# Uploaded images (local dev storage)
+/uploads/*
+!/uploads/.gitkeep
+secrets/
+/ecommerce-backend
+
+secrets/

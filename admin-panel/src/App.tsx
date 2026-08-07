@@ -1,0 +1,128 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Products from './pages/Products'
+import Categories from './pages/Categories'
+import Orders from './pages/Orders'
+import Coupons from './pages/Coupons'
+import DeliveryPartners from './pages/DeliveryPartners'
+import Warehouses from './pages/Warehouses'
+import WarehouseStaff from './pages/WarehouseStaff'
+import StockTransfers from './pages/StockTransfers'
+import Returns from './pages/Returns'
+import Analytics from './pages/Analytics'
+import WalletCredit from './pages/WalletCredit'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <Products />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <Categories />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coupons"
+            element={
+              <ProtectedRoute>
+                <Coupons />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/delivery-partners"
+            element={
+              <ProtectedRoute>
+                <DeliveryPartners />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/warehouses"
+            element={
+              <ProtectedRoute>
+                <Warehouses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/warehouse-staff"
+            element={
+              <ProtectedRoute>
+                <WarehouseStaff />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stock-transfers"
+            element={
+              <ProtectedRoute>
+                <StockTransfers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/returns"
+            element={
+              <ProtectedRoute>
+                <Returns />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wallet-credit"
+            element={
+              <ProtectedRoute>
+                <WalletCredit />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
+
+export default App
+
