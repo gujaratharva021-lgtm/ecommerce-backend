@@ -5,7 +5,8 @@ import 'orders_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
-  const OtpScreen({super.key, required this.phone});
+  final String? testOtp;
+  const OtpScreen({super.key, required this.phone, this.testOtp});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -15,6 +16,14 @@ class _OtpScreenState extends State<OtpScreen> {
   final _otpController = TextEditingController();
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.testOtp != null && widget.testOtp!.isNotEmpty) {
+      _otpController.text = widget.testOtp!;
+    }
+  }
 
   Future<void> _verifyOtp() async {
     final otp = _otpController.text.trim();
@@ -63,6 +72,14 @@ class _OtpScreenState extends State<OtpScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
+            if (widget.testOtp != null && widget.testOtp!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '(Test mode — auto-filled)',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: _otpController,

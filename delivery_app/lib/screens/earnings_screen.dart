@@ -32,7 +32,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load earnings';
+        _error = 'Failed to load earnings: $e';
         _loading = false;
       });
     }
@@ -142,3 +142,4 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+

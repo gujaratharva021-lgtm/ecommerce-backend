@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'otp_screen.dart';
 
@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => OtpScreen(phone: phone),
+            builder: (_) => OtpScreen(phone: phone, testOtp: data['otp']?.toString()),
           ),
         );
       } else {
