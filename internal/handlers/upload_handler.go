@@ -1,13 +1,21 @@
-package handlers
+﻿package handlers
 
 import (
+	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 )
 
 // allowedImageExts restricts uploads to common image formats.
@@ -22,12 +30,14 @@ const maxUploadSize = 5 << 20 // 5 MB
 
 // UploadImage godoc
 // POST /api/v1/upload (protected)
-// Accepts a multipart/form-data "image" field, saves it under ./uploads,
-// and returns a URL that can be stored on a Product/Category's image_url field.
+// Accepts a multipart/form-data "image" field and returns a URL that can be
+// stored on a Product/Category's image_url field.
 //
-// NOTE: This is Day 1/2 "structure ready" — local disk storage is fine for
-// development. Before production, swap SaveUploadedFile for an S3/GCS/Cloud
-// Storage client so images survive redeploys and scale past a single server.
+// If CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET are
+// set, the file is uploaded to Cloudinary so it survives redeploys/restarts.
+// Otherwise it falls back to local disk under ./uploads (fine for local dev,
+// but most hosts including Render's free tier wipe this on every
+// restart/redeploy - the returned URL will 404 later if you rely on it).
 func UploadImage(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
@@ -43,6 +53,17 @@ func UploadImage(c *gin.Context) {
 		return
 	}
 
+	cfg := config.AppConfig
+	if cfg != nil && cfg.CloudinaryCloudName != "" && cfg.CloudinaryAPIKey != "" && cfg.CloudinaryAPISecret != "" {
+		url, err := uploadToCloudinary(file, cfg)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"image_url": url})
+		return
+	}
+
 	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 	savePath := filepath.Join("uploads", filename)
 
@@ -54,4 +75,73 @@ func UploadImage(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"image_url": "/uploads/" + filename,
 	})
+}
+
+// uploadToCloudinary sends the file to Cloudinary's signed upload endpoint
+// using only the standard library (no SDK dependency) and returns the
+// permanent https secure_url.
+func uploadToCloudinary(fileHeader *multipart.FileHeader, cfg *config.Config) (string, error) {
+	src, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	// Cloudinary signature: sha1("<sorted params to sign>" + api_secret),
+	// hex-encoded. We only send "timestamp", so signing that alone is enough.
+	toSign := "timestamp=" + timestamp + cfg.CloudinaryAPISecret
+	sum := sha1.Sum([]byte(toSign))
+	signature := hex.EncodeToString(sum[:])
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", fileHeader.Filename)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(part, src); err != nil {
+		return "", err
+	}
+	_ = writer.WriteField("api_key", cfg.CloudinaryAPIKey)
+	_ = writer.WriteField("timestamp", timestamp)
+	_ = writer.WriteField("signature", signature)
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+
+	uploadURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/upload", cfg.CloudinaryCloudName)
+	req, err := http.NewRequest(http.MethodPost, uploadURL, body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		SecureURL string `json:"secure_url"`
+		Error     struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK || result.SecureURL == "" {
+		if result.Error.Message != "" {
+			return "", fmt.Errorf("cloudinary: %s", result.Error.Message)
+		}
+		return "", fmt.Errorf("cloudinary upload failed with status %d", resp.StatusCode)
+	}
+
+	return result.SecureURL, nil
 }
