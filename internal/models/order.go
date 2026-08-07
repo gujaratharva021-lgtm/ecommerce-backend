@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import "time"
 
@@ -29,6 +29,8 @@ UserID            uint             `gorm:"not null;index" json:"user_id"`
 User              User             `gorm:"foreignKey:UserID" json:"-"`
 AddressID         uint             `gorm:"not null" json:"address_id"`
 Address           Address          `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+WarehouseID       *uint            `gorm:"index" json:"warehouse_id,omitempty"`
+Warehouse         *Warehouse       `gorm:"foreignKey:WarehouseID" json:"warehouse,omitempty"`
 ItemsAmount       float64          `gorm:"not null" json:"items_amount"`
 DeliveryCharge    float64          `gorm:"not null;default:0" json:"delivery_charge"`
 WalletAmountUsed  float64          `gorm:"not null;default:0" json:"wallet_amount_used"`
@@ -54,8 +56,8 @@ CreatedAt time.Time `json:"created_at"`
 }
 
 // CheckoutRequest is the body for POST /orders/checkout.
-// AddressID is optional â€” if omitted, the user's default address is used.
-// PaymentMethod is optional â€” defaults to "cod" if omitted; "online" starts
+// AddressID is optional - if omitted, the user's default address is used.
+// PaymentMethod is optional - defaults to "cod" if omitted; "online" starts
 // the Razorpay flow (see POST /orders/:id/payment).
 type CheckoutRequest struct {
 AddressID     uint   `json:"address_id"`
