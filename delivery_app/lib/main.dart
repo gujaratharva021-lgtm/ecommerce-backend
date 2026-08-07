@@ -2,7 +2,7 @@
 import 'services/api_service.dart';
 import 'services/location_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/orders_screen.dart';
+import 'screens/home_shell.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,11 +10,11 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Delivery Partner',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -26,7 +26,6 @@ class MyApp extends StatelessWidget {
 
 class SplashDecider extends StatefulWidget {
   const SplashDecider({super.key});
-
   @override
   State<SplashDecider> createState() => _SplashDeciderState();
 }
@@ -46,7 +45,7 @@ class _SplashDeciderState extends State<SplashDecider> {
       LocationService.startTracking();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OrdersScreen()),
+        MaterialPageRoute(builder: (_) => const HomeShell()),
       );
     } else {
       Navigator.pushReplacement(
