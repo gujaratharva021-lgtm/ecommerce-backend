@@ -8,6 +8,7 @@ import (
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
 // staleLocationWindow is how recent a partner's last location update must
@@ -15,22 +16,6 @@ import (
 // Partners with an older (or missing) location are still eligible, but are
 // ranked after trackable ones, since we can't judge their real distance.
 const staleLocationWindow = 30 * time.Minute
-
-// haversineKm returns the great-circle distance in kilometers between two
-// lat/lng points. This is the standard formula used for short-to-medium
-// range distance estimates where earth curvature matters slightly.
-func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
-const earthRadiusKm = 6371.0
-dLat := (lat2 - lat1) * math.Pi / 180.0
-dLng := (lng2 - lng1) * math.Pi / 180.0
-rLat1 := lat1 * math.Pi / 180.0
-rLat2 := lat2 * math.Pi / 180.0
-
-a := math.Sin(dLat/2)*math.Sin(dLat/2) +
-math.Cos(rLat1)*math.Cos(rLat2)*math.Sin(dLng/2)*math.Sin(dLng/2)
-c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-return earthRadiusKm * c
-}
 
 // AutoAssignDeliveryPartner picks the nearest active, currently-unburdened
 // delivery partner and assigns them to the given order. It's a no-op (logs
@@ -97,7 +82,7 @@ p.LastLocationUpdate != nil && p.LastLocationUpdate.After(staleCutoff)
 
 var distanceKm float64
 if hasFreshLocation {
-distanceKm = haversineKm(custLat, custLng, *p.CurrentLat, *p.CurrentLng)
+distanceKm = utils.HaversineKm(custLat, custLng, *p.CurrentLat, *p.CurrentLng)
 } else {
 // Unknown distance: treat as far away so trackable partners
 // are preferred, but still selectable if no one else exists.

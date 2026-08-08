@@ -26,22 +26,37 @@ export default function Checkout() {
   const [walletBalance, setWalletBalance] = useState(0)
   const [isPlacing, setIsPlacing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [razorpayReady, setRazorpayReady] = useState(false)
 
   useEffect(() => {
-    listAddresses().then((addrs) => {
-      setAddresses(addrs)
-      const def = addrs.find((a) => a.is_default) ?? addrs[0]
-      if (def) setAddressId(def.id)
-    })
-    getWallet().then((w) => setWalletBalance(w.balance))
+    listAddresses()
+      .then((addrs) => {
+        setAddresses(addrs)
+        const def = addrs.find((a) => a.is_default) ?? addrs[0]
+        if (def) setAddressId(def.id)
+      })
+      .catch(() => setError('Could not load your addresses. Please refresh the page.'))
+    getWallet()
+      .then((w) => setWalletBalance(w.balance))
+      .catch(() => {
+        // Wallet is a non-critical enhancement to checkout — fail silently
+        // to 0 rather than blocking the page, but don't let it become an
+        // unhandled rejection.
+      })
   }, [])
 
   useEffect(() => {
     // Load Razorpay checkout script once, for online payments
+    if (window.Razorpay) {
+      setRazorpayReady(true)
+      return
+    }
     if (document.getElementById('razorpay-script')) return
     const script = document.createElement('script')
     script.id = 'razorpay-script'
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => setRazorpayReady(true)
+    script.onerror = () => setError('Could not load the payment provider. Please refresh and try again.')
     document.body.appendChild(script)
   }, [])
 
@@ -79,6 +94,11 @@ export default function Checkout() {
       })
 
       if (paymentMethod === 'online' && order.payment_status !== 'paid') {
+        if (!razorpayReady || !window.Razorpay) {
+          setError('Payment provider is still loading. Please wait a moment and try again.')
+          setIsPlacing(false)
+          return
+        }
         const payRes = await createPaymentOrder(order.id)
         const rzp = new window.Razorpay({
           key: payRes.key_id,

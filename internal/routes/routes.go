@@ -204,25 +204,33 @@ func SetupRoutes(router *gin.Engine) {
 				adminWarehouses.GET("/:id", handlers.GetWarehouse)
 				adminWarehouses.PUT("/:id", handlers.UpdateWarehouse)
 				adminWarehouses.DELETE("/:id", handlers.DeleteWarehouse)
-
-				adminWarehouseStaff := admin.Group("/warehouse-staff")
-				{
-					adminWarehouseStaff.POST("", handlers.CreateWarehouseStaff)
-					adminWarehouseStaff.GET("", handlers.GetWarehouseStaff)
-					adminWarehouseStaff.PUT("/:id", handlers.UpdateWarehouseStaff)
-					adminWarehouseStaff.DELETE("/:id", handlers.DeleteWarehouseStaff)
-				}
-
-				adminStockTransfers := admin.Group("/stock-transfers")
-				{
-					adminStockTransfers.GET("", handlers.GetStockTransfers)
-					adminStockTransfers.PUT("/:id/approve", handlers.ApproveStockTransfer)
-					adminStockTransfers.PUT("/:id/reject", handlers.RejectStockTransfer)
-				}
-                                adminStockTransfers.PUT("/:id/cancel", handlers.CancelStockTransfer)
-
-				admin.POST("/wallet/credit/:user_id", handlers.AdminCreditWallet)
 			}
+
+			// L-12: adminWarehouseStaff, adminStockTransfers, and the
+			// wallet-credit route were previously nested inside the
+			// adminWarehouses block above. Since they're all registered on
+			// `admin` (not `adminWarehouses`), Go's lexical brace scoping
+			// meant the URLs were already correct — but the indentation
+			// actively misled the reader about the route hierarchy, and the
+			// /:id/cancel line sat outside its own group block entirely
+			// (also mixed spaces/tabs). Pulled out as proper siblings here.
+			adminWarehouseStaff := admin.Group("/warehouse-staff")
+			{
+				adminWarehouseStaff.POST("", handlers.CreateWarehouseStaff)
+				adminWarehouseStaff.GET("", handlers.GetWarehouseStaff)
+				adminWarehouseStaff.PUT("/:id", handlers.UpdateWarehouseStaff)
+				adminWarehouseStaff.DELETE("/:id", handlers.DeleteWarehouseStaff)
+			}
+
+			adminStockTransfers := admin.Group("/stock-transfers")
+			{
+				adminStockTransfers.GET("", handlers.GetStockTransfers)
+				adminStockTransfers.PUT("/:id/approve", handlers.ApproveStockTransfer)
+				adminStockTransfers.PUT("/:id/reject", handlers.RejectStockTransfer)
+				adminStockTransfers.PUT("/:id/cancel", handlers.CancelStockTransfer)
+			}
+
+			admin.POST("/wallet/credit/:user_id", handlers.AdminCreditWallet)
 		}
 	}
 }

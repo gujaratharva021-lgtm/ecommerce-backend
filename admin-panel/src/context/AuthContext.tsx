@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '../types/auth'
-import { verifyOtp as verifyOtpApi, sendOtp as sendOtpApi } from '../api/auth'
+import { verifyOtp as verifyOtpApi, sendOtp as sendOtpApi, getMe } from '../api/auth'
 
 interface AuthContextValue {
   user: User | null
@@ -23,20 +23,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Restore session on load
+  // Restore session on load. Rather than trusting the cached role from
+  // localStorage (which could be stale, or hand-edited), revalidate against
+  // the server via getMe() and only admit the user if the server still says
+  // they're an admin. The data itself is already protected server-side by
+  // AdminOnly() middleware — this fixes the UX/defense-in-depth gap where a
+  // stale or tampered session could render the admin UI shell before the
+  // first API call 401s.
   useEffect(() => {
     const storedToken = localStorage.getItem('admin_token')
-    const storedUser = localStorage.getItem('admin_user')
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken)
-        setUser(JSON.parse(storedUser))
-      } catch {
+    if (!storedToken) {
+      setIsLoading(false)
+      return
+    }
+    setToken(storedToken)
+    getMe()
+      .then((freshUser) => {
+        if (freshUser.role !== 'admin') {
+          throw new Error('not an admin')
+        }
+        localStorage.setItem('admin_user', JSON.stringify(freshUser))
+        setUser(freshUser)
+      })
+      .catch(() => {
         localStorage.removeItem('admin_token')
         localStorage.removeItem('admin_user')
-      }
-    }
-    setIsLoading(false)
+        setToken(null)
+        setUser(null)
+      })
+      .finally(() => setIsLoading(false))
   }, [])
 
   async function sendOtp(phone: string) {

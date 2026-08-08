@@ -10,13 +10,20 @@ WalletTxnDebit  = "debit"
 
 // Wallet transaction reasons — used for filtering/reporting and to keep
 // the ledger self-explanatory without joining back to other tables.
+//
+// L-12: WalletReasonCashback and WalletReasonAdminDebit are declared but not
+// yet used anywhere in the codebase — there is currently no cashback-award
+// flow and no admin-debit endpoint. They're kept (rather than deleted) as
+// the intended constants for those features when they're built, so the
+// ledger's reason vocabulary is defined in one place up front; remove them
+// if those features are dropped instead of implemented.
 const (
-WalletReasonCashback     = "cashback"
-WalletReasonRefund       = "refund"
-WalletReasonCheckoutUse  = "checkout_use"
-WalletReasonAdminCredit  = "admin_credit"
-WalletReasonAdminDebit   = "admin_debit"
-WalletReasonOrderRefund  = "order_cancelled_refund"
+WalletReasonCashback    = "cashback"    // reserved: no cashback-award flow implemented yet
+WalletReasonRefund      = "refund"
+WalletReasonCheckoutUse = "checkout_use"
+WalletReasonAdminCredit = "admin_credit"
+WalletReasonAdminDebit  = "admin_debit" // reserved: no admin-debit endpoint implemented yet
+WalletReasonOrderRefund = "order_cancelled_refund"
 )
 
 // Wallet holds a user's spendable balance. One wallet per user, created

@@ -23,3 +23,11 @@ export async function verifyOtp(phone: string, otp: string): Promise<AuthRespons
   const { data } = await apiClient.post<AuthResponse>('/auth/verify-otp', payload)
   return data
 }
+
+// GET /api/v1/auth/me
+// Used on boot to revalidate a session restored from localStorage, instead
+// of trusting the stored role blindly (L-09).
+export async function getMe(): Promise<AuthResponse['user']> {
+  const { data } = await apiClient.get<AuthResponse['user']>('/auth/me')
+  return data
+}

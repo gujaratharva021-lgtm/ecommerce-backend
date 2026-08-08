@@ -15,13 +15,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// freeDeliveryThreshold and flatDeliveryCharge implement a simple, common
-// Indian-ecommerce delivery pricing rule: free delivery above the threshold,
-// otherwise a flat charge. Swap for a real shipping/rate-card service later.
-const (
-	freeDeliveryThreshold = 500.0
-	flatDeliveryCharge    = 50.0
-)
+// freeDeliveryThreshold implements a simple, common Indian-ecommerce
+// delivery pricing rule: free delivery above the threshold. The actual flat
+// charge below the threshold is computed by services/delivery_charge.go
+// (fallbackFlatCharge) — flatDeliveryCharge here was dead code (declared,
+// never referenced) and has been removed (L-12).
+const freeDeliveryThreshold = 500.0
 
 // Checkout godoc
 // POST /api/v1/orders/checkout (protected)

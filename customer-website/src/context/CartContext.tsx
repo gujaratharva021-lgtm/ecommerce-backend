@@ -28,6 +28,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const data = await getCart()
       setCart(data)
+    } catch {
+      // L-10: was try/finally with no catch — a failed load left a stale
+      // cart in state AND threw an unhandled promise rejection. Now it
+      // surfaces as an empty cart instead of silently keeping stale data.
+      setCart(null)
     } finally {
       setIsLoading(false)
     }
