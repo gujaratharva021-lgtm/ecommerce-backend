@@ -5,6 +5,7 @@ import (
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
 // Delivery charge pricing: a base fee plus a per-km charge from the
@@ -36,7 +37,7 @@ return fallbackFlatCharge
 
 nearestKm := math.MaxFloat64
 for _, w := range warehouses {
-d := haversineKm(*addrLat, *addrLng, w.Lat, w.Lng)
+d := utils.HaversineKm(*addrLat, *addrLng, w.Lat, w.Lng)
 if d < nearestKm {
 nearestKm = d
 }
