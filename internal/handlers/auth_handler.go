@@ -90,6 +90,7 @@ err = database.DB.Where("phone = ?", req.Phone).First(&user).Error
 if err != nil {
 user = models.User{
 Phone: req.Phone,
+Name:  req.Name,
 Role:  "customer",
 }
 if err := database.DB.Create(&user).Error; err != nil {

@@ -22,9 +22,12 @@ type SendOTPRequest struct {
 }
 
 // VerifyOTPRequest is the body for POST /auth/verify-otp
+// Name is optional: mobile signup collects it here so first-time users don't
+// end up with a blank name (see auth_handler.go VerifyOTP).
 type VerifyOTPRequest struct {
 	Phone string `json:"phone" binding:"required,len=10,numeric"`
 	OTP   string `json:"otp" binding:"required,len=6,numeric"`
+	Name  string `json:"name" binding:"omitempty,max=100"`
 }
 
 type AuthResponse struct {
