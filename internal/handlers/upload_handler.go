@@ -143,5 +143,20 @@ func uploadToCloudinary(fileHeader *multipart.FileHeader, cfg *config.Config) (s
 		return "", fmt.Errorf("cloudinary upload failed with status %d", resp.StatusCode)
 	}
 
-	return result.SecureURL, nil
+	return optimizeCloudinaryURL(result.SecureURL), nil
+}
+
+// optimizeCloudinaryURL inserts a transformation segment right after
+// "/upload/" so images are served resized (max width 600px), auto-compressed,
+// and in the best format for the requesting device (webp/avif when
+// supported). This makes product images load much faster on the app without
+// any change needed on the frontend - it's baked into the stored URL.
+func optimizeCloudinaryURL(url string) string {
+	const marker = "/upload/"
+	idx := strings.Index(url, marker)
+	if idx == -1 {
+		return url
+	}
+	insertAt := idx + len(marker)
+	return url[:insertAt] + "w_600,q_auto,f_auto/" + url[insertAt:]
 }
