@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Layout({ children }: { children: ReactNode }) {

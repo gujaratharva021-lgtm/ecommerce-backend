@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listOrders, cancelOrder } from '../api/orders'
 import type { Order } from '../types'

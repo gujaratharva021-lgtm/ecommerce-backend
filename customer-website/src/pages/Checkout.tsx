@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { listAddresses } from '../api/addresses'
 import { checkout, createPaymentOrder, verifyPayment } from '../api/orders'

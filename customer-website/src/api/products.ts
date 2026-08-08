@@ -1,4 +1,4 @@
-﻿import { apiClient } from './client'
+import { apiClient } from './client'
 import type { Product, ProductListResponse, ProductListQuery, Review } from '../types'
 
 export const listProducts = (params?: ProductListQuery) =>

@@ -1,4 +1,4 @@
-﻿import { apiClient } from './client'
+import { apiClient } from './client'
 import type { Coupon, WalletResponse, Wishlist } from '../types'
 
 export const validateCoupon = (code: string, orderAmount: number) =>

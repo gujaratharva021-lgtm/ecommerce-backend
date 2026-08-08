@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"fmt"
@@ -27,6 +27,7 @@ type Config struct {
 	CloudinaryCloudName     string
 	CloudinaryAPIKey        string
 	CloudinaryAPISecret     string
+	OTPDebugMode            bool
 }
 
 var AppConfig *Config
@@ -54,6 +55,7 @@ func LoadConfig() *Config {
 		CloudinaryCloudName:     getEnv("CLOUDINARY_CLOUD_NAME", ""),
 		CloudinaryAPIKey:        getEnv("CLOUDINARY_API_KEY", ""),
 		CloudinaryAPISecret:     getEnv("CLOUDINARY_API_SECRET", ""),
+		OTPDebugMode:            getEnv("OTP_DEBUG_MODE", "false") == "true",
 	}
 
 	if cfg.CloudinaryCloudName == "" || cfg.CloudinaryAPIKey == "" || cfg.CloudinaryAPISecret == "" {

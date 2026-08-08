@@ -1,4 +1,4 @@
-﻿const BASE = "http://192.168.1.12:8081/api/v1";
+const BASE = "http://192.168.1.12:8081/api/v1";
 const UPLOAD_BASE = "http://192.168.1.12:8081";
 
 function parseArgs() {

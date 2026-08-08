@@ -1,4 +1,4 @@
-﻿# migrations/
+# migrations/
 
 This project uses golang-migrate for versioned, production-safe schema migrations.
 

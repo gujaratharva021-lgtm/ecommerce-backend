@@ -1,4 +1,4 @@
-﻿const fs = require("fs");
+const fs = require("fs");
 const path = require("path");
 
 const ASSETS_DIR = "C:\\Users\\Administrator\\Desktop\\Blinkit\\assets\\categories";

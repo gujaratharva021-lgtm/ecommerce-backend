@@ -1,4 +1,4 @@
-﻿import apiClient from './client'
+import apiClient from './client'
 import type { StockTransfer } from '../types/warehouse'
 export const listMyStockTransfers = () =>
   apiClient.get('/warehouse/stock-transfers').then((r) => r.data as { stock_transfers: StockTransfer[] })

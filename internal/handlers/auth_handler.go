@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "crypto/rand"
@@ -8,6 +8,7 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -56,10 +57,11 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save OTP"})
 return
 }
 
-c.JSON(http.StatusOK, gin.H{
-"message": "OTP sent successfully",
-"otp":     code, // TEST MODE ONLY -- remove this field once real SMS is wired up
-})
+resp := gin.H{"message": "OTP sent successfully"}
+if config.AppConfig != nil && config.AppConfig.OTPDebugMode {
+resp["otp"] = code // only included when OTP_DEBUG_MODE=true (no real SMS gateway wired up yet)
+}
+c.JSON(http.StatusOK, resp)
 }
 
 // VerifyOTP godoc

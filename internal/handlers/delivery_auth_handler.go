@@ -5,6 +5,7 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -54,7 +55,9 @@ resp := gin.H{
 "message":            "OTP sent successfully",
 "expires_in_minutes": otpValidityMinutes,
 }
-resp["otp"] = code
+if config.AppConfig != nil && config.AppConfig.OTPDebugMode {
+resp["otp"] = code // only included when OTP_DEBUG_MODE=true (no real SMS gateway wired up yet)
+}
 c.JSON(http.StatusOK, resp)
 }
 

@@ -78,3 +78,19 @@ return
 c.Next()
 }
 }
+
+// CustomerOnly ensures the authenticated principal is a customer, not a
+// delivery partner or warehouse staff member re-using their own numeric ID
+// against customer-scoped routes (wallet, cart, orders, etc.). AuthMiddleware
+// only proves "is logged in", not "is a customer" -- this closes that gap.
+func CustomerOnly() gin.HandlerFunc {
+return func(c *gin.Context) {
+role, exists := c.Get("role")
+if !exists || role != "customer" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Customer access required"})
+c.Abort()
+return
+}
+c.Next()
+}
+}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -26,15 +27,20 @@ const (
 // POST /api/v1/orders/checkout (protected)
 // Converts the user's current cart into an order: validates stock for every
 // item, snapshots prices, deducts inventory, applies a coupon if given,
-// creates the order + order items, and empties the cart ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â all inside a
+// creates the order + order items, and empties the cart — all inside a
 // single DB transaction so a failure partway through never leaves stock,
 // coupon usage, or the cart in a bad state.
 func Checkout(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 
 	var req models.CheckoutRequest
-	// Body is optional ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â an empty/missing body just means "use default address + COD".
-	_ = c.ShouldBindJSON(&req)
+	// Body is optional — an empty/missing body just means "use default address + COD".
+	// A body that *was* sent but is malformed/invalid must still be rejected,
+	// so only io.EOF (no body at all) is swallowed here.
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		return
+	}
 
 	paymentMethod := req.PaymentMethod
 	if paymentMethod == "" {
@@ -201,7 +207,7 @@ func Checkout(c *gin.Context) {
 		}
 
 		// Record coupon usage only after the order is successfully created,
-		// inside the same transaction ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â if anything above fails, the coupon
+		// inside the same transaction — if anything above fails, the coupon
 		// use rolls back too, so it never gets burned on a failed checkout.
 		if appliedCoupon != nil {
 			if err := ApplyCoupon(tx, appliedCoupon, order.ID, discount); err != nil {
@@ -234,7 +240,7 @@ func Checkout(c *gin.Context) {
 }
 
 // GetOrders godoc
-// GET /api/v1/orders (protected) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ?page=&limit=
+// GET /api/v1/orders (protected) — ?page=&limit=
 func GetOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
 

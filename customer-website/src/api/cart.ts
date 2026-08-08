@@ -1,4 +1,4 @@
-﻿import { apiClient } from './client'
+import { apiClient } from './client'
 import type { CartResponse } from '../types'
 
 export const getCart = () => apiClient.get<CartResponse>('/cart').then((r) => r.data)

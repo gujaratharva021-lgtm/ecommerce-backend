@@ -1,4 +1,4 @@
-﻿import { apiClient } from './client'
+import { apiClient } from './client'
 import type { Address, AddressRequest } from '../types'
 
 export const listAddresses = () =>

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { listAddresses, createAddress, deleteAddress, setDefaultAddress } from '../api/addresses'
 import type { Address, AddressRequest } from '../types'
 

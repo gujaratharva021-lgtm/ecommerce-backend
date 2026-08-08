@@ -1,4 +1,4 @@
-﻿import { apiClient } from './client'
+import { apiClient } from './client'
 import type { AuthResponse, User } from '../types'
 
 export const sendOTP = (phone: string) =>

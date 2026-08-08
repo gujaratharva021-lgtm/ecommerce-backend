@@ -1,4 +1,4 @@
-﻿export interface WarehouseStaff {
+export interface WarehouseStaff {
   id: number
   name: string
   phone: string
