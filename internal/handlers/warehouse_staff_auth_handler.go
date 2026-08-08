@@ -5,7 +5,6 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
-"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -55,9 +54,7 @@ resp := gin.H{
 "message":            "OTP sent successfully",
 "expires_in_minutes": otpValidityMinutes,
 }
-if config.AppConfig.GinMode != "release" {
 resp["otp"] = code
-}
 c.JSON(http.StatusOK, resp)
 }
 
