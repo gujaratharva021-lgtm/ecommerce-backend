@@ -2,7 +2,9 @@ package database
 
 import (
 	"log"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"gorm.io/driver/postgres"
@@ -14,12 +16,31 @@ var DB *gorm.DB
 
 // ConnectDatabase opens a connection to PostgreSQL and stores it in DB.
 func ConnectDatabase(cfg *config.Config) {
+	// Only log every SQL query in dev mode. In production this slows down
+	// every request and floods the logs.
+	logLevel := logger.Info
+	if cfg.GinMode == gin.ReleaseMode {
+		logLevel = logger.Warn
+	}
+
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying sql.DB: %v", err)
+	}
+	// Connection pool tuning - prevents stale/hanging connections on hosted
+	// Postgres (common cause of slow requests after idle periods on Render).
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(2 * time.Minute)
+
 	DB = db
 	log.Println("Database connected successfully")
 }
