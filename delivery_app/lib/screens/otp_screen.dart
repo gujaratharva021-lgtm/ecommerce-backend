@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
-import 'orders_screen.dart';
+import 'home_shell.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -43,7 +43,7 @@ class _OtpScreenState extends State<OtpScreen> {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const OrdersScreen()),
+          MaterialPageRoute(builder: (_) => const HomeShell()),
           (route) => false,
         );
       } else {
@@ -113,3 +113,4 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 }
+
