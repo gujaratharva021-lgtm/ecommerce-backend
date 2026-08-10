@@ -11,6 +11,7 @@ import (
 // SetupRoutes defines every API endpoint for the application.
 func SetupRoutes(router *gin.Engine) {
 	router.Use(middleware.CORS())
+	router.Use(middleware.SecurityHeaders())
 
 	router.GET("/health", handlers.HealthCheck)
 
