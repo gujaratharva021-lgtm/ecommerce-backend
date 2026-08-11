@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -31,6 +32,7 @@ func CreateCategory(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Category already exists or could not be created"})
 		return
 	}
+	_ = cache.Delete(c.Request.Context(), "categories:all")
 	adminID := c.MustGet("user_id").(uint)
 	adminPhone := c.MustGet("phone").(string)
 	utils.LogAudit(adminID, adminPhone, "create_category", "category", fmt.Sprint(category.ID), "name: "+category.Name)
@@ -61,6 +63,7 @@ func UpdateCategory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
 		return
 	}
+	_ = cache.Delete(c.Request.Context(), "categories:all")
 
 	adminID := c.MustGet("user_id").(uint)
 	adminPhone := c.MustGet("phone").(string)
@@ -93,6 +96,7 @@ func DeleteCategory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete category"})
 		return
 	}
+	_ = cache.Delete(c.Request.Context(), "categories:all")
 
 	adminID := c.MustGet("user_id").(uint)
 	adminPhone := c.MustGet("phone").(string)
@@ -146,6 +150,7 @@ InStock:     req.Stock > 0,
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
 		return
 	}
+	_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 
 	database.DB.Preload("Category").Preload("Inventories").First(&product, product.ID)
 
@@ -189,6 +194,8 @@ func UpdateProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
 		return
 	}
+	_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
+	_ = cache.Delete(c.Request.Context(), "products:id:"+id)
 
 	database.DB.Preload("Category").Preload("Inventories").First(&product, product.ID)
 
@@ -220,6 +227,8 @@ func DeleteProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
 		return
 	}
+	_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
+	_ = cache.Delete(c.Request.Context(), "products:id:"+id)
 
 	adminID := c.MustGet("user_id").(uint)
 	adminPhone := c.MustGet("phone").(string)
@@ -264,6 +273,8 @@ func UpdateInventory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update inventory"})
 		return
 	}
+	if err := cache.DeleteByPrefix(c.Request.Context(), "products:list:"); err != nil { }
+	_ = cache.Delete(c.Request.Context(), "products:id:"+id)
 
 	adminID := c.MustGet("user_id").(uint)
 	adminPhone := c.MustGet("phone").(string)

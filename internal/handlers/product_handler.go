@@ -1,12 +1,15 @@
-package handlers
+﻿package handlers
 
 import (
+	"fmt"
 	"math"
 	"net/http"
+	"time"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 )
 
@@ -25,6 +28,19 @@ func GetProducts(c *gin.Context) {
 	}
 	if query.Limit < 1 || query.Limit > 100 {
 		query.Limit = 20
+	}
+
+	inStockStr := "any"
+	if query.InStock != nil {
+		inStockStr = fmt.Sprintf("%v", *query.InStock)
+	}
+	cacheKey := fmt.Sprintf("products:list:page=%d:limit=%d:search=%s:cat=%d:min=%.2f:max=%.2f:instock=%s:sort=%s",
+		query.Page, query.Limit, query.Search, query.CategoryID, query.MinPrice, query.MaxPrice, inStockStr, query.Sort)
+
+	var cachedResponse models.ProductListResponse
+	if found, _ := cache.Get(c.Request.Context(), cacheKey, &cachedResponse); found {
+		c.JSON(http.StatusOK, cachedResponse)
+		return
 	}
 
 	db := database.DB.Model(&models.Product{}).Preload("Category").Preload("Inventories")
@@ -87,37 +103,55 @@ func GetProducts(c *gin.Context) {
 
 	totalPages := int(math.Ceil(float64(total) / float64(query.Limit)))
 
-	c.JSON(http.StatusOK, models.ProductListResponse{
+	response := models.ProductListResponse{
 		Products:   products,
 		Page:       query.Page,
 		Limit:      query.Limit,
 		Total:      total,
 		TotalPages: totalPages,
-	})
+	}
+
+	_ = cache.Set(c.Request.Context(), cacheKey, response, 3*time.Minute)
+	c.JSON(http.StatusOK, response)
 }
 
 // GetProductByID godoc
 // GET /api/v1/products/:id
 func GetProductByID(c *gin.Context) {
 	id := c.Param("id")
+	cacheKey := "products:id:" + id
 
 	var product models.Product
+	if found, _ := cache.Get(c.Request.Context(), cacheKey, &product); found {
+		c.JSON(http.StatusOK, product)
+		return
+	}
+
 	if err := database.DB.Preload("Category").Preload("Inventories").First(&product, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 		return
 	}
 
+	_ = cache.Set(c.Request.Context(), cacheKey, product, 10*time.Minute)
 	c.JSON(http.StatusOK, product)
 }
 
 // GetCategories godoc
 // GET /api/v1/categories
 func GetCategories(c *gin.Context) {
+	cacheKey := "categories:all"
 	var categories []models.Category
+
+	if found, _ := cache.Get(c.Request.Context(), cacheKey, &categories); found {
+		c.JSON(http.StatusOK, gin.H{"categories": categories})
+		return
+	}
+
 	if err := database.DB.Order("name ASC").Find(&categories).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
 		return
 	}
 
+	_ = cache.Set(c.Request.Context(), cacheKey, categories, 30*time.Minute)
 	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }

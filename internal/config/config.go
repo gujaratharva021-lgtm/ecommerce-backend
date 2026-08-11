@@ -27,6 +27,7 @@ type Config struct {
 	CloudinaryCloudName     string
 	CloudinaryAPIKey        string
 	CloudinaryAPISecret     string
+	RedisURL                string
 }
 
 var AppConfig *Config
@@ -54,6 +55,7 @@ func LoadConfig() *Config {
 		CloudinaryCloudName:     getEnv("CLOUDINARY_CLOUD_NAME", ""),
 		CloudinaryAPIKey:        getEnv("CLOUDINARY_API_KEY", ""),
 		CloudinaryAPISecret:     getEnv("CLOUDINARY_API_SECRET", ""),
+		RedisURL:                getEnv("REDIS_URL", ""),
 	}
 
 	if cfg.CloudinaryCloudName == "" || cfg.CloudinaryAPIKey == "" || cfg.CloudinaryAPISecret == "" {

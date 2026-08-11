@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 "log"
@@ -19,6 +19,9 @@ cfg := config.LoadConfig()
 
 // 2. Connect to PostgreSQL
 database.ConnectDatabase(cfg)
+
+	// 2b. Connect to Redis (optional - caching disabled if REDIS_URL unset)
+	database.ConnectRedis(cfg)
 
 // 3. Run auto-migration to create tables (dev/debug only;
 // In production (GIN_MODE=release), schema changes must go through
