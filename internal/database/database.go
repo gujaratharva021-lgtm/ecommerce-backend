@@ -1,4 +1,4 @@
-package database
+﻿package database
 
 import (
 	"log"
@@ -76,9 +76,14 @@ func AutoMigrate() {
 		&models.WalletTransaction{},
 		&models.ReturnRequest{},
 		&models.ReturnRequestItem{},
+		&models.CartReservation{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
+	if err := DB.Exec(`ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS service_area geometry(Polygon, 4326)`).Error; err != nil {
+		log.Fatalf("Failed to add service_area column: %v", err)
+	}
+
 	log.Println("Database migration completed")
 }

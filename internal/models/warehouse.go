@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import (
 "time"
@@ -17,6 +17,7 @@ Address   string         `json:"address"`
 Lat             float64        `json:"lat"`
 Lng             float64        `json:"lng"`
 ServiceRadiusKm float64        `gorm:"default:5" json:"service_radius_km"`
+	ServiceArea     string         `gorm:"-" json:"service_area,omitempty"`
 IsActive        bool           `gorm:"default:true" json:"is_active"`
 CreatedAt time.Time      `json:"created_at"`
 UpdatedAt time.Time      `json:"updated_at"`

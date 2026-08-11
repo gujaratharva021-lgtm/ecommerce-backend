@@ -1,4 +1,4 @@
-package routes
+﻿package routes
 
 import (
 	"time"
@@ -51,6 +51,7 @@ func SetupRoutes(router *gin.Engine) {
 
 		// ---- Serviceability routes (public) ----
 		api.GET("/serviceability", handlers.CheckServiceability)
+	api.GET("/debug-postgis", handlers.DebugCheckPostGIS)
 
 		// ---- Notification routes (protected) ----
 		api.GET("/notifications", middleware.AuthMiddleware(), handlers.GetMyNotifications)
@@ -205,6 +206,7 @@ func SetupRoutes(router *gin.Engine) {
 				adminWarehouses.GET("/:id", handlers.GetWarehouse)
 				adminWarehouses.PUT("/:id", handlers.UpdateWarehouse)
 				adminWarehouses.DELETE("/:id", handlers.DeleteWarehouse)
+					adminWarehouses.PUT("/:id/service-area", handlers.SetWarehouseServiceArea)
 
 				adminWarehouseStaff := admin.Group("/warehouse-staff")
 				{
@@ -227,3 +229,4 @@ func SetupRoutes(router *gin.Engine) {
 		}
 	}
 }
+
