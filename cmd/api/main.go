@@ -43,6 +43,12 @@ services.SendPushToAll("Quick Delivery", "\U0001F6D2 Everything you need, delive
 c.AddFunc("0 15 * * *", func() {
 services.SendPushToAll("Fresh Deals", "\U0001F389 Fresh deals are waiting for you. Don't miss out!")
 })
+// Sweep expired cart reservations every 2 minutes. Reservations also
+// self-expire lazily (checked inline on every reserve), but this catches
+// holds nobody happens to re-check, so rows don't pile up forever.
+c.AddFunc("*/2 * * * *", func() {
+services.CleanupExpiredReservations()
+})
 c.Start()
 
 // 6. Setup Gin router

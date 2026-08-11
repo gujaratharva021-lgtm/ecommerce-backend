@@ -1,0 +1,417 @@
+diff --git a/cmd/api/main.go b/cmd/api/main.go
+index 794f7f1..7298847 100644
+--- a/cmd/api/main.go
++++ b/cmd/api/main.go
+@@ -43,6 +43,12 @@ services.SendPushToAll("Quick Delivery", "\U0001F6D2 Everything you need, delive
+ c.AddFunc("0 15 * * *", func() {
+ services.SendPushToAll("Fresh Deals", "\U0001F389 Fresh deals are waiting for you. Don't miss out!")
+ })
++// Sweep expired cart reservations every 2 minutes. Reservations also
++// self-expire lazily (checked inline on every reserve), but this catches
++// holds nobody happens to re-check, so rows don't pile up forever.
++c.AddFunc("*/2 * * * *", func() {
++services.CleanupExpiredReservations()
++})
+ c.Start()
+ 
+ // 6. Setup Gin router
+diff --git a/internal/database/database.go b/internal/database/database.go
+index b9a4f6c..f125f3a 100644
+--- a/internal/database/database.go
++++ b/internal/database/database.go
+@@ -76,6 +76,7 @@ func AutoMigrate() {
+ 		&models.WalletTransaction{},
+ 		&models.ReturnRequest{},
+ 		&models.ReturnRequestItem{},
++		&models.CartReservation{},
+ 	)
+ 	if err != nil {
+ 		log.Fatalf("Failed to auto-migrate database: %v", err)
+diff --git a/internal/handlers/cart_handler.go b/internal/handlers/cart_handler.go
+index 853ab08..ec2fb21 100644
+--- a/internal/handlers/cart_handler.go
++++ b/internal/handlers/cart_handler.go
+@@ -6,6 +6,8 @@ import (
+ 	"github.com/gin-gonic/gin"
+ 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+ 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
++	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
++	"gorm.io/gorm"
+ )
+ 
+ // getOrCreateCart returns the user's cart, creating one if it doesn't exist yet
+@@ -24,6 +26,24 @@ func getOrCreateCart(userID uint) (*models.Cart, error) {
+ 	return &cart, nil
+ }
+ 
++// resolveWarehouseForUser returns the nearest warehouse to the user's
++// default saved address, or nil (no error) if the user has no default
++// address yet - callers should fall back to the old combined-stock check
++// in that case, since we can't reserve at a specific warehouse without
++// knowing which one the user would actually be served from.
++func resolveWarehouseForUser(userID uint) (*models.Warehouse, error) {
++	var address models.Address
++	err := database.DB.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error
++	if err != nil || address.Lat == nil || address.Lng == nil {
++		return nil, nil
++	}
++	warehouse, _, err := FindNearestWarehouse(*address.Lat, *address.Lng)
++	if err != nil {
++		return nil, err
++	}
++	return warehouse, nil
++}
++
+ // buildCartResponse loads items (with product + inventory) and computes totals.
+ func buildCartResponse(cart *models.Cart) (models.CartResponse, error) {
+ 	var items []models.CartItem
+@@ -90,44 +110,64 @@ func AddToCart(c *gin.Context) {
+ 		return
+ 	}
+ 
+-	// Check combined stock across all warehouses.
+-	totalStock, err := database.GetTotalStock(req.ProductID)
++	cart, err := getOrCreateCart(userID)
+ 	if err != nil {
+-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
++		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
+ 		return
+ 	}
+-	if totalStock < req.Quantity {
+-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+-		return
++
++	var existingItem models.CartItem
++	hasExisting := database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error == nil
++	newQuantity := req.Quantity
++	if hasExisting {
++		newQuantity = existingItem.Quantity + req.Quantity
+ 	}
+ 
+-	cart, err := getOrCreateCart(userID)
++	// Resolve the user's nearest warehouse (from their default address) so
++	// the stock check/hold is warehouse-specific and accounts for other
++	// shoppers' active 10-minute reservations. Users without a saved
++	// default address yet fall back to the old combined-stock check,
++	// since we don't know which warehouse would actually serve them.
++	warehouse, err := resolveWarehouseForUser(userID)
+ 	if err != nil {
+-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
++		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
+ 		return
+ 	}
+ 
+-	var existingItem models.CartItem
+-	err = database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error
+-	if err == nil {
+-		// Item already in cart Ã¢â‚¬â€ increment quantity
+-		existingItem.Quantity += req.Quantity
+-		if err := database.DB.Save(&existingItem).Error; err != nil {
+-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
+-			return
++	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
++		if warehouse != nil {
++			if err := services.ReserveStock(tx, userID, req.ProductID, warehouse.ID, newQuantity); err != nil {
++				return err
++			}
++		} else {
++			totalStock, err := database.GetTotalStock(req.ProductID)
++			if err != nil {
++				return err
++			}
++			if totalStock < newQuantity {
++				return services.ErrInsufficientStock
++			}
++		}
++
++		if hasExisting {
++			existingItem.Quantity = newQuantity
++			return tx.Save(&existingItem).Error
+ 		}
+-	} else {
+ 		newItem := models.CartItem{
+ 			CartID:    cart.ID,
+ 			ProductID: req.ProductID,
+-			Quantity:  req.Quantity,
++			Quantity:  newQuantity,
+ 		}
+-		if err := database.DB.Create(&newItem).Error; err != nil {
++		return tx.Create(&newItem).Error
++	})
++	if txErr != nil {
++		if txErr == services.ErrInsufficientStock {
++			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
++		} else {
+ 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add item to cart"})
+-			return
+ 		}
++		return
+ 	}
+-
+ 	resp, err := buildCartResponse(cart)
+ 	if err != nil {
+ 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
+@@ -161,20 +201,37 @@ func UpdateCartItem(c *gin.Context) {
+ 		return
+ 	}
+ 
+-	// Check combined stock across all warehouses (same rule as AddToCart).
+-	totalStock, err := database.GetTotalStock(item.ProductID)
++	// Resolve warehouse the same way AddToCart does, so the stock/hold
++	// check accounts for other shoppers' active reservations.
++	warehouse, err := resolveWarehouseForUser(userID)
+ 	if err != nil {
+-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
+-		return
+-	}
+-	if totalStock < req.Quantity {
+-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
++		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
+ 		return
+ 	}
+ 
+-	item.Quantity = req.Quantity
+-	if err := database.DB.Save(&item).Error; err != nil {
+-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
++	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
++		if warehouse != nil {
++			if err := services.ReserveStock(tx, userID, item.ProductID, warehouse.ID, req.Quantity); err != nil {
++				return err
++			}
++		} else {
++			totalStock, err := database.GetTotalStock(item.ProductID)
++			if err != nil {
++				return err
++			}
++			if totalStock < req.Quantity {
++				return services.ErrInsufficientStock
++			}
++		}
++		item.Quantity = req.Quantity
++		return tx.Save(&item).Error
++	})
++	if txErr != nil {
++		if txErr == services.ErrInsufficientStock {
++			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
++		} else {
++			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
++		}
+ 		return
+ 	}
+ 
+@@ -209,6 +266,12 @@ func RemoveFromCart(c *gin.Context) {
+ 		return
+ 	}
+ 
++	// Release any hold on this product too, regardless of which warehouse
++	// it was reserved at - the item is gone from the cart, so nothing
++	// should keep the stock tied up until the TTL runs out on its own.
++	database.DB.Where("user_id = ? AND product_id = ?", userID, item.ProductID).
++		Delete(&models.CartReservation{})
++
+ 	resp, err := buildCartResponse(&cart)
+ 	if err != nil {
+ 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
+diff --git a/internal/handlers/order_handler.go b/internal/handlers/order_handler.go
+index e57ee78..fab87e3 100644
+--- a/internal/handlers/order_handler.go
++++ b/internal/handlers/order_handler.go
+@@ -216,6 +216,13 @@ if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err
+ return err
+ }
+ 
++// The real stock deduction above (under its own row lock) is now the
++// source of truth, so any cart holds this user had - for these items
++// or anything else left over - no longer serve a purpose.
++if err := services.ReleaseAllUserReservations(tx, userID); err != nil {
++return err
++}
++
+ return nil
+ })
+ 
+diff --git a/internal/models/cart_reservation.go b/internal/models/cart_reservation.go
+new file mode 100644
+index 0000000..1dd16cb
+--- /dev/null
++++ b/internal/models/cart_reservation.go
+@@ -0,0 +1,27 @@
++package models
++
++import "time"
++
++// CartReservation is a short-lived hold on stock for one (user, product,
++// warehouse) combination, created when an item is added to (or updated in)
++// a cart. It exists to give an accurate "in stock" picture to *other*
++// shoppers browsing the same product — it does NOT replace the real,
++// transactional stock deduction that happens at Checkout (which still uses
++// SELECT ... FOR UPDATE on the Inventory row and is the actual source of
++// truth). If the hold expires before checkout, the stock silently becomes
++// available to others again; nothing needs to "undo" it, since a reserved
++// unit was never actually deducted from Inventory.Stock.
++//
++// One row per (UserID, ProductID, WarehouseID) — updating quantity/expiry
++// in place (upsert) rather than creating duplicates, so a user changing
++// the quantity of the same cart item doesn't pile up rows.
++type CartReservation struct {
++	ID          uint      `gorm:"primaryKey" json:"id"`
++	UserID      uint      `gorm:"not null;uniqueIndex:idx_reservation_user_product_wh" json:"user_id"`
++	ProductID   uint      `gorm:"not null;uniqueIndex:idx_reservation_user_product_wh;index:idx_reservation_product_wh" json:"product_id"`
++	WarehouseID uint      `gorm:"not null;uniqueIndex:idx_reservation_user_product_wh;index:idx_reservation_product_wh" json:"warehouse_id"`
++	Quantity    int       `gorm:"not null" json:"quantity"`
++	ExpiresAt   time.Time `gorm:"not null;index" json:"expires_at"`
++	CreatedAt   time.Time `json:"created_at"`
++	UpdatedAt   time.Time `json:"updated_at"`
++}
+diff --git a/internal/services/reservation.go b/internal/services/reservation.go
+new file mode 100644
+index 0000000..b5b2482
+--- /dev/null
++++ b/internal/services/reservation.go
+@@ -0,0 +1,104 @@
++package services
++
++import (
++	"errors"
++	"time"
++
++	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
++	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
++	"gorm.io/gorm"
++	"gorm.io/gorm/clause"
++)
++
++// ReservationTTL is how long a cart hold lasts before it silently expires
++// and the stock becomes available to other shoppers again.
++const ReservationTTL = 10 * time.Minute
++
++var ErrInsufficientStock = errors.New("insufficient stock for this product")
++
++// expireStaleReservations deletes reservation rows (for one product+warehouse)
++// whose hold has already run out. Called right before every availability
++// check/reserve so expired holds never block a genuinely free purchase -
++// this is the "lazy cleanup" half of the TTL (see also the periodic sweep
++// registered in main.go for reservations nobody happens to re-check).
++func expireStaleReservations(tx *gorm.DB, productID, warehouseID uint) error {
++	return tx.Where("product_id = ? AND warehouse_id = ? AND expires_at < ?",
++		productID, warehouseID, time.Now()).
++		Delete(&models.CartReservation{}).Error
++}
++
++// ReserveStock places (or refreshes) a 10-minute hold for userID on
++// quantity units of productID at warehouseID. It fails with
++// ErrInsufficientStock if, after subtracting everyone else's active holds,
++// there isn't enough real stock left to grant this reservation.
++//
++// Must be called with the Inventory row already locked (SELECT ... FOR
++// UPDATE) by the caller's transaction, so two concurrent reserves on the
++// same product/warehouse can't both read the same "available" number and
++// both succeed beyond real stock.
++func ReserveStock(tx *gorm.DB, userID, productID, warehouseID uint, quantity int) error {
++	if err := expireStaleReservations(tx, productID, warehouseID); err != nil {
++		return err
++	}
++
++	var inventory models.Inventory
++	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
++		Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).
++		First(&inventory).Error; err != nil {
++		return errors.New("this product is not available at your nearest warehouse")
++	}
++	if !inventory.InStock {
++		return ErrInsufficientStock
++	}
++
++	var reservedByOthers int64
++	if err := tx.Model(&models.CartReservation{}).
++		Where("product_id = ? AND warehouse_id = ? AND user_id != ? AND expires_at >= ?",
++			productID, warehouseID, userID, time.Now()).
++		Select("COALESCE(SUM(quantity), 0)").
++		Scan(&reservedByOthers).Error; err != nil {
++		return err
++	}
++
++	available := inventory.Stock - int(reservedByOthers)
++	if quantity > available {
++		return ErrInsufficientStock
++	}
++
++	// Upsert: one row per (user, product, warehouse) - update in place.
++	reservation := models.CartReservation{
++		UserID:      userID,
++		ProductID:   productID,
++		WarehouseID: warehouseID,
++		Quantity:    quantity,
++		ExpiresAt:   time.Now().Add(ReservationTTL),
++	}
++	return tx.Clauses(clause.OnConflict{
++		Columns:   []clause.Column{{Name: "user_id"}, {Name: "product_id"}, {Name: "warehouse_id"}},
++		DoUpdates: clause.AssignmentColumns([]string{"quantity", "expires_at", "updated_at"}),
++	}).Create(&reservation).Error
++}
++
++// ReleaseReservation removes a single (user, product, warehouse) hold, e.g.
++// when the item is removed from the cart entirely.
++func ReleaseReservation(userID, productID, warehouseID uint) error {
++	return database.DB.
++		Where("user_id = ? AND product_id = ? AND warehouse_id = ?", userID, productID, warehouseID).
++		Delete(&models.CartReservation{}).Error
++}
++
++// ReleaseAllUserReservations clears every hold a user has, regardless of
++// warehouse. Called after a successful checkout (the real stock deduction
++// already happened under its own lock, so the holds have served their
++// purpose) and after the cart is cleared, so nothing lingers until its TTL.
++func ReleaseAllUserReservations(tx *gorm.DB, userID uint) error {
++	return tx.Where("user_id = ?", userID).Delete(&models.CartReservation{}).Error
++}
++
++// CleanupExpiredReservations deletes every reservation row (any product,
++// any warehouse) whose hold has run out. Registered as a periodic cron job
++// in main.go so rows don't pile up indefinitely for products nobody
++// re-checks after the original shopper wanders off.
++func CleanupExpiredReservations() {
++	database.DB.Where("expires_at < ?", time.Now()).Delete(&models.CartReservation{})
++}
+diff --git a/migrations/000012_add_cart_reservations.down.sql b/migrations/000012_add_cart_reservations.down.sql
+new file mode 100644
+index 0000000..ddef42a
+--- /dev/null
++++ b/migrations/000012_add_cart_reservations.down.sql
+@@ -0,0 +1 @@
++DROP TABLE IF EXISTS public.cart_reservations CASCADE;
+diff --git a/migrations/000012_add_cart_reservations.up.sql b/migrations/000012_add_cart_reservations.up.sql
+new file mode 100644
+index 0000000..830b0d3
+--- /dev/null
++++ b/migrations/000012_add_cart_reservations.up.sql
+@@ -0,0 +1,29 @@
++-- Short-lived (10-minute) cart holds per (user, product, warehouse), so
++-- other shoppers see accurate "in stock" numbers before checkout actually
++-- deducts real stock. See internal/services/reservation.go for the logic.
++CREATE TABLE public.cart_reservations (
++    id BIGSERIAL PRIMARY KEY,
++    user_id bigint NOT NULL,
++    product_id bigint NOT NULL,
++    warehouse_id bigint NOT NULL,
++    quantity integer NOT NULL,
++    expires_at timestamp with time zone NOT NULL,
++    created_at timestamp with time zone,
++    updated_at timestamp with time zone
++);
++
++CREATE UNIQUE INDEX idx_reservation_user_product_wh
++    ON public.cart_reservations (user_id, product_id, warehouse_id);
++
++CREATE INDEX idx_reservation_product_wh
++    ON public.cart_reservations (product_id, warehouse_id);
++
++CREATE INDEX idx_cart_reservations_expires_at
++    ON public.cart_reservations (expires_at);
++
++ALTER TABLE ONLY public.cart_reservations
++    ADD CONSTRAINT fk_cart_reservations_user FOREIGN KEY (user_id) REFERENCES public.users(id);
++ALTER TABLE ONLY public.cart_reservations
++    ADD CONSTRAINT fk_cart_reservations_product FOREIGN KEY (product_id) REFERENCES public.products(id);
++ALTER TABLE ONLY public.cart_reservations
++    ADD CONSTRAINT fk_cart_reservations_warehouse FOREIGN KEY (warehouse_id) REFERENCES public.warehouses(id);

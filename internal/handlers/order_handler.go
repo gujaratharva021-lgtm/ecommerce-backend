@@ -216,6 +216,13 @@ if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err
 return err
 }
 
+// The real stock deduction above (under its own row lock) is now the
+// source of truth, so any cart holds this user had - for these items
+// or anything else left over - no longer serve a purpose.
+if err := services.ReleaseAllUserReservations(tx, userID); err != nil {
+return err
+}
+
 return nil
 })
 
