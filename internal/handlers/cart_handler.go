@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+	"gorm.io/gorm"
 )
 
 // getOrCreateCart returns the user's cart, creating one if it doesn't exist yet
@@ -22,6 +24,24 @@ func getOrCreateCart(userID uint) (*models.Cart, error) {
 		return nil, err
 	}
 	return &cart, nil
+}
+
+// resolveWarehouseForUser returns the nearest warehouse to the user's
+// default saved address, or nil (no error) if the user has no default
+// address yet - callers should fall back to the old combined-stock check
+// in that case, since we can't reserve at a specific warehouse without
+// knowing which one the user would actually be served from.
+func resolveWarehouseForUser(userID uint) (*models.Warehouse, error) {
+	var address models.Address
+	err := database.DB.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error
+	if err != nil || address.Lat == nil || address.Lng == nil {
+		return nil, nil
+	}
+	warehouse, _, err := FindNearestWarehouse(*address.Lat, *address.Lng)
+	if err != nil {
+		return nil, err
+	}
+	return warehouse, nil
 }
 
 // buildCartResponse loads items (with product + inventory) and computes totals.
@@ -90,17 +110,6 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
-	// Check combined stock across all warehouses.
-	totalStock, err := database.GetTotalStock(req.ProductID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
-		return
-	}
-	if totalStock < req.Quantity {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
-		return
-	}
-
 	cart, err := getOrCreateCart(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
@@ -108,26 +117,57 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var existingItem models.CartItem
-	err = database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error
-	if err == nil {
-		// Item already in cart Ã¢â‚¬â€ increment quantity
-		existingItem.Quantity += req.Quantity
-		if err := database.DB.Save(&existingItem).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
-			return
+	hasExisting := database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error == nil
+	newQuantity := req.Quantity
+	if hasExisting {
+		newQuantity = existingItem.Quantity + req.Quantity
+	}
+
+	// Resolve the user's nearest warehouse (from their default address) so
+	// the stock check/hold is warehouse-specific and accounts for other
+	// shoppers' active 10-minute reservations. Users without a saved
+	// default address yet fall back to the old combined-stock check,
+	// since we don't know which warehouse would actually serve them.
+	warehouse, err := resolveWarehouseForUser(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
+		return
+	}
+
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		if warehouse != nil {
+			if err := services.ReserveStock(tx, userID, req.ProductID, warehouse.ID, newQuantity); err != nil {
+				return err
+			}
+		} else {
+			totalStock, err := database.GetTotalStock(req.ProductID)
+			if err != nil {
+				return err
+			}
+			if totalStock < newQuantity {
+				return services.ErrInsufficientStock
+			}
 		}
-	} else {
+
+		if hasExisting {
+			existingItem.Quantity = newQuantity
+			return tx.Save(&existingItem).Error
+		}
 		newItem := models.CartItem{
 			CartID:    cart.ID,
 			ProductID: req.ProductID,
-			Quantity:  req.Quantity,
+			Quantity:  newQuantity,
 		}
-		if err := database.DB.Create(&newItem).Error; err != nil {
+		return tx.Create(&newItem).Error
+	})
+	if txErr != nil {
+		if txErr == services.ErrInsufficientStock {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add item to cart"})
-			return
 		}
+		return
 	}
-
 	resp, err := buildCartResponse(cart)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
@@ -161,20 +201,37 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
-	// Check combined stock across all warehouses (same rule as AddToCart).
-	totalStock, err := database.GetTotalStock(item.ProductID)
+	// Resolve warehouse the same way AddToCart does, so the stock/hold
+	// check accounts for other shoppers' active reservations.
+	warehouse, err := resolveWarehouseForUser(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check stock"})
-		return
-	}
-	if totalStock < req.Quantity {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
 		return
 	}
 
-	item.Quantity = req.Quantity
-	if err := database.DB.Save(&item).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		if warehouse != nil {
+			if err := services.ReserveStock(tx, userID, item.ProductID, warehouse.ID, req.Quantity); err != nil {
+				return err
+			}
+		} else {
+			totalStock, err := database.GetTotalStock(item.ProductID)
+			if err != nil {
+				return err
+			}
+			if totalStock < req.Quantity {
+				return services.ErrInsufficientStock
+			}
+		}
+		item.Quantity = req.Quantity
+		return tx.Save(&item).Error
+	})
+	if txErr != nil {
+		if txErr == services.ErrInsufficientStock {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
+		}
 		return
 	}
 
@@ -208,6 +265,12 @@ func RemoveFromCart(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove cart item"})
 		return
 	}
+
+	// Release any hold on this product too, regardless of which warehouse
+	// it was reserved at - the item is gone from the cart, so nothing
+	// should keep the stock tied up until the TTL runs out on its own.
+	database.DB.Where("user_id = ? AND product_id = ?", userID, item.ProductID).
+		Delete(&models.CartReservation{})
 
 	resp, err := buildCartResponse(&cart)
 	if err != nil {
