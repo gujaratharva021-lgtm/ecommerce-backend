@@ -6,6 +6,7 @@ import (
 "strconv"
 
 "github.com/gin-gonic/gin"
+	"log"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 )
@@ -95,10 +96,11 @@ return
 var hasPolygon bool
 var containsPoint bool
 row := database.DB.Raw(
-`SELECT service_area IS NOT NULL, COALESCE(ST_Contains(service_area, ST_SetSRID(ST_MakePoint(?, ?), 4326)), false) FROM warehouses WHERE id = ?`,
+`SELECT service_area IS NOT NULL, CASE WHEN service_area IS NOT NULL THEN ST_Contains(service_area, ST_SetSRID(ST_MakePoint(?, ?), 4326)) ELSE false END FROM warehouses WHERE id = ?`,
 lng, lat, nearest.ID,
 ).Row()
 if err := row.Scan(&hasPolygon, &containsPoint); err != nil {
+	log.Printf("serviceability check failed: %v", err)
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check serviceability"})
 return
 }
