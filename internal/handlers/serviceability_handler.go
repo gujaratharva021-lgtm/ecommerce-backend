@@ -92,7 +92,25 @@ c.JSON(http.StatusOK, gin.H{
 return
 }
 
-serviceable := distance <= nearest.ServiceRadiusKm
+var hasPolygon bool
+var containsPoint bool
+row := database.DB.Raw(
+`SELECT service_area IS NOT NULL, COALESCE(ST_Contains(service_area, ST_SetSRID(ST_MakePoint(?, ?), 4326)), false) FROM warehouses WHERE id = ?`,
+lng, lat, nearest.ID,
+).Row()
+if err := row.Scan(&hasPolygon, &containsPoint); err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check serviceability"})
+return
+}
+
+var serviceable bool
+method := "radius"
+if hasPolygon {
+serviceable = containsPoint
+method = "polygon"
+} else {
+serviceable = distance <= nearest.ServiceRadiusKm
+}
 response := gin.H{
 "serviceable": serviceable,
 "distance_km": math.Round(distance*100) / 100,
@@ -102,6 +120,7 @@ response := gin.H{
 "city":              nearest.City,
 "service_radius_km": nearest.ServiceRadiusKm,
 },
+	"method":      method,
 }
 if !serviceable {
 response["message"] = "Sorry, we don't deliver to this location yet"
