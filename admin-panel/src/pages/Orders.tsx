@@ -111,6 +111,7 @@ export default function Orders() {
                 <tr className="bg-slate-900 text-slate-400 text-left">
                   <th className="px-4 py-3 font-medium">Order</th>
                   <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium">Products</th>
                   <th className="px-4 py-3 font-medium">Total</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Update</th>
@@ -122,6 +123,20 @@ export default function Orders() {
                   <tr key={o.id} className="border-t border-slate-800">
                     <td className="px-4 py-3">#{o.id}</td>
                     <td className="px-4 py-3">User {o.user_id}</td>
+                    <td className="px-4 py-3 max-w-xs">
+                      {o.items && o.items.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {o.items.map((it) => (
+                            <div key={it.id} className="text-slate-300">
+                              {it.product?.name ?? `Product #${it.product_id}`}
+                              <span className="text-slate-500"> × {it.quantity}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">No items</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">₹{o.total_amount}</td>
                     <td className="px-4 py-3">
                       <span

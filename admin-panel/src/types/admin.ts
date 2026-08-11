@@ -23,6 +23,16 @@ export interface Category {
   name: string
 }
 
+export interface OrderItem {
+  id: number
+  order_id: number
+  product_id: number
+  product?: Product
+  quantity: number
+  price: number
+  created_at?: string
+}
+
 export interface Order {
   id: number
   user_id: number
@@ -30,6 +40,7 @@ export interface Order {
   total_amount: number
   payment_method?: string
   created_at: string
+  items?: OrderItem[]
 }
 
 export interface Coupon {
