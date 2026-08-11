@@ -51,6 +51,7 @@ func SetupRoutes(router *gin.Engine) {
 
 		// ---- Serviceability routes (public) ----
 		api.GET("/serviceability", handlers.CheckServiceability)
+	api.GET("/debug-postgis", handlers.DebugCheckPostGIS)
 
 		// ---- Notification routes (protected) ----
 		api.GET("/notifications", middleware.AuthMiddleware(), handlers.GetMyNotifications)
