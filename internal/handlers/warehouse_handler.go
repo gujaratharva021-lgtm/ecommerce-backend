@@ -56,7 +56,37 @@ if err := database.DB.Order("created_at DESC").Find(&warehouses).Error; err != n
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load warehouses"})
 return
 }
+attachServiceAreas(warehouses)
 c.JSON(http.StatusOK, gin.H{"warehouses": warehouses})
+}
+
+// attachServiceAreas fills in the ServiceArea field (ignored by GORM since
+// it's a PostGIS geometry column) with each warehouse's service_area as a
+// GeoJSON string, so the admin panel can render the saved polygon.
+func attachServiceAreas(warehouses []models.Warehouse) {
+if len(warehouses) == 0 {
+return
+}
+type row struct {
+ID       uint
+GeoJSON  string
+}
+var rows []row
+if err := database.DB.Raw(
+`SELECT id, ST_AsGeoJSON(service_area) AS geo_json FROM warehouses WHERE service_area IS NOT NULL AND deleted_at IS NULL`,
+).Scan(&rows).Error; err != nil {
+log.Printf("failed to load warehouse service areas: %v", err)
+return
+}
+byID := make(map[uint]string, len(rows))
+for _, r := range rows {
+byID[r.ID] = r.GeoJSON
+}
+for i := range warehouses {
+if gj, ok := byID[warehouses[i].ID]; ok {
+warehouses[i].ServiceArea = gj
+}
+}
 }
 
 // GetWarehouse godoc
@@ -69,6 +99,7 @@ if err := database.DB.First(&warehouse, id).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
 return
 }
+attachServiceAreas([]models.Warehouse{warehouse})
 
 c.JSON(http.StatusOK, gin.H{"warehouse": warehouse})
 }

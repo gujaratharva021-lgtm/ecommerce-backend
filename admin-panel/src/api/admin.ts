@@ -89,6 +89,9 @@ export const updateWarehouse = (id: number, data: Partial<Warehouse>) =>
 export const deleteWarehouse = (id: number) =>
   apiClient.delete(`/admin/warehouses/${id}`).then((r) => r.data)
 
+export const setWarehouseServiceArea = (id: number, geojson: string) =>
+  apiClient.put(`/admin/warehouses/${id}/service-area`, { geojson }).then((r) => r.data)
+
 // ---- Warehouse Staff ----
 export const listWarehouseStaff = () =>
   apiClient.get('/admin/warehouse-staff').then((r) => r.data)

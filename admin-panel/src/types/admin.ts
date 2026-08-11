@@ -82,6 +82,7 @@ export interface Warehouse {
   lat: number
   lng: number
   service_radius_km?: number
+  service_area?: string
   is_active?: boolean
 }
 

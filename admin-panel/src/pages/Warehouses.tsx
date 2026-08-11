@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
+import ServiceAreaModal from '../components/ServiceAreaModal'
 import {
   listWarehouses,
   createWarehouse,
@@ -26,6 +27,7 @@ export default function Warehouses() {
 
   const [showCreate, setShowCreate] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
+  const [serviceAreaWarehouse, setServiceAreaWarehouse] = useState<Warehouse | null>(null)
 
   const [form, setForm] = useState(emptyForm)
   const [isSaving, setIsSaving] = useState(false)
@@ -166,6 +168,7 @@ export default function Warehouses() {
                   <th className="px-4 py-3 font-medium">City</th>
                   <th className="px-4 py-3 font-medium">Lat, Lng</th>
                   <th className="px-4 py-3 font-medium">Radius (km)</th>
+                  <th className="px-4 py-3 font-medium">Service Area</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
@@ -179,6 +182,18 @@ export default function Warehouses() {
                       {w.lat?.toFixed(4)}, {w.lng?.toFixed(4)}
                     </td>
                     <td className="px-4 py-3">{w.service_radius_km ?? 5}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setServiceAreaWarehouse(w)}
+                        className={`text-xs px-2 py-1 rounded-full transition-colors ${
+                          w.service_area
+                            ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {w.service_area ? 'Set \u2713 (edit)' : 'Set polygon'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
@@ -304,6 +319,14 @@ export default function Warehouses() {
             </button>
           </form>
         </Modal>
+      )}
+
+      {serviceAreaWarehouse && (
+        <ServiceAreaModal
+          warehouse={serviceAreaWarehouse}
+          onClose={() => setServiceAreaWarehouse(null)}
+          onSaved={load}
+        />
       )}
     </Layout>
   )
