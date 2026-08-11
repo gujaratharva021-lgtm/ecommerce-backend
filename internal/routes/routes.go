@@ -1,4 +1,4 @@
-package routes
+﻿package routes
 
 import (
 	"time"
@@ -51,6 +51,7 @@ func SetupRoutes(router *gin.Engine) {
 
 		// ---- Serviceability routes (public) ----
 		api.GET("/serviceability", handlers.CheckServiceability)
+			api.GET("/run-cart-reservation-migration", handlers.RunCartReservationMigration)
 
 		// ---- Notification routes (protected) ----
 		api.GET("/notifications", middleware.AuthMiddleware(), handlers.GetMyNotifications)
@@ -227,3 +228,4 @@ func SetupRoutes(router *gin.Engine) {
 		}
 	}
 }
+
