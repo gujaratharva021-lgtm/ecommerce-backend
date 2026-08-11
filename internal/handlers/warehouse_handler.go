@@ -1,7 +1,8 @@
-package handlers
+﻿package handlers
 
 import (
-"net/http"
+"log"
+	"net/http"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
@@ -125,4 +126,34 @@ return
 }
 
 c.JSON(http.StatusOK, gin.H{"message": "Warehouse deleted"})
+}
+// SetWarehouseServiceArea sets the polygon geofence for a warehouse using GeoJSON.
+// Body: {"geojson": "{\"type\":\"Polygon\",\"coordinates\":[[[lng,lat],[lng,lat],...]]}"}
+func SetWarehouseServiceArea(c *gin.Context) {
+id := c.Param("id")
+
+var warehouse models.Warehouse
+if err := database.DB.First(&warehouse, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
+return
+}
+
+var req struct {
+GeoJSON string `json:"geojson" binding:"required"`
+}
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+if err := database.DB.Exec(
+`UPDATE warehouses SET service_area = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326) WHERE id = ?`,
+req.GeoJSON, warehouse.ID,
+).Error; err != nil {
+log.Printf("failed to set service_area for warehouse %v: %v", warehouse.ID, err)
+c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid GeoJSON polygon: " + err.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"success": true, "warehouse_id": warehouse.ID})
 }

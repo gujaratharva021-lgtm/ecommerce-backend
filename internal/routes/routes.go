@@ -206,6 +206,7 @@ func SetupRoutes(router *gin.Engine) {
 				adminWarehouses.GET("/:id", handlers.GetWarehouse)
 				adminWarehouses.PUT("/:id", handlers.UpdateWarehouse)
 				adminWarehouses.DELETE("/:id", handlers.DeleteWarehouse)
+					adminWarehouses.PUT("/:id/service-area", handlers.SetWarehouseServiceArea)
 
 				adminWarehouseStaff := admin.Group("/warehouse-staff")
 				{
