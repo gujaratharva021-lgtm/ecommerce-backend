@@ -52,6 +52,17 @@ func SetupRoutes(router *gin.Engine) {
 		// ---- Serviceability routes (public) ----
 		api.GET("/serviceability", handlers.CheckServiceability)
 	api.GET("/debug-postgis", handlers.DebugCheckPostGIS)
+	api.GET("/offers", handlers.GetActiveOffers)
+	api.GET("/banners", handlers.GetActiveBanners)
+	api.GET("/delivery-zones/check", handlers.CheckPincode)
+	support := api.Group("/support")
+	support.Use(middleware.AuthMiddleware())
+	{
+		support.POST("/tickets", handlers.CreateTicket)
+		support.GET("/tickets", handlers.GetMyTickets)
+		support.GET("/tickets/:id/messages", handlers.GetTicketMessages)
+		support.POST("/tickets/:id/messages", handlers.ReplyToTicket)
+	}
 
 		// ---- Notification routes (protected) ----
 		api.GET("/notifications", middleware.AuthMiddleware(), handlers.GetMyNotifications)
@@ -151,6 +162,34 @@ func SetupRoutes(router *gin.Engine) {
 		{
 				admin.GET("/audit-logs", handlers.GetAuditLogs)
 				admin.POST("/notifications/broadcast", handlers.BroadcastNotification)
+				adminOffers := admin.Group("/offers")
+				{
+					adminOffers.POST("", handlers.CreateOffer)
+					adminOffers.GET("", handlers.GetOffers)
+					adminOffers.PUT("/:id/status", handlers.UpdateOfferStatus)
+					adminOffers.DELETE("/:id", handlers.DeleteOffer)
+				}
+				adminBanners := admin.Group("/banners")
+				{
+					adminBanners.POST("", handlers.CreateBanner)
+					adminBanners.GET("", handlers.GetBanners)
+					adminBanners.PUT("/:id", handlers.UpdateBanner)
+					adminBanners.DELETE("/:id", handlers.DeleteBanner)
+				}
+				adminZones := admin.Group("/delivery-zones")
+				{
+					adminZones.POST("", handlers.CreateDeliveryZone)
+					adminZones.GET("", handlers.GetDeliveryZones)
+					adminZones.PUT("/:id", handlers.UpdateDeliveryZone)
+					adminZones.DELETE("/:id", handlers.DeleteDeliveryZone)
+				}
+				adminSupport := admin.Group("/support")
+				{
+					adminSupport.GET("/tickets", handlers.GetAllTickets)
+					adminSupport.GET("/tickets/:id/messages", handlers.GetTicketMessagesAdmin)
+					adminSupport.POST("/tickets/:id/messages", handlers.AdminReplyToTicket)
+					adminSupport.PUT("/tickets/:id/status", handlers.UpdateTicketStatus)
+				}
 				adminCustomers := admin.Group("/customers")
 				{
 					adminCustomers.GET("", handlers.GetCustomers)

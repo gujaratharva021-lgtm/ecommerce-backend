@@ -78,6 +78,11 @@ func AutoMigrate() {
 		&models.ReturnRequestItem{},
 		&models.CartReservation{},
 		&models.Setting{},
+		&models.Offer{},
+		&models.Banner{},
+		&models.DeliveryZone{},
+		&models.SupportTicket{},
+		&models.SupportMessage{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
