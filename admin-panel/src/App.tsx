@@ -17,6 +17,7 @@ import WarehouseStaff from './pages/WarehouseStaff'
 import StockTransfers from './pages/StockTransfers'
 import Returns from './pages/Returns'
 import Analytics from './pages/Analytics'
+import AuditLogs from './pages/AuditLogs'
 import WalletCredit from './pages/WalletCredit'
 
 function App() {
@@ -150,6 +151,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogs />
               </ProtectedRoute>
             }
           />

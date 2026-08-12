@@ -236,3 +236,23 @@ export const SETTINGS_LABELS: Record<string, string> = {
   gst_percentage: 'GST Percentage (%)',
 }
 
+
+// ---- Audit Logs ----
+export interface AuditLog {
+  id: number
+  admin_id: number
+  admin_phone: string
+  action: string
+  entity_type: string
+  entity_id: string
+  details: string
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  logs: AuditLog[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}

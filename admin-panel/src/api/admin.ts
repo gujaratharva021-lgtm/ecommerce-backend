@@ -174,3 +174,7 @@ export const updateSettings = (settings: Record<string, string>) =>
 
 export const deleteCoupon = (id: number) =>
   apiClient.delete(`/admin/coupons/${id}`).then((r) => r.data)
+
+// ---- Audit Logs ----
+export const getAuditLogs = (params?: Record<string, any>) =>
+  apiClient.get('/admin/audit-logs', { params }).then((r) => r.data)
