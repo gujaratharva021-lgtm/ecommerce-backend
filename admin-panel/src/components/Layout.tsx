@@ -21,6 +21,7 @@ const navItems = [
   { to: '/wallet-credit', label: 'Wallet Credit', icon: '\u25CF' },
   { to: '/audit-logs', label: 'Audit Logs', icon: '\u2263' },
   { to: '/notifications', label: 'Notifications', icon: '\u25CB' },
+  { to: '/offers', label: 'Offers', icon: '\u25C6' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

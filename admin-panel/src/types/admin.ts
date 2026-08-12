@@ -256,3 +256,27 @@ export interface AuditLogsResponse {
   total: number
   total_pages: number
 }
+
+// ---- Offers ----
+export interface Offer {
+  id: number
+  title: string
+  description: string
+  image_url: string
+  discount_text: string
+  category_id?: number | null
+  start_date: string
+  end_date: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface CreateOfferRequest {
+  title: string
+  description?: string
+  image_url?: string
+  discount_text?: string
+  category_id?: number | null
+  start_date: string
+  end_date: string
+}

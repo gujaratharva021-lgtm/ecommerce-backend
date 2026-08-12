@@ -1,5 +1,5 @@
-import apiClient from './client'
-import type { Product, ProductCreateRequest, CreateCouponRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
+﻿import apiClient from './client'
+import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
 
@@ -182,3 +182,16 @@ export const getAuditLogs = (params?: Record<string, any>) =>
 // ---- Notifications ----
 export const broadcastNotification = (title: string, body: string) =>
   apiClient.post('/admin/notifications/broadcast', { title, body }).then((r) => r.data)
+
+// ---- Offers ----
+export const listOffers = () =>
+  apiClient.get('/admin/offers').then((r) => r.data)
+
+export const createOffer = (data: CreateOfferRequest) =>
+  apiClient.post('/admin/offers', data).then((r) => r.data)
+
+export const updateOfferStatus = (id: number, isActive: boolean) =>
+  apiClient.put(`/admin/offers/${id}/status`, { is_active: isActive }).then((r) => r.data)
+
+export const deleteOffer = (id: number) =>
+  apiClient.delete(`/admin/offers/${id}`).then((r) => r.data)

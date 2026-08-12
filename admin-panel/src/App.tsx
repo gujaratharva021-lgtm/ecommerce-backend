@@ -19,6 +19,7 @@ import Returns from './pages/Returns'
 import Analytics from './pages/Analytics'
 import AuditLogs from './pages/AuditLogs'
 import Notifications from './pages/Notifications'
+import Offers from './pages/Offers'
 import WalletCredit from './pages/WalletCredit'
 
 function App() {
@@ -168,6 +169,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Notifications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/offers"
+            element={
+              <ProtectedRoute>
+                <Offers />
               </ProtectedRoute>
             }
           />
