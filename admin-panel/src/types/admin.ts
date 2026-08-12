@@ -322,3 +322,24 @@ export interface CreateDeliveryZoneRequest {
   is_cod_available?: boolean
   estimated_days?: number
 }
+
+// ---- Support Tickets ----
+export interface SupportTicket {
+  id: number
+  user_id: number
+  order_id?: number | null
+  subject: string
+  status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  priority: 'low' | 'normal' | 'high'
+  created_at: string
+  updated_at: string
+}
+
+export interface SupportMessage {
+  id: number
+  ticket_id: number
+  sender_id: number
+  sender_type: 'customer' | 'admin'
+  message: string
+  created_at: string
+}

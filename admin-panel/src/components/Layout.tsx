@@ -24,6 +24,7 @@ const navItems = [
   { to: '/offers', label: 'Offers', icon: '\u25C6' },
   { to: '/banners', label: 'Banners', icon: '\u25A9' },
   { to: '/delivery-zones', label: 'Delivery Zones', icon: '\u2302' },
+  { to: '/support', label: 'Support', icon: '\u2691' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

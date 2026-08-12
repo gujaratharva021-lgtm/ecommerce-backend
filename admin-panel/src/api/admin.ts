@@ -221,3 +221,16 @@ export const updateDeliveryZone = (id: number, data: Partial<CreateDeliveryZoneR
 
 export const deleteDeliveryZone = (id: number) =>
   apiClient.delete(`/admin/delivery-zones/${id}`).then((r) => r.data)
+
+// ---- Support Tickets ----
+export const listSupportTickets = (status?: string) =>
+  apiClient.get('/admin/support/tickets', { params: status ? { status } : {} }).then((r) => r.data)
+
+export const getSupportTicketMessages = (id: number) =>
+  apiClient.get(`/admin/support/tickets/${id}/messages`).then((r) => r.data)
+
+export const replyToSupportTicket = (id: number, message: string) =>
+  apiClient.post(`/admin/support/tickets/${id}/messages`, { message }).then((r) => r.data)
+
+export const updateSupportTicketStatus = (id: number, status: string) =>
+  apiClient.put(`/admin/support/tickets/${id}/status`, { status }).then((r) => r.data)
