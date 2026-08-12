@@ -110,7 +110,7 @@ return
 }
 
 var orders []models.Order
-database.DB.Preload("Items").Preload("Address").Where("user_id = ?", user.ID).Order("created_at DESC").Find(&orders)
+database.DB.Preload("Items.Product").Preload("Address").Where("user_id = ?", user.ID).Order("created_at DESC").Find(&orders)
 
 var addresses []models.Address
 database.DB.Where("user_id = ?", user.ID).Find(&addresses)
