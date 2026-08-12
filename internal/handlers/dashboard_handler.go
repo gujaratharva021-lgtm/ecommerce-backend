@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"net/http"
@@ -190,6 +190,16 @@ func GetDashboardOverview(c *gin.Context) {
 		day := trendStart.AddDate(0, 0, i).Format("2006-01-02")
 		charts.UserGrowth = append(charts.UserGrowth, DashboardUserPoint{Date: day, Count: userByDay[day]})
 	}
+
+	// Pre-initialize every chart slice to empty (not nil). GORM leaves a
+	// slice nil when a query matches zero rows, and encoding/json renders a
+	// nil slice as null instead of [] - which crashes the frontend's
+	// .map() calls on a fresh/low-data database. Empty slices avoid that.
+	charts.OrdersByStatus = []DashboardStatusCount{}
+	charts.PaymentSplit = []DashboardPaymentSplit{}
+	charts.TopProducts = []ProductPerformance{}
+	charts.RevenueByWarehouse = []DashboardWarehouseRevenue{}
+	charts.TicketsByStatus = []DashboardStatusCount{}
 
 	// Orders by status
 	database.DB.Model(&models.Order{}).

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -68,7 +68,20 @@ export default function Dashboard() {
     async function load() {
       try {
         const res = await getDashboardOverview()
-        if (!cancelled) setData(res)
+        if (!cancelled) {
+          setData({
+            ...res,
+            charts: {
+              sales_trend: res.charts?.sales_trend ?? [],
+              user_growth: res.charts?.user_growth ?? [],
+              orders_by_status: res.charts?.orders_by_status ?? [],
+              payment_split: res.charts?.payment_split ?? [],
+              top_products: res.charts?.top_products ?? [],
+              revenue_by_warehouse: res.charts?.revenue_by_warehouse ?? [],
+              tickets_by_status: res.charts?.tickets_by_status ?? [],
+            },
+          })
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.response?.data?.error ?? 'Failed to load dashboard.')
       } finally {
