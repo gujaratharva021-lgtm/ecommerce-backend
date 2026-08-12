@@ -1,14 +1,15 @@
-package models
+﻿package models
 
 import "time"
 
-// User is identified by phone number only — no email/password.
+// User is identified by phone number only â€” no email/password.
 // Login happens via OTP sent to the phone (see OTP model + auth handlers).
 type User struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Name      string    `json:"name"`
 	Phone     string    `gorm:"uniqueIndex;not null" json:"phone"`
 	Role      string    `gorm:"default:customer" json:"role"` // customer / admin
+	IsBlocked bool      `gorm:"default:false" json:"is_blocked"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -33,7 +34,7 @@ type AuthResponse struct {
 }
 
 // UpdateProfileRequest is the body for PUT /auth/me. Phone is intentionally
-// excluded — it's the login identity, so changing it goes through a
+// excluded â€” it's the login identity, so changing it goes through a
 // separate OTP-verified flow, not a plain profile edit.
 type UpdateProfileRequest struct {
 	Name string `json:"name" binding:"required"`
