@@ -280,3 +280,23 @@ export interface CreateOfferRequest {
   start_date: string
   end_date: string
 }
+
+// ---- Banners ----
+export interface Banner {
+  id: number
+  image_url: string
+  title: string
+  link_type: 'product' | 'category' | 'url' | 'none'
+  link_value: string
+  display_order: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface CreateBannerRequest {
+  image_url: string
+  title?: string
+  link_type?: string
+  link_value?: string
+  display_order?: number
+}

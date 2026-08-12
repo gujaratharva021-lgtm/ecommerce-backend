@@ -20,6 +20,7 @@ import Analytics from './pages/Analytics'
 import AuditLogs from './pages/AuditLogs'
 import Notifications from './pages/Notifications'
 import Offers from './pages/Offers'
+import Banners from './pages/Banners'
 import WalletCredit from './pages/WalletCredit'
 
 function App() {
@@ -177,6 +178,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Offers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/banners"
+            element={
+              <ProtectedRoute>
+                <Banners />
               </ProtectedRoute>
             }
           />

@@ -22,6 +22,7 @@ const navItems = [
   { to: '/audit-logs', label: 'Audit Logs', icon: '\u2263' },
   { to: '/notifications', label: 'Notifications', icon: '\u25CB' },
   { to: '/offers', label: 'Offers', icon: '\u25C6' },
+  { to: '/banners', label: 'Banners', icon: '\u25A9' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

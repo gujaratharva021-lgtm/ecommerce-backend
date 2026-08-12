@@ -1,5 +1,5 @@
 ﻿import apiClient from './client'
-import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
+import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, CreateBannerRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
 
@@ -195,3 +195,16 @@ export const updateOfferStatus = (id: number, isActive: boolean) =>
 
 export const deleteOffer = (id: number) =>
   apiClient.delete(`/admin/offers/${id}`).then((r) => r.data)
+
+// ---- Banners ----
+export const listBanners = () =>
+  apiClient.get('/admin/banners').then((r) => r.data)
+
+export const createBanner = (data: CreateBannerRequest) =>
+  apiClient.post('/admin/banners', data).then((r) => r.data)
+
+export const updateBanner = (id: number, data: Partial<CreateBannerRequest> & { is_active?: boolean }) =>
+  apiClient.put(`/admin/banners/${id}`, data).then((r) => r.data)
+
+export const deleteBanner = (id: number) =>
+  apiClient.delete(`/admin/banners/${id}`).then((r) => r.data)
