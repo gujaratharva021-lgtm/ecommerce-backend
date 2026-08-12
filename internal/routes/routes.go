@@ -153,8 +153,8 @@ func SetupRoutes(router *gin.Engine) {
 				{
 					adminCustomers.GET("", handlers.GetCustomers)
 					adminCustomers.GET("/:id", handlers.GetCustomerByID)
-					adminCustomers.PUT("/:id/block", handlers.BlockCustomer)
-					adminCustomers.PUT("/:id/unblock", handlers.UnblockCustomer)
+					adminCustomers.PUT("/:id/block", middleware.RequirePermission(middleware.PermBlockCustomer), handlers.BlockCustomer)
+					adminCustomers.PUT("/:id/unblock", middleware.RequirePermission(middleware.PermBlockCustomer), handlers.UnblockCustomer)
 				}
 
 			adminCategories := admin.Group("/categories")
@@ -167,12 +167,18 @@ func SetupRoutes(router *gin.Engine) {
 			adminProducts := admin.Group("/products")
 			{
 				adminProducts.POST("", handlers.CreateProduct)
-				adminProducts.PUT("/:id", handlers.UpdateProduct)
+				adminProducts.PUT("/:id", middleware.RequirePermission(middleware.PermEditPrice), handlers.UpdateProduct)
 				adminProducts.DELETE("/:id", handlers.DeleteProduct)
 				adminProducts.PUT("/:id/inventory", handlers.UpdateInventory)
 			}
 
 				admin.GET("/inventory", handlers.GetInventoryOverview)
+				adminStaff := admin.Group("/staff")
+				{
+					adminStaff.GET("", handlers.GetAdminStaff)
+					adminStaff.PUT("/:id/role", middleware.RequirePermission(middleware.PermManageStaff), handlers.UpdateStaffRole)
+				}
+
 
 			adminOrders := admin.Group("/orders")
 			{
@@ -183,7 +189,7 @@ func SetupRoutes(router *gin.Engine) {
 			adminReturns := admin.Group("/returns")
 			{
 				adminReturns.GET("", handlers.GetReturns)
-				adminReturns.PUT("/:id/approve", handlers.ApproveReturn)
+				adminReturns.PUT("/:id/approve", middleware.RequirePermission(middleware.PermApproveRefund), handlers.ApproveReturn)
 				adminReturns.PUT("/:id/reject", handlers.RejectReturn)
 			}
 

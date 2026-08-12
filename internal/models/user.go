@@ -10,6 +10,7 @@ type User struct {
 	Phone     string    `gorm:"uniqueIndex;not null" json:"phone"`
 	Role      string    `gorm:"default:customer" json:"role"` // customer / admin
 	IsBlocked bool      `gorm:"default:false" json:"is_blocked"`
+	AdminRole string    `gorm:"default:''" json:"admin_role,omitempty"` // super_admin/admin/ops_manager/warehouse_manager/support_agent/finance_manager (only meaningful when Role=admin)
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
