@@ -178,3 +178,7 @@ export const deleteCoupon = (id: number) =>
 // ---- Audit Logs ----
 export const getAuditLogs = (params?: Record<string, any>) =>
   apiClient.get('/admin/audit-logs', { params }).then((r) => r.data)
+
+// ---- Notifications ----
+export const broadcastNotification = (title: string, body: string) =>
+  apiClient.post('/admin/notifications/broadcast', { title, body }).then((r) => r.data)

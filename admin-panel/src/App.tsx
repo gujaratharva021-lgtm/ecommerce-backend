@@ -18,6 +18,7 @@ import StockTransfers from './pages/StockTransfers'
 import Returns from './pages/Returns'
 import Analytics from './pages/Analytics'
 import AuditLogs from './pages/AuditLogs'
+import Notifications from './pages/Notifications'
 import WalletCredit from './pages/WalletCredit'
 
 function App() {
@@ -159,6 +160,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AuditLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <Notifications />
               </ProtectedRoute>
             }
           />
