@@ -7,6 +7,7 @@ const navItems = [
   { to: '/customers', label: 'Customers', icon: '\u25C7' },
   { to: '/inventory', label: 'Inventory Overview', icon: '\u25A6' },
   { to: '/staff-roles', label: 'Staff & Roles', icon: '\u25C8' },
+  { to: '/settings', label: 'Settings', icon: '\u2699' },
   { to: '/products', label: 'Products', icon: '\u25A3' },
   { to: '/categories', label: 'Categories', icon: '\u25A4' },
   { to: '/orders', label: 'Orders', icon: '\u25A5' },

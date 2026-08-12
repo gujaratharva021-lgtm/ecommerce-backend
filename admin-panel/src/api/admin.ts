@@ -164,3 +164,10 @@ export const listAdminStaff = () =>
 
 export const updateStaffRole = (id: number, adminRole: string) =>
   apiClient.put(`/admin/staff/${id}/role`, { admin_role: adminRole }).then((r) => r.data)
+
+// ---- Settings ----
+export const getSettings = () =>
+  apiClient.get('/admin/settings').then((r) => r.data)
+
+export const updateSettings = (settings: Record<string, string>) =>
+  apiClient.put('/admin/settings', { settings }).then((r) => r.data)

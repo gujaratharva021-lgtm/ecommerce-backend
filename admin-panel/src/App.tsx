@@ -7,6 +7,7 @@ import Products from './pages/Products'
 import Customers from './pages/Customers'
 import InventoryOverview from './pages/InventoryOverview'
 import StaffRoles from './pages/StaffRoles'
+import Settings from './pages/Settings'
 import Categories from './pages/Categories'
 import Orders from './pages/Orders'
 import Coupons from './pages/Coupons'
@@ -141,6 +142,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StaffRoles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

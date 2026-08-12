@@ -219,3 +219,19 @@ export const ADMIN_ROLES = [
   { value: 'support_agent', label: 'Support Agent' },
   { value: 'finance_manager', label: 'Finance Manager' },
 ]
+
+// ---- Settings ----
+export interface SettingsMap {
+  [key: string]: string
+}
+
+export const SETTINGS_LABELS: Record<string, string> = {
+  free_delivery_threshold: 'Free Delivery Threshold (₹)',
+  flat_delivery_charge: 'Flat Delivery Charge (₹)',
+  min_order_amount: 'Minimum Order Amount (₹)',
+  cancellation_window_minutes: 'Cancellation Window (minutes)',
+  company_name: 'Company Name',
+  support_phone: 'Support Phone',
+  support_email: 'Support Email',
+  gst_percentage: 'GST Percentage (%)',
+}
