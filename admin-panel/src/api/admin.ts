@@ -1,5 +1,5 @@
 ﻿import apiClient from './client'
-import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, CreateBannerRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
+import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, CreateBannerRequest, CreateDeliveryZoneRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
 
@@ -208,3 +208,16 @@ export const updateBanner = (id: number, data: Partial<CreateBannerRequest> & { 
 
 export const deleteBanner = (id: number) =>
   apiClient.delete(`/admin/banners/${id}`).then((r) => r.data)
+
+// ---- Delivery Zones ----
+export const listDeliveryZones = () =>
+  apiClient.get('/admin/delivery-zones').then((r) => r.data)
+
+export const createDeliveryZone = (data: CreateDeliveryZoneRequest) =>
+  apiClient.post('/admin/delivery-zones', data).then((r) => r.data)
+
+export const updateDeliveryZone = (id: number, data: Partial<CreateDeliveryZoneRequest> & { is_active?: boolean }) =>
+  apiClient.put(`/admin/delivery-zones/${id}`, data).then((r) => r.data)
+
+export const deleteDeliveryZone = (id: number) =>
+  apiClient.delete(`/admin/delivery-zones/${id}`).then((r) => r.data)

@@ -300,3 +300,25 @@ export interface CreateBannerRequest {
   link_value?: string
   display_order?: number
 }
+
+// ---- Delivery Zones ----
+export interface DeliveryZone {
+  id: number
+  name: string
+  city: string
+  pincodes: string
+  delivery_charge: number
+  is_cod_available: boolean
+  estimated_days: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface CreateDeliveryZoneRequest {
+  name: string
+  city?: string
+  pincodes: string
+  delivery_charge?: number
+  is_cod_available?: boolean
+  estimated_days?: number
+}
