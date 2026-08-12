@@ -171,3 +171,6 @@ export const getSettings = () =>
 
 export const updateSettings = (settings: Record<string, string>) =>
   apiClient.put('/admin/settings', { settings }).then((r) => r.data)
+
+export const deleteCoupon = (id: number) =>
+  apiClient.delete(`/admin/coupons/${id}`).then((r) => r.data)

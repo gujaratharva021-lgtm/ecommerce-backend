@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
-import { listCoupons, createCoupon, updateCouponStatus } from '../api/admin'
+import { listCoupons, createCoupon, updateCouponStatus, deleteCoupon } from '../api/admin'
 import type { Coupon } from '../types/admin'
 
 const emptyForm = {
@@ -86,6 +86,16 @@ export default function Coupons() {
     }
   }
 
+  async function handleDelete(c: Coupon) {
+    if (!confirm("Delete coupon " + c.code + "? This cannot be undone.")) return
+    try {
+      await deleteCoupon(c.id)
+      setCoupons((prev) => prev.filter((x) => x.id !== c.id))
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Failed to delete coupon.')
+    }
+  }
+
   return (
     <Layout>
       <div className="p-8">
@@ -157,9 +167,15 @@ export default function Coupons() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleToggleStatus(c)}
-                        className="text-indigo-400 hover:text-indigo-300 text-xs"
+                        className="text-indigo-400 hover:text-indigo-300 text-xs mr-3"
                       >
                         {c.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c)}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>

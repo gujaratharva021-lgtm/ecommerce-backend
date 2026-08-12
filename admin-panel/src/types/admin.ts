@@ -1,4 +1,4 @@
-export interface Product {
+﻿export interface Product {
   id: number
   name: string
   description?: string
@@ -226,12 +226,13 @@ export interface SettingsMap {
 }
 
 export const SETTINGS_LABELS: Record<string, string> = {
-  free_delivery_threshold: 'Free Delivery Threshold (₹)',
-  flat_delivery_charge: 'Flat Delivery Charge (₹)',
-  min_order_amount: 'Minimum Order Amount (₹)',
+  free_delivery_threshold: 'Free Delivery Threshold (â‚¹)',
+  flat_delivery_charge: 'Flat Delivery Charge (â‚¹)',
+  min_order_amount: 'Minimum Order Amount (â‚¹)',
   cancellation_window_minutes: 'Cancellation Window (minutes)',
   company_name: 'Company Name',
   support_phone: 'Support Phone',
   support_email: 'Support Email',
   gst_percentage: 'GST Percentage (%)',
 }
+
