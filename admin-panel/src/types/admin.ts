@@ -173,3 +173,31 @@ export interface CustomerDetail extends CustomerSummary {
   wallet?: { id: number; balance: number } | null
   wallet_transactions?: { id: number; type: string; amount: number; created_at: string }[]
 }
+
+// ---- Inventory Overview ----
+export interface InventoryRow {
+  product_id: number
+  product_name: string
+  category_name: string
+  warehouse_id: number
+  warehouse_name: string
+  stock: number
+  reserved: number
+  available: number
+  in_stock: boolean
+}
+
+export interface InventoryOverviewResponse {
+  total_skus: number
+  total_available_stock: number
+  total_reserved_stock: number
+  low_stock_count: number
+  out_of_stock_count: number
+  damaged_stock: number
+  expired_stock: number
+  rows: InventoryRow[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}

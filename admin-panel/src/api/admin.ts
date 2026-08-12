@@ -153,3 +153,7 @@ export const blockCustomer = (id: number) =>
 
 export const unblockCustomer = (id: number) =>
   apiClient.put(`/admin/customers/${id}/unblock`).then((r) => r.data)
+
+// ---- Inventory Overview ----
+export const getInventoryOverview = (params?: Record<string, any>) =>
+  apiClient.get('/admin/inventory', { params }).then((r) => r.data)
