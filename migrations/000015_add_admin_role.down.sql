@@ -1,1 +1,1 @@
-﻿ALTER TABLE users DROP COLUMN IF EXISTS admin_role;
+ALTER TABLE users DROP COLUMN IF EXISTS admin_role;

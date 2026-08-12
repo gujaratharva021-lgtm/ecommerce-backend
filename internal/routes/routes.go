@@ -1,4 +1,4 @@
-﻿package routes
+package routes
 
 import (
 	"time"
@@ -162,7 +162,14 @@ func SetupRoutes(router *gin.Engine) {
 		{
 				admin.GET("/audit-logs", handlers.GetAuditLogs)
 				admin.POST("/notifications/broadcast", handlers.BroadcastNotification)
-				adminOffers := admin.Group("/offers")
+				adminPayments := admin.Group("/payments")
+{
+adminPayments.GET("", handlers.GetAdminPayments)
+adminPayments.GET("/reconciliation", handlers.GetAdminPaymentReconciliation)
+adminPayments.GET("/:order_id", handlers.GetAdminPaymentDetail)
+adminPayments.PUT("/:order_id/status", handlers.UpdateAdminPaymentStatus)
+}
+adminOffers := admin.Group("/offers")
 				{
 					adminOffers.POST("", handlers.CreateOffer)
 					adminOffers.GET("", handlers.GetOffers)

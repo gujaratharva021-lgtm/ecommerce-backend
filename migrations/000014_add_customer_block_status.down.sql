@@ -1,1 +1,1 @@
-﻿ALTER TABLE users DROP COLUMN IF EXISTS is_blocked;
+ALTER TABLE users DROP COLUMN IF EXISTS is_blocked;
