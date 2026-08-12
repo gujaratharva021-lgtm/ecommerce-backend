@@ -172,6 +172,8 @@ func SetupRoutes(router *gin.Engine) {
 				adminProducts.PUT("/:id/inventory", handlers.UpdateInventory)
 			}
 
+				admin.GET("/inventory", handlers.GetInventoryOverview)
+
 			adminOrders := admin.Group("/orders")
 			{
 				adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
