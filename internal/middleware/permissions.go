@@ -16,17 +16,19 @@ PermBlockCustomer   = "customer:block"
 PermManageStaff     = "staff:manage"
 PermEditPrice       = "product:price_edit"
 PermDeleteCoupon    = "coupon:delete"
+	PermManageSettings  = "settings:manage"
 )
 
 // rolePermissions maps each admin sub-role to the set of permissions it holds.
 // super_admin implicitly has everything (checked separately below).
 var rolePermissions = map[string]map[string]bool{
 "admin": {
-PermApproveRefund: true,
-PermBlockCustomer: true,
-PermManageStaff:   true,
-PermEditPrice:     true,
-PermDeleteCoupon:  true,
+PermApproveRefund:  true,
+PermBlockCustomer:  true,
+PermManageStaff:    true,
+PermEditPrice:      true,
+PermDeleteCoupon:   true,
+PermManageSettings: true,
 },
 "ops_manager": {
 PermBlockCustomer: true,

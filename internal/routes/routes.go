@@ -173,6 +173,12 @@ func SetupRoutes(router *gin.Engine) {
 			}
 
 				admin.GET("/inventory", handlers.GetInventoryOverview)
+				adminSettings := admin.Group("/settings")
+				{
+					adminSettings.GET("", handlers.GetSettings)
+					adminSettings.PUT("", middleware.RequirePermission(middleware.PermManageSettings), handlers.UpdateSettings)
+				}
+
 				adminStaff := admin.Group("/staff")
 				{
 					adminStaff.GET("", handlers.GetAdminStaff)

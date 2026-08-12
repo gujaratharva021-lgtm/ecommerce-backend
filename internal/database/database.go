@@ -77,6 +77,7 @@ func AutoMigrate() {
 		&models.ReturnRequest{},
 		&models.ReturnRequestItem{},
 		&models.CartReservation{},
+		&models.Setting{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -84,6 +85,8 @@ func AutoMigrate() {
 	if err := DB.Exec(`ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS service_area geometry(Polygon, 4326)`).Error; err != nil {
 		log.Fatalf("Failed to add service_area column: %v", err)
 	}
+
+	seedDefaultSettings()
 
 	log.Println("Database migration completed")
 }
