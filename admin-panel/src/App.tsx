@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Customers from './pages/Customers'
 import InventoryOverview from './pages/InventoryOverview'
+import StaffRoles from './pages/StaffRoles'
 import Categories from './pages/Categories'
 import Orders from './pages/Orders'
 import Coupons from './pages/Coupons'
@@ -132,6 +133,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <InventoryOverview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff-roles"
+            element={
+              <ProtectedRoute>
+                <StaffRoles />
               </ProtectedRoute>
             }
           />

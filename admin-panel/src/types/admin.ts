@@ -201,3 +201,21 @@ export interface InventoryOverviewResponse {
   total: number
   total_pages: number
 }
+
+// ---- Staff & Roles ----
+export interface StaffMember {
+  id: number
+  name: string
+  phone: string
+  admin_role?: string
+  created_at: string
+}
+
+export const ADMIN_ROLES = [
+  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'ops_manager', label: 'Operations Manager' },
+  { value: 'warehouse_manager', label: 'Warehouse Manager' },
+  { value: 'support_agent', label: 'Support Agent' },
+  { value: 'finance_manager', label: 'Finance Manager' },
+]

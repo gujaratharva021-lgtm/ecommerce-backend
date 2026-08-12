@@ -157,3 +157,10 @@ export const unblockCustomer = (id: number) =>
 // ---- Inventory Overview ----
 export const getInventoryOverview = (params?: Record<string, any>) =>
   apiClient.get('/admin/inventory', { params }).then((r) => r.data)
+
+// ---- Staff & Roles ----
+export const listAdminStaff = () =>
+  apiClient.get('/admin/staff').then((r) => r.data)
+
+export const updateStaffRole = (id: number, adminRole: string) =>
+  apiClient.put(`/admin/staff/${id}/role`, { admin_role: adminRole }).then((r) => r.data)
