@@ -201,9 +201,10 @@ func SetupRoutes(router *gin.Engine) {
 
 			adminCoupons := admin.Group("/coupons")
 			{
-				adminCoupons.POST("", handlers.CreateCoupon)
+				adminCoupons.POST("", middleware.RequirePermission(middleware.PermDeleteCoupon), handlers.CreateCoupon)
 				adminCoupons.GET("", handlers.GetCoupons)
-				adminCoupons.PUT("/:id/status", handlers.UpdateCouponStatus)
+				adminCoupons.PUT("/:id/status", middleware.RequirePermission(middleware.PermDeleteCoupon), handlers.UpdateCouponStatus)
+				adminCoupons.DELETE("/:id", middleware.RequirePermission(middleware.PermDeleteCoupon), handlers.DeleteCoupon)
 			}
 			adminAnalytics := admin.Group("/analytics")
 			{

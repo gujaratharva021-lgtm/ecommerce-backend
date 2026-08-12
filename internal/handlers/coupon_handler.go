@@ -194,3 +194,27 @@ func UpdateCouponStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, coupon)
 }
+
+
+// DeleteCoupon godoc
+// DELETE /api/v1/admin/coupons/:id (admin only, requires coupon:delete permission)
+func DeleteCoupon(c *gin.Context) {
+id, err := strconv.Atoi(c.Param("id"))
+if err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": "invalid coupon id"})
+return
+}
+
+var coupon models.Coupon
+if err := database.DB.First(&coupon, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Coupon not found"})
+return
+}
+
+if err := database.DB.Delete(&coupon).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete coupon"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"success": true})
+}
