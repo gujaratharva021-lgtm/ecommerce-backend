@@ -140,3 +140,16 @@ export const creditWallet = (userId: number, amount: number, note?: string) =>
 
 export const cancelStockTransfer = (id: number) =>
   apiClient.put(`/admin/stock-transfers/${id}/cancel`).then((r) => r.data)
+
+// ---- Customers ----
+export const listCustomers = (params?: Record<string, any>) =>
+  apiClient.get('/admin/customers', { params }).then((r) => r.data)
+
+export const getCustomer = (id: number) =>
+  apiClient.get(`/admin/customers/${id}`).then((r) => r.data)
+
+export const blockCustomer = (id: number) =>
+  apiClient.put(`/admin/customers/${id}/block`).then((r) => r.data)
+
+export const unblockCustomer = (id: number) =>
+  apiClient.put(`/admin/customers/${id}/unblock`).then((r) => r.data)

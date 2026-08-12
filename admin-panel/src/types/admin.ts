@@ -143,3 +143,33 @@ export interface Wallet {
   created_at: string
   updated_at: string
 }
+
+// ---- Customers ----
+export interface CustomerSummary {
+  id: number
+  name: string
+  phone: string
+  is_blocked: boolean
+  created_at: string
+  total_orders: number
+  total_spent: number
+  last_order_at?: string | null
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  orders: Order[]
+  addresses: {
+    id: number
+    label: string
+    full_name: string
+    phone: string
+    line1: string
+    line2?: string
+    city: string
+    state: string
+    pincode: string
+    is_default: boolean
+  }[]
+  wallet?: { id: number; balance: number } | null
+  wallet_transactions?: { id: number; type: string; amount: number; created_at: string }[]
+}

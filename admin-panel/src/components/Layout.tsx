@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const navItems = [
   { to: '/dashboard', label: 'Overview', icon: '\u25C6' },
+  { to: '/customers', label: 'Customers', icon: '\u25C7' },
   { to: '/products', label: 'Products', icon: '\u25A3' },
   { to: '/categories', label: 'Categories', icon: '\u25A4' },
   { to: '/orders', label: 'Orders', icon: '\u25A5' },
