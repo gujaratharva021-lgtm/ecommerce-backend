@@ -149,6 +149,14 @@ func SetupRoutes(router *gin.Engine) {
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
 		{
+				adminCustomers := admin.Group("/customers")
+				{
+					adminCustomers.GET("", handlers.GetCustomers)
+					adminCustomers.GET("/:id", handlers.GetCustomerByID)
+					adminCustomers.PUT("/:id/block", handlers.BlockCustomer)
+					adminCustomers.PUT("/:id/unblock", handlers.UnblockCustomer)
+				}
+
 			adminCategories := admin.Group("/categories")
 			{
 				adminCategories.POST("", handlers.CreateCategory)
