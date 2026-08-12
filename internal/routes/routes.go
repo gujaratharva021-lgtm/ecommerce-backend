@@ -150,6 +150,7 @@ func SetupRoutes(router *gin.Engine) {
 		admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
 		{
 				admin.GET("/audit-logs", handlers.GetAuditLogs)
+				admin.POST("/notifications/broadcast", handlers.BroadcastNotification)
 				adminCustomers := admin.Group("/customers")
 				{
 					adminCustomers.GET("", handlers.GetCustomers)
