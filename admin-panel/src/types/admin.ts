@@ -1,4 +1,4 @@
-﻿export interface Product {
+export interface Product {
   id: number
   name: string
   description?: string
@@ -342,4 +342,56 @@ export interface SupportMessage {
   sender_type: 'customer' | 'admin'
   message: string
   created_at: string
+}
+
+export interface AdminPaymentRow {
+  order_id: number
+  transaction_id: string
+  customer_name: string
+  customer_phone: string
+  amount: number
+  refunded_amount: number
+  payment_method: 'cod' | 'online'
+  gateway: string
+  status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
+  created_at: string
+}
+
+export interface AdminPaymentListResponse {
+  payments: AdminPaymentRow[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+export interface AdminPaymentDetail {
+  order: any
+  customer: { id: number; name: string; phone: string }
+  payment: {
+    id?: number
+    order_id: number
+    razorpay_order_id?: string
+    razorpay_payment_id?: string
+    amount: number
+    currency: string
+    status: string
+    gateway: string
+    refunded_amount: number
+    created_at?: string
+    updated_at?: string
+  }
+  has_payment_record: boolean
+}
+
+export interface AdminPaymentReconciliationSummary {
+  total_collected: number
+  total_pending: number
+  total_refunded: number
+  count_paid: number
+  count_pending: number
+  count_failed: number
+  count_refunded: number
+  online_collected: number
+  cod_collected: number
 }

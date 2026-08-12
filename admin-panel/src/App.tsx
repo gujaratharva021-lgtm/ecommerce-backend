@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
@@ -23,6 +23,7 @@ import Offers from './pages/Offers'
 import Banners from './pages/Banners'
 import DeliveryZones from './pages/DeliveryZones'
 import SupportTickets from './pages/SupportTickets'
+import Payments from './pages/Payments'
 import WalletCredit from './pages/WalletCredit'
 
 function App() {
@@ -204,6 +205,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SupportTickets />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <Payments />
               </ProtectedRoute>
             }
           />

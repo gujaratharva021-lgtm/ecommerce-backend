@@ -1,4 +1,4 @@
-﻿import apiClient from './client'
+import apiClient from './client'
 import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, CreateBannerRequest, CreateDeliveryZoneRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
@@ -234,3 +234,28 @@ export const replyToSupportTicket = (id: number, message: string) =>
 
 export const updateSupportTicketStatus = (id: number, status: string) =>
   apiClient.put(`/admin/support/tickets/${id}/status`, { status }).then((r) => r.data)
+
+export const listAdminPayments = (params: {
+  search?: string
+  status?: string
+  payment_method?: string
+  gateway?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  limit?: number
+}) => apiClient.get('/admin/payments', { params }).then((r) => r.data)
+
+export const getAdminPaymentReconciliation = (params: { date_from?: string; date_to?: string }) =>
+  apiClient.get('/admin/payments/reconciliation', { params }).then((r) => r.data)
+
+export const getAdminPaymentDetail = (orderId: number) =>
+  apiClient.get(`/admin/payments/${orderId}`).then((r) => r.data)
+
+export const updateAdminPaymentStatus = (orderId: number, status: string, refundedAmount?: number) =>
+  apiClient
+    .put(`/admin/payments/${orderId}/status`, {
+      status,
+      ...(refundedAmount !== undefined ? { refunded_amount: refundedAmount } : {}),
+    })
+    .then((r) => r.data)
