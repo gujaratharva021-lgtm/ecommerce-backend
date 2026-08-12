@@ -258,6 +258,7 @@ adminOffers := admin.Group("/offers")
 			{
 				adminAnalytics.GET("/summary", handlers.GetAnalyticsSummary)
 				adminAnalytics.GET("/products", handlers.GetProductPerformance)
+				adminAnalytics.GET("/dashboard", handlers.GetDashboardOverview)
 			}
 
 			adminDeliveryPartners := admin.Group("/delivery-partners")

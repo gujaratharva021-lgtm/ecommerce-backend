@@ -395,3 +395,75 @@ export interface AdminPaymentReconciliationSummary {
   online_collected: number
   cod_collected: number
 }
+
+export interface DashboardStats {
+  total_users: number
+  new_users_today: number
+  total_orders: number
+  orders_today: number
+  total_sales: number
+  revenue_today: number
+  avg_order_value: number
+  pending_orders: number
+  confirmed_orders: number
+  shipped_orders: number
+  delivered_orders: number
+  cancelled_orders: number
+  returned_orders: number
+  total_products: number
+  low_stock_products: number
+  out_of_stock_products: number
+  active_delivery_partners: number
+  total_warehouses: number
+  open_support_tickets: number
+  pending_payment_amount: number
+}
+
+export interface DashboardTrendPoint {
+  date: string
+  revenue: number
+  orders: number
+}
+
+export interface DashboardUserPoint {
+  date: string
+  count: number
+}
+
+export interface DashboardStatusCount {
+  status: string
+  count: number
+}
+
+export interface DashboardPaymentSplit {
+  method: string
+  revenue: number
+  count: number
+}
+
+export interface DashboardProductRow {
+  product_id: number
+  product_name: string
+  units_sold: number
+  total_revenue: number
+}
+
+export interface DashboardWarehouseRevenue {
+  warehouse_name: string
+  revenue: number
+}
+
+export interface DashboardCharts {
+  sales_trend: DashboardTrendPoint[]
+  user_growth: DashboardUserPoint[]
+  orders_by_status: DashboardStatusCount[]
+  payment_split: DashboardPaymentSplit[]
+  top_products: DashboardProductRow[]
+  revenue_by_warehouse: DashboardWarehouseRevenue[]
+  tickets_by_status: DashboardStatusCount[]
+}
+
+export interface DashboardOverview {
+  stats: DashboardStats
+  charts: DashboardCharts
+}

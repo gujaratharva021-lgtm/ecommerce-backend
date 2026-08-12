@@ -249,6 +249,9 @@ export const listAdminPayments = (params: {
 export const getAdminPaymentReconciliation = (params: { date_from?: string; date_to?: string }) =>
   apiClient.get('/admin/payments/reconciliation', { params }).then((r) => r.data)
 
+export const getDashboardOverview = () =>
+  apiClient.get('/admin/analytics/dashboard').then((r) => r.data)
+
 export const getAdminPaymentDetail = (orderId: number) =>
   apiClient.get(`/admin/payments/${orderId}`).then((r) => r.data)
 
