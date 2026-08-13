@@ -103,6 +103,15 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseOrders.GET("", handlers.GetWarehouseOrders)
 				warehouseOrders.PUT("/:id/accept", handlers.AcceptOrder)
 			}
+
+			warehousePicking := warehouse.Group("/picking")
+			warehousePicking.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehousePicking.GET("/:order_id", handlers.GetPickingTask)
+				warehousePicking.PUT("/:order_id/start", handlers.StartPicking)
+				warehousePicking.PUT("/:order_id/complete", handlers.CompletePicking)
+				warehousePicking.PUT("/items/:item_id", handlers.MarkPickItem)
+			}
 		}
 
 		// ---- Cart routes (protected) ----
