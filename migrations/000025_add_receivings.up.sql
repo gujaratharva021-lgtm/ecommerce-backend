@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS receivings (
+CREATE TABLE IF NOT EXISTS receivings (
     id BIGSERIAL PRIMARY KEY,
     warehouse_id BIGINT NOT NULL,
     supplier_name VARCHAR(255) NOT NULL,

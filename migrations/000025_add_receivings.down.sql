@@ -1,1 +1,1 @@
-﻿DROP TABLE IF EXISTS receivings;
+DROP TABLE IF EXISTS receivings;

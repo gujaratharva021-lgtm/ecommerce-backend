@@ -2,6 +2,7 @@
 
 import (
 "errors"
+"fmt"
 "net/http"
 
 "github.com/gin-gonic/gin"
@@ -137,9 +138,25 @@ ProductID:   transfer.ProductID,
 WarehouseID: transfer.ToWarehouseID,
 }
 }
+previousQty := inventory.Stock
 inventory.Stock += transfer.Quantity
 inventory.InStock = inventory.Stock > 0
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+movement := models.StockMovement{
+ProductID:    transfer.ProductID,
+WarehouseID:  transfer.ToWarehouseID,
+PreviousQty:  previousQty,
+Change:       transfer.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementTransfer,
+StaffID:      &staffID,
+ReferenceID:  &transfer.ID,
+Notes:        fmt.Sprintf("Stock transfer #%d received from warehouse #%d", transfer.ID, transfer.FromWarehouseID),
+}
+if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 
@@ -205,11 +222,27 @@ statusCode = http.StatusBadRequest
 return errors.New("insufficient stock at source warehouse to approve this transfer")
 }
 
+previousQty := inventory.Stock
 inventory.Stock -= transfer.Quantity
 if inventory.Stock <= 0 {
 inventory.InStock = false
 }
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+movement := models.StockMovement{
+ProductID:    transfer.ProductID,
+WarehouseID:  transfer.FromWarehouseID,
+PreviousQty:  previousQty,
+Change:       -transfer.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementTransfer,
+StaffID:      &staffID,
+ReferenceID:  &transfer.ID,
+Notes:        fmt.Sprintf("Stock transfer #%d approved, dispatched to warehouse #%d", transfer.ID, transfer.ToWarehouseID),
+}
+if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 
@@ -329,11 +362,27 @@ statusCode = http.StatusBadRequest
 return errors.New("insufficient stock at source warehouse to approve this transfer")
 }
 
+previousQty := inventory.Stock
 inventory.Stock -= transfer.Quantity
 if inventory.Stock <= 0 {
 inventory.InStock = false
 }
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+movement := models.StockMovement{
+ProductID:    transfer.ProductID,
+WarehouseID:  transfer.FromWarehouseID,
+PreviousQty:  previousQty,
+Change:       -transfer.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementTransfer,
+StaffID:      &adminID,
+ReferenceID:  &transfer.ID,
+Notes:        fmt.Sprintf("Stock transfer #%d approved by admin, dispatched to warehouse #%d", transfer.ID, transfer.ToWarehouseID),
+}
+if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 
@@ -410,9 +459,24 @@ ProductID:   transfer.ProductID,
 WarehouseID: transfer.FromWarehouseID,
 }
 }
+previousQty := inventory.Stock
 inventory.Stock += transfer.Quantity
 inventory.InStock = inventory.Stock > 0
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+movement := models.StockMovement{
+ProductID:    transfer.ProductID,
+WarehouseID:  transfer.FromWarehouseID,
+PreviousQty:  previousQty,
+Change:       transfer.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementCorrection,
+ReferenceID:  &transfer.ID,
+Notes:        fmt.Sprintf("Stock transfer #%d cancelled - stock restored to source warehouse", transfer.ID),
+}
+if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 

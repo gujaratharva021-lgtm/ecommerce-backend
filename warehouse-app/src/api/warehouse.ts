@@ -23,6 +23,7 @@ import type {
   WarehouseBin,
   Inventory,
   StockMovementsResponse,
+  AuditLogsResponse,
   OrderInvoice,
 } from '../types/warehouse'
 
@@ -244,3 +245,14 @@ export const getWarehouseInventory = (params: {
 export const getOrderInvoice = (orderId: number) =>
   apiClient.get(`/warehouse/orders/${orderId}/invoice`).then((r) => r.data as OrderInvoice)
 
+
+
+// ---- Audit logs ----
+
+export const listAuditLogs = (params: {
+  action?: string
+  entity_type?: string
+  staff_id?: number
+  page?: number
+  limit?: number
+}) => apiClient.get('/warehouse/audit-logs', { params }).then((r) => r.data as AuditLogsResponse)

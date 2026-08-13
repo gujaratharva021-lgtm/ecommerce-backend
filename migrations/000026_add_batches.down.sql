@@ -1,1 +1,1 @@
-﻿DROP TABLE IF EXISTS batches;
+DROP TABLE IF EXISTS batches;

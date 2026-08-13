@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS warehouse_zones (
+CREATE TABLE IF NOT EXISTS warehouse_zones (
     id BIGSERIAL PRIMARY KEY,
     warehouse_id BIGINT NOT NULL,
     name VARCHAR(100) NOT NULL,

@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS order_handovers (
+CREATE TABLE IF NOT EXISTS order_handovers (
     id BIGSERIAL PRIMARY KEY,
     order_id BIGINT NOT NULL UNIQUE REFERENCES orders(id),
     warehouse_id BIGINT NOT NULL,

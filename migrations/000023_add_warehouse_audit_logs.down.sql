@@ -1,1 +1,1 @@
-﻿DROP TABLE IF EXISTS warehouse_audit_logs;
+DROP TABLE IF EXISTS warehouse_audit_logs;

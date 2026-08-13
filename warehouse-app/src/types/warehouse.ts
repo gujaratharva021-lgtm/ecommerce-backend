@@ -480,3 +480,26 @@ export interface OrderInvoice {
   generated_at: string
   items: InvoiceItem[]
 }
+
+// ---- Audit logs ----
+
+export interface WarehouseAuditLog {
+  id: number
+  warehouse_id: number
+  staff_id: number
+  staff_name: string
+  action: string
+  entity_type: string
+  entity_id: string
+  before_value?: string
+  after_value?: string
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  audit_logs: WarehouseAuditLog[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
