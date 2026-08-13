@@ -1,0 +1,210 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { acceptOrder, listWarehouseOrders } from '../api/warehouse'
+import type { Order, OrderStatus } from '../types/warehouse'
+import StatusBadge from '../components/StatusBadge'
+import { getErrorMessage } from '../utils/errors'
+
+const TABS: { label: string; status?: OrderStatus }[] = [
+  { label: 'New Orders', status: 'confirmed' },
+  { label: 'Picking', status: 'picking' },
+  { label: 'Packing', status: 'packing' },
+  { label: 'Ready for Dispatch', status: 'ready_for_dispatch' },
+  { label: 'Completed', status: 'delivered' },
+  { label: 'All', status: undefined },
+]
+
+// Where an order's action button should route the staff member.
+function actionFor(order: Order): { label: string; onClick: () => void } | null {
+  if (order.status === 'confirmed') return null // handled via Accept button
+  if (order.status === 'picking' || order.status === 'picked') return { label: 'Go to Picking', onClick: () => {} }
+  if (order.status === 'packing') return { label: 'Go to Packing', onClick: () => {} }
+  return null
+}
+
+export default function Orders() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeStatus = searchParams.get('status') ?? 'confirmed'
+  const page = parseInt(searchParams.get('page') ?? '1', 10)
+
+  const [orders, setOrders] = useState<Order[]>([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [acceptingId, setAcceptingId] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params: { status?: string; page: number; limit: number } = { page, limit: 20 }
+      const tab = TABS.find((t) => (t.status ?? 'all') === activeStatus)
+      if (tab?.status) params.status = tab.status
+      const data = await listWarehouseOrders(params)
+      setOrders(data.orders ?? [])
+      setTotalPages(data.total_pages || 1)
+      setTotal(data.total)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to load orders.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [activeStatus, page])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function setTab(status?: OrderStatus) {
+    setSearchParams(status ? { status, page: '1' } : { status: 'all', page: '1' })
+  }
+
+  function setPage(p: number) {
+    setSearchParams({ status: activeStatus, page: String(p) })
+  }
+
+  async function handleAccept(order: Order) {
+    setAcceptingId(order.id)
+    setError(null)
+    try {
+      await acceptOrder(order.id)
+      await load()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to accept order.'))
+    } finally {
+      setAcceptingId(null)
+    }
+  }
+
+  function goToTask(order: Order) {
+    if (order.status === 'picking' || order.status === 'picked') navigate(`/picking/${order.id}`)
+    else if (order.status === 'packing' || order.status === 'packed') navigate(`/packing/${order.id}`)
+  }
+
+  return (
+    <div className="p-6 max-w-6xl">
+      <h1 className="text-lg font-semibold mb-4">Orders</h1>
+
+      <div className="flex gap-1 border-b border-slate-800 mb-4 overflow-x-auto">
+        {TABS.map((tab) => {
+          const key = tab.status ?? 'all'
+          const isActive = key === activeStatus
+          return (
+            <button
+              key={key}
+              onClick={() => setTab(tab.status)}
+              className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
+                isActive
+                  ? 'border-indigo-400 text-indigo-300 font-medium'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {error && (
+        <div className="border border-rose-900 bg-rose-950/40 text-rose-300 text-sm rounded-lg px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className="text-sm text-slate-400">Loading orders...</p>
+      ) : orders.length === 0 ? (
+        <div className="border border-slate-800 rounded-xl bg-slate-900 p-10 text-center">
+          <p className="text-sm text-slate-400">No orders in this view.</p>
+        </div>
+      ) : (
+        <div className="border border-slate-800 rounded-xl bg-slate-900 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-800 text-left text-xs text-slate-400 uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Items</th>
+                <th className="px-4 py-3">Total</th>
+                <th className="px-4 py-3">Payment</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => {
+                const itemCount = order.items?.length ?? 0
+                const totalQty = order.items?.reduce((sum, i) => sum + i.quantity, 0) ?? 0
+                const action = actionFor(order)
+                return (
+                  <tr key={order.id} className="border-b border-slate-800 last:border-0 hover:bg-slate-800/40">
+                    <td className="px-4 py-3 font-medium">#{order.id}</td>
+                    <td className="px-4 py-3 text-slate-400">
+                      {new Date(order.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-slate-400">
+                      {itemCount} lines &middot; {totalQty} qty
+                    </td>
+                    <td className="px-4 py-3">₹{order.total_amount.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-slate-400 uppercase text-xs">
+                      {order.payment_method} &middot; {order.payment_status}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={order.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {order.status === 'confirmed' ? (
+                        <button
+                          onClick={() => handleAccept(order)}
+                          disabled={acceptingId === order.id}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        >
+                          {acceptingId === order.id ? 'Accepting...' : 'Accept'}
+                        </button>
+                      ) : action ? (
+                        <button
+                          onClick={() => goToTask(order)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium transition-colors"
+                        >
+                          {action.label}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-600">&mdash;</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!isLoading && orders.length > 0 && (
+        <div className="flex items-center justify-between mt-4 text-xs text-slate-400">
+          <span>
+            Page {page} of {totalPages} &middot; {total} total
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

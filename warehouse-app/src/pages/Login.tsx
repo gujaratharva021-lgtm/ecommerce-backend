@@ -50,7 +50,7 @@ export default function Login() {
     setIsSubmitting(true)
     try {
       await verifyOtp(phone, otp)
-      navigate('/stock-transfers')
+      navigate('/dashboard')
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Failed to verify OTP. Please try again.')
     } finally {

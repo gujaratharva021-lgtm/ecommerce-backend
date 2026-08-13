@@ -1,5 +1,4 @@
 ﻿import { useEffect, useState } from 'react'
-import Layout from '../components/Layout'
 import {
   listMyStockTransfers,
   requestStockTransfer,
@@ -125,7 +124,6 @@ export default function StockTransfers() {
   }
 
   return (
-    <Layout>
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -272,6 +270,5 @@ export default function StockTransfers() {
           </div>
         )}
       </div>
-    </Layout>
   )
 }

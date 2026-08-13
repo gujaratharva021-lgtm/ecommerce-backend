@@ -29,3 +29,4 @@ secrets/
 /ecommerce-backend
 
 secrets/
+warehouse-app/src_backup_*/

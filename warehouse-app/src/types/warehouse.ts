@@ -38,3 +38,135 @@ export interface StockTransfer {
   approved_by?: number | null
   created_at?: string
 }
+
+// ---- Orders / fulfillment ----
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'picking'
+  | 'picked'
+  | 'packing'
+  | 'packed'
+  | 'ready_for_dispatch'
+  | 'shipped'
+  | 'delivered'
+  | 'returned'
+  | 'cancelled'
+
+export interface Address {
+  id: number
+  line1?: string
+  line2?: string
+  city?: string
+  state?: string
+  pincode?: string
+}
+
+export interface OrderItem {
+  id: number
+  order_id: number
+  product_id: number
+  product?: Product
+  quantity: number
+  price: number
+}
+
+export interface Order {
+  id: number
+  user_id: number
+  address_id: number
+  address?: Address
+  warehouse_id?: number
+  items_amount: number
+  delivery_charge: number
+  wallet_amount_used: number
+  total_amount: number
+  status: OrderStatus
+  payment_method: 'cod' | 'online'
+  payment_status: 'pending' | 'paid' | 'failed'
+  delivery_partner_id?: number | null
+  items?: OrderItem[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OrdersResponse {
+  orders: Order[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+// ---- Picking ----
+
+export type PickItemStatus = 'pending' | 'picked' | 'unavailable' | 'short'
+export type TaskStatus = 'pending' | 'in_progress' | 'completed'
+
+export interface PickingTaskItem {
+  id: number
+  picking_task_id: number
+  order_item_id: number
+  product_id: number
+  product?: Product
+  quantity_needed: number
+  quantity_picked: number
+  status: PickItemStatus
+  reason?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PickingTask {
+  id: number
+  order_id: number
+  order?: Order
+  warehouse_id: number
+  picker_id?: number | null
+  status: TaskStatus
+  started_at?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+  items?: PickingTaskItem[]
+}
+
+// ---- Packing ----
+
+export interface PackingTask {
+  id: number
+  order_id: number
+  order?: Order
+  warehouse_id: number
+  packer_id?: number | null
+  status: TaskStatus
+  started_at?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PackingTaskResponse {
+  packing_task: PackingTask
+  picked_items: PickingTaskItem[]
+}
+
+// ---- Dashboard ----
+
+export interface WarehouseDashboardStats {
+  today_orders: number
+  new_orders: number
+  picking: number
+  packed: number
+  ready_for_dispatch: number
+  completed_today: number
+  cancelled_today: number
+  low_stock_products: number
+  out_of_stock_products: number
+  pending_stock_transfers: number
+  active_staff: number
+  avg_picking_minutes: number
+  avg_packing_minutes: number
+  fulfillment_rate: number
+}
