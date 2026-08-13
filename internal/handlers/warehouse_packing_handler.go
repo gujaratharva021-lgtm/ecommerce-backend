@@ -1,12 +1,14 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
 "time"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetPackingTask godoc
@@ -71,6 +73,7 @@ c.JSON(http.StatusOK, task)
 // checking task.Status == "completed" up front (idempotency guard).
 func CompletePacking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
+staffID := c.MustGet("staff_id").(uint)
 orderID := c.Param("order_id")
 
 var task models.PackingTask
@@ -93,6 +96,10 @@ task.CompletedAt = &now
 database.DB.Save(&task)
 
 database.DB.Model(&models.Order{}).Where("id = ?", orderID).Update("status", models.OrderStatusReadyForDispatch)
+
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_packing", "order", orderID,
+"status=packing", "status=ready_for_dispatch")
 
 c.JSON(http.StatusOK, gin.H{"success": true, "packing_task": task, "order_status": models.OrderStatusReadyForDispatch})
 }

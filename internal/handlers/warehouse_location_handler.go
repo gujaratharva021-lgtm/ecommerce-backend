@@ -1,12 +1,14 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
 "strconv"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // ---- Zones ----
@@ -209,6 +211,9 @@ return
 }
 
 database.DB.Delete(&zone)
+staffID := c.MustGet("staff_id").(uint)
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "delete_zone", "warehouse_zone", zoneID, zone.Name, "")
 c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
@@ -235,6 +240,9 @@ return
 }
 
 database.DB.Delete(&rack)
+staffID := c.MustGet("staff_id").(uint)
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "delete_rack", "warehouse_rack", rackID, rack.Name, "")
 c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
@@ -262,5 +270,8 @@ return
 }
 
 database.DB.Delete(&bin)
+staffID := c.MustGet("staff_id").(uint)
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "delete_bin", "warehouse_bin", binID, bin.Name, "")
 c.JSON(http.StatusOK, gin.H{"success": true})
 }

@@ -1,12 +1,14 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
 "time"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "gorm.io/gorm"
 )
 
@@ -74,6 +76,10 @@ if txErr != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record handover: " + txErr.Error()})
 return
 }
+
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "handover_order", "order", orderID,
+"status=ready_for_dispatch", "status=handed_over")
 
 c.JSON(http.StatusOK, gin.H{"success": true, "order_id": order.ID, "status": order.Status})
 }

@@ -1,12 +1,14 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
 "time"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetPickingTask godoc
@@ -147,6 +149,10 @@ item.QuantityPicked = 0
 item.Status = req.Status
 item.Reason = req.Reason
 database.DB.Save(&item)
+
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "mark_pick_item", "picking_task_item", itemID,
+"status=pending", fmt.Sprintf("status=%s qty_picked=%d", item.Status, item.QuantityPicked))
 
 // Auto-create a WarehouseException for unavailable/short picks so staff
 // don't have to double-enter what they already reported inline here.

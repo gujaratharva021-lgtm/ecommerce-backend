@@ -149,6 +149,8 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseExceptions.PUT("/:id", handlers.UpdateWarehouseException)
 			}
 
+			warehouse.GET("/audit-logs", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseAuditLogs)
+
 			warehouse.GET("/staff/performance", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseStaffPerformance)
 			warehouse.GET("/staff/performance/me", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetMyPerformance)
 
