@@ -114,7 +114,7 @@ staff.IsActive = *req.IsActive
 }
 
 if err := database.DB.Save(&staff).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update warehouse staff"})
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update warehouse staff", "debug": err.Error()})
 return
 }
 
