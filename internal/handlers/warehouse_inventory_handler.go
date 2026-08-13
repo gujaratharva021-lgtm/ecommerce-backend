@@ -34,7 +34,7 @@ query.Limit = 20
 damagedCutoff := time.Now().AddDate(0, 0, -30)
 var damagedIDs []uint
 database.DB.Model(&models.StockMovement{}).
-Where("warehouse_id = ? AND movement_type = ? AND created_at >= ?", warehouseID, models.MovementDamaged, damagedCutoff).
+Where("warehouse_id = ? AND reason = ? AND created_at >= ?", warehouseID, models.AdjustReasonDamaged, damagedCutoff).
 Distinct("product_id").Pluck("product_id", &damagedIDs)
 
 var expiredIDs []uint
@@ -152,7 +152,7 @@ row.ExpiredQty = expiredQty
 
 if damagedSet[inv.ProductID] {
 var lastDamaged models.StockMovement
-if err := database.DB.Where("product_id = ? AND warehouse_id = ? AND movement_type = ?", inv.ProductID, warehouseID, models.MovementDamaged).
+if err := database.DB.Where("product_id = ? AND warehouse_id = ? AND reason = ?", inv.ProductID, warehouseID, models.AdjustReasonDamaged).
 Order("created_at DESC").First(&lastDamaged).Error; err == nil {
 ts := lastDamaged.CreatedAt.Format(time.RFC3339)
 row.LastDamagedAt = &ts
