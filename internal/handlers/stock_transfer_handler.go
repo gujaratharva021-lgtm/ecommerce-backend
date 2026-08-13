@@ -390,14 +390,19 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Stock transfer not found"})
 return
 }
 
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&transfer, id).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("stock transfer not found")
+}
 if transfer.Status != models.StockTransferInTransit {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only in-transit transfers can be cancelled"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("only in-transit transfers can be cancelled - it may have already been processed")
 }
 
-txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 var inventory models.Inventory
-err := tx.Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.FromWarehouseID).
+err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.FromWarehouseID).
 First(&inventory).Error
 if err != nil {
 inventory = models.Inventory{
@@ -416,7 +421,7 @@ return tx.Save(&transfer).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel stock transfer"})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
