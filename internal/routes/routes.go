@@ -163,6 +163,16 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseReceiving.PUT("/:id/putaway", handlers.PutAwayReceiving)
 			}
 
+			warehouseBatches := warehouse.Group("/batches")
+			warehouseBatches.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehouseBatches.POST("", handlers.CreateBatch)
+				warehouseBatches.GET("", handlers.GetWarehouseBatches)
+				warehouseBatches.GET("/expiring", handlers.GetExpiringBatches)
+				warehouseBatches.PUT("/:id/quantity", handlers.AdjustBatchQuantity)
+				warehouseBatches.DELETE("/:id", handlers.DeleteBatch)
+			}
+
 			warehouse.GET("/staff/performance", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseStaffPerformance)
 			warehouse.GET("/staff/performance/me", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetMyPerformance)
 
