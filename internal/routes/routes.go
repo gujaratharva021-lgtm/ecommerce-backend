@@ -120,6 +120,9 @@ func SetupRoutes(router *gin.Engine) {
 				warehousePacking.PUT("/:order_id/start", handlers.StartPacking)
 				warehousePacking.PUT("/:order_id/complete", handlers.CompletePacking)
 			}
+
+			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseDashboard)
+			}
 		}
 
 		// ---- Cart routes (protected) ----
@@ -324,5 +327,4 @@ adminOffers := admin.Group("/offers")
 			}
 		}
 	}
-}
 
