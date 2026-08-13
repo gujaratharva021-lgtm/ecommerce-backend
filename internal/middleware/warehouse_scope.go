@@ -38,6 +38,7 @@ return
 c.Set("warehouse_id", staff.WarehouseID)
 c.Set("staff_id", staff.ID)
 c.Set("staff_name", staff.Name)
+c.Set("staff_role", staff.Role)
 c.Next()
 }
 }
