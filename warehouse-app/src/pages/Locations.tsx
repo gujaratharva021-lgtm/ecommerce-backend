@@ -8,6 +8,9 @@ import {
   createBin,
   getProductInventory,
   assignProductBin,
+  deleteZone,
+  deleteRack,
+  deleteBin,
 } from '../api/warehouse'
 import type { WarehouseZone, WarehouseRack, WarehouseBin, Inventory } from '../types/warehouse'
 import { getErrorMessage } from '../utils/errors'
@@ -26,6 +29,7 @@ export default function Locations() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Product -> bin assignment
   const [productIdInput, setProductIdInput] = useState('')
@@ -70,6 +74,67 @@ export default function Locations() {
       setBins(data.bins)
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load bins.'))
+    }
+  }
+
+  const handleDeleteZone = async (zone: WarehouseZone, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm(`Delete zone "${zone.name}"? This only works if it has no racks.`)) return
+    setDeletingId(`zone-${zone.id}`)
+    setError(null)
+    try {
+      await deleteZone(zone.id)
+      if (selectedZone?.id === zone.id) {
+        setSelectedZone(null)
+        setSelectedRack(null)
+        setRacks([])
+        setBins([])
+      }
+      await loadZones()
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to delete zone.'))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteRack = async (rack: WarehouseRack, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm(`Delete rack "${rack.name}"? This only works if it has no bins.`)) return
+    setDeletingId(`rack-${rack.id}`)
+    setError(null)
+    try {
+      await deleteRack(rack.id)
+      if (selectedRack?.id === rack.id) {
+        setSelectedRack(null)
+        setBins([])
+      }
+      if (selectedZone) {
+        const data = await listRacks(selectedZone.id)
+        setRacks(data.racks)
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to delete rack.'))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteBin = async (bin: WarehouseBin, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm(`Delete bin "${bin.name}"? This only works if no product is assigned to it.`)) return
+    setDeletingId(`bin-${bin.id}`)
+    setError(null)
+    try {
+      await deleteBin(bin.id)
+      if (selectedRack) {
+        const data = await listBins(selectedRack.id)
+        setBins(data.bins)
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to delete bin.'))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -178,17 +243,25 @@ export default function Locations() {
                 <p className="text-xs text-slate-500 px-4 py-4">No zones yet.</p>
               )}
               {zones.map((z) => (
-                <button
+                <div
                   key={z.id}
                   onClick={() => selectZone(z)}
-                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                     selectedZone?.id === z.id
                       ? 'bg-indigo-500/15 text-indigo-300'
                       : 'text-slate-300 hover:bg-slate-800/50'
                   }`}
                 >
-                  {z.name}
-                </button>
+                  <span>{z.name}</span>
+                  <button
+                    onClick={(e) => handleDeleteZone(z, e)}
+                    disabled={deletingId === `zone-${z.id}`}
+                    className="text-slate-600 hover:text-rose-400 disabled:opacity-40 text-xs px-1.5"
+                    title="Delete zone (only if empty)"
+                  >
+                    {deletingId === `zone-${z.id}` ? '...' : '\u2715'}
+                  </button>
+                </div>
               ))}
             </div>
             <div className="p-3 border-t border-slate-800 flex gap-1.5">
@@ -221,17 +294,25 @@ export default function Locations() {
                 <p className="text-xs text-slate-500 px-4 py-4">No racks yet.</p>
               )}
               {racks.map((r) => (
-                <button
+                <div
                   key={r.id}
                   onClick={() => selectRack(r)}
-                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer ${
                     selectedRack?.id === r.id
                       ? 'bg-indigo-500/15 text-indigo-300'
                       : 'text-slate-300 hover:bg-slate-800/50'
                   }`}
                 >
-                  {r.name}
-                </button>
+                  <span>{r.name}</span>
+                  <button
+                    onClick={(e) => handleDeleteRack(r, e)}
+                    disabled={deletingId === `rack-${r.id}`}
+                    className="text-slate-600 hover:text-rose-400 disabled:opacity-40 text-xs px-1.5"
+                    title="Delete rack (only if empty)"
+                  >
+                    {deletingId === `rack-${r.id}` ? '...' : '\u2715'}
+                  </button>
+                </div>
               ))}
             </div>
             {selectedZone && (
@@ -266,9 +347,19 @@ export default function Locations() {
                 <p className="text-xs text-slate-500 px-4 py-4">No bins yet.</p>
               )}
               {bins.map((b) => (
-                <div key={b.id} className="px-4 py-2.5 text-sm text-slate-300">
-                  {b.name}
-                  <span className="text-slate-600 ml-2 text-xs">#{b.id}</span>
+                <div key={b.id} className="px-4 py-2.5 text-sm text-slate-300 flex items-center justify-between">
+                  <span>
+                    {b.name}
+                    <span className="text-slate-600 ml-2 text-xs">#{b.id}</span>
+                  </span>
+                  <button
+                    onClick={(e) => handleDeleteBin(b, e)}
+                    disabled={deletingId === `bin-${b.id}`}
+                    className="text-slate-600 hover:text-rose-400 disabled:opacity-40 text-xs px-1.5"
+                    title="Delete bin (only if unassigned)"
+                  >
+                    {deletingId === `bin-${b.id}` ? '...' : '\u2715'}
+                  </button>
                 </div>
               ))}
             </div>

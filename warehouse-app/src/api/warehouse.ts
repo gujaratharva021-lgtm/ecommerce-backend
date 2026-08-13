@@ -141,3 +141,14 @@ export const adjustStock = (
 
 export const listStockMovements = (params: { product_id?: number; movement_type?: string; page?: number; limit?: number }) =>
   apiClient.get('/warehouse/stock-movements', { params }).then((r) => r.data as StockMovementsResponse)
+
+// ---- Warehouse location deletion ----
+
+export const deleteZone = (zoneId: number) =>
+  apiClient.delete(`/warehouse/zones/${zoneId}`).then((r) => r.data)
+
+export const deleteRack = (rackId: number) =>
+  apiClient.delete(`/warehouse/racks/${rackId}`).then((r) => r.data)
+
+export const deleteBin = (binId: number) =>
+  apiClient.delete(`/warehouse/bins/${binId}`).then((r) => r.data)
