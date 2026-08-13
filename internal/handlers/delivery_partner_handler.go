@@ -209,8 +209,8 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to y
 return
 }
 
-if order.Status != models.OrderStatusConfirmed {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be confirmed before it can be marked shipped"})
+if order.Status != models.OrderStatusHandedOver {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be handed over by the warehouse before it can be marked shipped"})
 return
 }
 
