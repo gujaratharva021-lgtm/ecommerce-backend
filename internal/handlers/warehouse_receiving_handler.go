@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
 "net/http"
 "strconv"
@@ -225,6 +226,10 @@ id := c.Param("id")
 var req models.PutAwayReceivingRequest
 _ = c.ShouldBindJSON(&req)
 
+// Existence/ownership pre-check only - the authoritative status check
+// happens inside the transaction below, under a row lock, so two
+// concurrent put-away calls for the same receiving record can't both
+// pass and both add stock (duplicate receiving / double addition).
 var rec models.Receiving
 if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Receiving record not found for your warehouse"})
@@ -237,6 +242,20 @@ return
 
 statusCode := http.StatusInternalServerError
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+// Re-fetch and lock the receiving row itself, then re-check its status.
+// This closes the race where two simultaneous requests both read
+// status=accepted before either commits.
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", id, warehouseID).
+First(&rec).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("receiving record not found for your warehouse")
+}
+if rec.Status != models.ReceivingStatusAccepted {
+statusCode = http.StatusBadRequest
+return errors.New("only accepted records can be put away - it may have already been put away, current status: " + rec.Status)
+}
+
 var inv models.Inventory
 err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 Where("product_id = ? AND warehouse_id = ?", rec.ProductID, warehouseID).

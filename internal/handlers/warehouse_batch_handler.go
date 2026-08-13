@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
 "net/http"
 "strconv"
@@ -10,6 +11,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // CreateBatch godoc
@@ -151,15 +154,20 @@ return
 }
 
 var batch models.Batch
-if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&batch).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Batch not found for your warehouse"})
-return
+var previousQty int
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&batch).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("batch not found for your warehouse")
 }
-
-previousQty := batch.Quantity
+previousQty = batch.Quantity
 batch.Quantity = req.Quantity
-if err := database.DB.Save(&batch).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update batch quantity"})
+return tx.Save(&batch).Error
+})
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
