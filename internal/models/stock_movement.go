@@ -47,7 +47,7 @@ CreatedAt    time.Time `json:"created_at"`
 
 // StockAdjustmentRequest is the body for POST /warehouse/inventory/:product_id/adjust
 type StockAdjustmentRequest struct {
-NewQuantity int    `json:"new_quantity" binding:"required,gte=0"`
+NewQuantity int    `json:"new_quantity" binding:"gte=0"`
 Reason      string `json:"reason" binding:"required,oneof=damaged expired counting_error lost found manual_correction other"`
 Notes       string `json:"notes"`
 }

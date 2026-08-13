@@ -53,7 +53,7 @@ Notes            string `json:"notes"`
 
 // MarkReceivedRequest is the body for PUT /warehouse/receiving/:id/receive
 type MarkReceivedRequest struct {
-ReceivedQuantity int    `json:"received_quantity" binding:"required,gte=0"`
+ReceivedQuantity int    `json:"received_quantity" binding:"gte=0"`
 DamagedQuantity  int    `json:"damaged_quantity" binding:"gte=0"`
 Notes            string `json:"notes"`
 }

@@ -24,5 +24,5 @@ UpdatedAt   time.Time `json:"updated_at"`
 // for the given warehouse.
 type InventoryUpdateRequest struct {
 WarehouseID uint `json:"warehouse_id" binding:"required"`
-Stock       int  `json:"stock" binding:"required,gte=0"`
+Stock       int  `json:"stock" binding:"gte=0"`
 }
