@@ -25,6 +25,7 @@ import type {
   StockMovementsResponse,
   AuditLogsResponse,
   OrderInvoice,
+  WarehouseNotificationsResponse,
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>

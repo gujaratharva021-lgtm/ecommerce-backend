@@ -1,7 +1,12 @@
 ﻿package main
 
 import (
+"context"
 "log"
+"net/http"
+"os"
+"os/signal"
+"syscall"
 "time"
 
 "github.com/gin-gonic/gin"
@@ -20,8 +25,8 @@ cfg := config.LoadConfig()
 // 2. Connect to PostgreSQL
 database.ConnectDatabase(cfg)
 
-	// 2b. Connect to Redis (optional - caching disabled if REDIS_URL unset)
-	database.ConnectRedis(cfg)
+// 2b. Connect to Redis (optional - caching disabled if REDIS_URL unset)
+database.ConnectRedis(cfg)
 
 // 3. Run auto-migration to create tables (dev/debug only;
 // In production (GIN_MODE=release), schema changes must go through
@@ -61,9 +66,30 @@ router := gin.Default()
 // 7. Register all routes
 routes.SetupRoutes(router)
 
-// 8. Start server
+// 8. Start server, with graceful shutdown on SIGINT/SIGTERM so in-flight
+// requests (e.g. a handover or invoice generation mid-transaction) get a
+// chance to finish instead of being cut off when a container is stopped.
+srv := &http.Server{
+Addr:    ":" + cfg.Port,
+Handler: router,
+}
+
+go func() {
 log.Printf("Server starting on port %s", cfg.Port)
-if err := router.Run(":" + cfg.Port); err != nil {
+if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 log.Fatalf("Failed to start server: %v", err)
 }
+}()
+
+quit := make(chan os.Signal, 1)
+signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+<-quit
+log.Println("Shutting down server...")
+
+ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+defer cancel()
+if err := srv.Shutdown(ctx); err != nil {
+log.Fatalf("Server forced to shut down: %v", err)
+}
+log.Println("Server exited cleanly")
 }
