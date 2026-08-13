@@ -229,3 +229,88 @@ export interface StaffPerformanceRow {
   accuracy_rate: number
   exceptions_caused: number
 }
+
+// ---- Warehouse locations ----
+
+export interface WarehouseZone {
+  id: number
+  warehouse_id: number
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WarehouseRack {
+  id: number
+  zone_id: number
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WarehouseBin {
+  id: number
+  rack_id: number
+  rack?: WarehouseRack & { zone?: WarehouseZone }
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Inventory {
+  id: number
+  product_id: number
+  product?: Product
+  warehouse_id: number
+  bin_id?: number | null
+  bin?: WarehouseBin | null
+  stock: number
+  in_stock: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ---- Stock movements ----
+
+export type MovementType =
+  | 'receive'
+  | 'sale'
+  | 'adjustment'
+  | 'transfer'
+  | 'damaged'
+  | 'expired'
+  | 'return'
+  | 'correction'
+
+export type AdjustReason =
+  | 'damaged'
+  | 'expired'
+  | 'counting_error'
+  | 'lost'
+  | 'found'
+  | 'manual_correction'
+  | 'other'
+
+export interface StockMovement {
+  id: number
+  product_id: number
+  product?: Product
+  warehouse_id: number
+  previous_qty: number
+  change: number
+  new_qty: number
+  movement_type: MovementType
+  reason?: string
+  staff_id?: number | null
+  reference_id?: number | null
+  notes?: string
+  created_at: string
+}
+
+export interface StockMovementsResponse {
+  movements: StockMovement[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}

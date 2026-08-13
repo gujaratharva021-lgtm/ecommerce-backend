@@ -11,6 +11,11 @@ import type {
   ExceptionsResponse,
   WarehouseException,
   StaffPerformanceRow,
+  WarehouseZone,
+  WarehouseRack,
+  WarehouseBin,
+  Inventory,
+  StockMovementsResponse,
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>
@@ -98,3 +103,41 @@ export const getStaffPerformance = () =>
 
 export const getMyPerformance = () =>
   apiClient.get('/warehouse/staff/performance/me').then((r) => r.data as StaffPerformanceRow)
+
+// ---- Warehouse locations ----
+
+export const listZones = () =>
+  apiClient.get('/warehouse/zones').then((r) => r.data as { zones: WarehouseZone[] })
+
+export const createZone = (name: string) =>
+  apiClient.post('/warehouse/zones', { name }).then((r) => r.data as WarehouseZone)
+
+export const listRacks = (zoneId: number) =>
+  apiClient.get(`/warehouse/zones/${zoneId}/racks`).then((r) => r.data as { racks: WarehouseRack[] })
+
+export const createRack = (zoneId: number, name: string) =>
+  apiClient.post(`/warehouse/zones/${zoneId}/racks`, { name }).then((r) => r.data as WarehouseRack)
+
+export const listBins = (rackId: number) =>
+  apiClient.get(`/warehouse/racks/${rackId}/bins`).then((r) => r.data as { bins: WarehouseBin[] })
+
+export const createBin = (rackId: number, name: string) =>
+  apiClient.post(`/warehouse/racks/${rackId}/bins`, { name }).then((r) => r.data as WarehouseBin)
+
+export const getProductInventory = (productId: number) =>
+  apiClient.get(`/warehouse/inventory/${productId}`).then((r) => r.data as Inventory)
+
+export const assignProductBin = (productId: number, binId: number | null) =>
+  apiClient
+    .put(`/warehouse/inventory/${productId}/bin`, { bin_id: binId })
+    .then((r) => r.data as Inventory)
+
+// ---- Stock adjustment / movement ----
+
+export const adjustStock = (
+  productId: number,
+  data: { new_quantity: number; reason: string; notes?: string }
+) => apiClient.post(`/warehouse/inventory/${productId}/adjust`, data).then((r) => r.data as Inventory)
+
+export const listStockMovements = (params: { product_id?: number; movement_type?: string; page?: number; limit?: number }) =>
+  apiClient.get('/warehouse/stock-movements', { params }).then((r) => r.data as StockMovementsResponse)
