@@ -33,7 +33,7 @@ export interface StockTransfer {
   to_warehouse_id: number
   to_warehouse?: Warehouse
   quantity: number
-  status: 'pending' | 'in_transit' | 'received' | 'rejected'
+  status: 'pending' | 'in_transit' | 'received' | 'rejected' | 'cancelled'
   requested_by: number
   approved_by?: number | null
   created_at?: string
