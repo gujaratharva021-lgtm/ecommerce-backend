@@ -90,25 +90,25 @@ func SetupRoutes(router *gin.Engine) {
 			warehouseStockTransfers := warehouse.Group("/stock-transfers")
 			warehouseStockTransfers.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
-				warehouseStockTransfers.POST("", handlers.RequestStockTransfer)
-				warehouseStockTransfers.GET("", handlers.GetMyStockTransfers)
-				warehouseStockTransfers.PUT("/:id/receive", handlers.ReceiveStockTransfer)
-				warehouseStockTransfers.PUT("/:id/approve", handlers.ApproveStockTransferByWarehouseStaff)
-				warehouseStockTransfers.PUT("/:id/reject", handlers.RejectStockTransferByWarehouseStaff)
+				warehouseStockTransfers.POST("", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.RequestStockTransfer)
+				warehouseStockTransfers.GET("", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetMyStockTransfers)
+				warehouseStockTransfers.PUT("/:id/receive", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.ReceiveStockTransfer)
+				warehouseStockTransfers.PUT("/:id/approve", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.ApproveStockTransferByWarehouseStaff)
+				warehouseStockTransfers.PUT("/:id/reject", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.RejectStockTransferByWarehouseStaff)
 			}
 
 			warehouseOrders := warehouse.Group("/orders")
 			warehouseOrders.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
-				warehouseOrders.GET("", handlers.GetWarehouseOrders)
-				warehouseOrders.PUT("/:id/accept", handlers.AcceptOrder)
-				warehouseOrders.PUT("/:id/handover", handlers.HandoverOrder)
-				warehouseOrders.GET("/:id/handover", handlers.GetHandover)
-warehouseOrders.GET("/:id/invoice", handlers.GetOrderInvoice)
+				warehouseOrders.GET("", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseOrders)
+				warehouseOrders.PUT("/:id/accept", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.AcceptOrder)
+				warehouseOrders.PUT("/:id/handover", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.HandoverOrder)
+				warehouseOrders.GET("/:id/handover", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetHandover)
+warehouseOrders.GET("/:id/invoice", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetOrderInvoice)
 			}
 
 			warehousePicking := warehouse.Group("/picking")
-			warehousePicking.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			warehousePicking.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RolePickers...))
 			{
 				warehousePicking.GET("/:order_id", handlers.GetPickingTask)
 				warehousePicking.PUT("/:order_id/start", handlers.StartPicking)
@@ -118,7 +118,7 @@ warehouseOrders.GET("/:id/invoice", handlers.GetOrderInvoice)
 			}
 
 			warehousePacking := warehouse.Group("/packing")
-			warehousePacking.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			warehousePacking.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RolePackers...))
 			{
 				warehousePacking.GET("/:order_id", handlers.GetPackingTask)
 				warehousePacking.PUT("/:order_id/start", handlers.StartPacking)
@@ -128,35 +128,35 @@ warehouseOrders.GET("/:id/invoice", handlers.GetOrderInvoice)
 			warehouseLocations := warehouse.Group("")
 			warehouseLocations.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
-				warehouseLocations.GET("/zones", handlers.GetWarehouseZones)
-				warehouseLocations.POST("/zones", handlers.CreateWarehouseZone)
-				warehouseLocations.GET("/zones/:zone_id/racks", handlers.GetZoneRacks)
-				warehouseLocations.POST("/zones/:zone_id/racks", handlers.CreateRack)
-				warehouseLocations.GET("/racks/:rack_id/bins", handlers.GetRackBins)
-				warehouseLocations.POST("/racks/:rack_id/bins", handlers.CreateBin)
-				warehouseLocations.PUT("/inventory/:product_id/bin", handlers.AssignProductBin)
-				warehouseLocations.GET("/inventory/:product_id", handlers.GetProductInventory)
-				warehouseLocations.DELETE("/zones/:zone_id", handlers.DeleteZone)
-				warehouseLocations.DELETE("/racks/:rack_id", handlers.DeleteRack)
-				warehouseLocations.DELETE("/bins/:bin_id", handlers.DeleteBin)
-				warehouseLocations.POST("/inventory/:product_id/adjust", handlers.AdjustStock)
-				warehouseLocations.GET("/stock-movements", handlers.GetStockMovements)
+				warehouseLocations.GET("/zones", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseZones)
+				warehouseLocations.POST("/zones", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.CreateWarehouseZone)
+				warehouseLocations.GET("/zones/:zone_id/racks", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetZoneRacks)
+				warehouseLocations.POST("/zones/:zone_id/racks", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.CreateRack)
+				warehouseLocations.GET("/racks/:rack_id/bins", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetRackBins)
+				warehouseLocations.POST("/racks/:rack_id/bins", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.CreateBin)
+				warehouseLocations.PUT("/inventory/:product_id/bin", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.AssignProductBin)
+				warehouseLocations.GET("/inventory/:product_id", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetProductInventory)
+				warehouseLocations.DELETE("/zones/:zone_id", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.DeleteZone)
+				warehouseLocations.DELETE("/racks/:rack_id", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.DeleteRack)
+				warehouseLocations.DELETE("/bins/:bin_id", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.DeleteBin)
+				warehouseLocations.POST("/inventory/:product_id/adjust", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.AdjustStock)
+				warehouseLocations.GET("/stock-movements", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetStockMovements)
 			}
 
 			warehouseExceptions := warehouse.Group("/exceptions")
 			warehouseExceptions.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
-				warehouseExceptions.GET("", handlers.GetWarehouseExceptions)
-				warehouseExceptions.GET("/:id", handlers.GetWarehouseException)
-				warehouseExceptions.PUT("/:id", handlers.UpdateWarehouseException)
+				warehouseExceptions.GET("", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseExceptions)
+				warehouseExceptions.GET("/:id", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseException)
+				warehouseExceptions.PUT("/:id", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.UpdateWarehouseException)
 			}
 
-			warehouse.GET("/audit-logs", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseAuditLogs)
-			warehouse.GET("/staff", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseStaffOverview)
-			warehouse.GET("/inventory", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseInventory)
+			warehouse.GET("/audit-logs", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseAuditLogs)
+			warehouse.GET("/staff", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseStaffOverview)
+			warehouse.GET("/inventory", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseInventory)
 
 			warehouseReceiving := warehouse.Group("/receiving")
-			warehouseReceiving.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			warehouseReceiving.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleInventoryOps...))
 			{
 				warehouseReceiving.POST("", handlers.CreateReceiving)
 				warehouseReceiving.GET("", handlers.GetWarehouseReceivings)
@@ -169,17 +169,17 @@ warehouseOrders.GET("/:id/invoice", handlers.GetOrderInvoice)
 			warehouseBatches := warehouse.Group("/batches")
 			warehouseBatches.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
-				warehouseBatches.POST("", handlers.CreateBatch)
-				warehouseBatches.GET("", handlers.GetWarehouseBatches)
-				warehouseBatches.GET("/expiring", handlers.GetExpiringBatches)
-				warehouseBatches.PUT("/:id/quantity", handlers.AdjustBatchQuantity)
-				warehouseBatches.DELETE("/:id", handlers.DeleteBatch)
+				warehouseBatches.POST("", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.CreateBatch)
+				warehouseBatches.GET("", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseBatches)
+				warehouseBatches.GET("/expiring", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetExpiringBatches)
+				warehouseBatches.PUT("/:id/quantity", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.AdjustBatchQuantity)
+				warehouseBatches.DELETE("/:id", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.DeleteBatch)
 			}
 
-			warehouse.GET("/staff/performance", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseStaffPerformance)
-			warehouse.GET("/staff/performance/me", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetMyPerformance)
+			warehouse.GET("/staff/performance", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseStaffPerformance)
+			warehouse.GET("/staff/performance/me", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetMyPerformance)
 
-			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseDashboard)
+			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseDashboard)
 			}
 		}
 
@@ -385,4 +385,5 @@ adminOffers := admin.Group("/offers")
 			}
 		}
 	}
+
 
