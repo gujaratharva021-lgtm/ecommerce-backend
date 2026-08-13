@@ -9,6 +9,8 @@ import type {
   WarehouseDashboardStats,
   PickItemStatus,
   ScanResult,
+  Receiving,
+  ReceivingsResponse,
   ExceptionsResponse,
   WarehouseException,
   StaffPerformanceRow,
@@ -158,3 +160,29 @@ export const deleteBin = (binId: number) =>
 
 export const scanPickItem = (itemId: number, barcode: string) =>
   apiClient.put(`/warehouse/picking/items/${itemId}/scan`, { barcode }).then((r) => r.data as ScanResult)
+
+
+// ---- Receiving ----
+
+export const createReceiving = (data: {
+  supplier_name: string
+  reference_number?: string
+  product_id: number
+  expected_quantity: number
+  notes?: string
+}) => apiClient.post('/warehouse/receiving', data).then((r) => r.data as Receiving)
+
+export const listReceivings = (params: { status?: string; page?: number; limit?: number }) =>
+  apiClient.get('/warehouse/receiving', { params }).then((r) => r.data as ReceivingsResponse)
+
+export const getReceiving = (id: number) =>
+  apiClient.get(`/warehouse/receiving/${id}`).then((r) => r.data as Receiving)
+
+export const markReceived = (id: number, data: { received_quantity: number; damaged_quantity: number; notes?: string }) =>
+  apiClient.put(`/warehouse/receiving/${id}/receive`, data).then((r) => r.data as Receiving)
+
+export const qcReceiving = (id: number, data: { action: 'accept' | 'reject'; accepted_quantity?: number; rejection_reason?: string }) =>
+  apiClient.put(`/warehouse/receiving/${id}/qc`, data).then((r) => r.data as Receiving)
+
+export const putAwayReceiving = (id: number, binId: number | null) =>
+  apiClient.put(`/warehouse/receiving/${id}/putaway`, { bin_id: binId }).then((r) => r.data as Receiving)

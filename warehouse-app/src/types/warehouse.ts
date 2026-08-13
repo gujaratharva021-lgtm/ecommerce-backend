@@ -323,3 +323,42 @@ export interface ScanResult {
   product_id: number
   product_name: string
 }
+
+// ---- Receiving ----
+
+export type ReceivingStatus = 'pending' | 'received' | 'accepted' | 'rejected' | 'put_away'
+
+export interface Receiving {
+  id: number
+  warehouse_id: number
+  supplier_name: string
+  reference_number?: string
+  product_id: number
+  product?: Product
+  expected_quantity: number
+  received_quantity: number
+  damaged_quantity: number
+  accepted_quantity: number
+  status: ReceivingStatus
+  bin_id?: number | null
+  bin?: WarehouseBin | null
+  created_by_staff_id: number
+  received_by_staff_id?: number | null
+  qc_by_staff_id?: number | null
+  put_away_by_staff_id?: number | null
+  notes?: string
+  rejection_reason?: string
+  received_at?: string | null
+  qc_at?: string | null
+  put_away_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReceivingsResponse {
+  receivings: Receiving[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
