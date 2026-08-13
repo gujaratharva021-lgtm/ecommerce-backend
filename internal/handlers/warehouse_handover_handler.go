@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
 "net/http"
 "time"
@@ -10,11 +11,13 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // HandoverOrderRequest is the body for PUT /warehouse/orders/:id/handover
 type HandoverOrderRequest struct {
 PackageCount int `json:"package_count" binding:"required,min=1"`
+DeliveryPartnerID uint `json:"delivery_partner_id" binding:"required"`
 }
 
 // HandoverOrder godoc
@@ -39,24 +42,30 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Order not found for your warehouse"}
 return
 }
 
-if order.Status != models.OrderStatusReadyForDispatch {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only ready_for_dispatch orders can be handed over, current status: " + order.Status})
-return
-}
-
-if order.DeliveryPartnerID == nil {
-c.JSON(http.StatusBadRequest, gin.H{"error": "No delivery partner assigned to this order yet"})
-return
-}
-
-var existing models.OrderHandover
-if err := database.DB.Where("order_id = ?", order.ID).First(&existing).Error; err == nil {
-c.JSON(http.StatusConflict, gin.H{"error": "This order has already been handed over"})
-return
-}
-
+statusCode := http.StatusInternalServerError
 now := time.Now()
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, order.ID).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("order not found")
+}
+if order.Status != models.OrderStatusReadyForDispatch {
+statusCode = http.StatusBadRequest
+return errors.New("only ready_for_dispatch orders can be handed over, current status: " + order.Status)
+}
+if order.DeliveryPartnerID == nil {
+statusCode = http.StatusBadRequest
+return errors.New("no delivery partner assigned to this order yet")
+}
+if *order.DeliveryPartnerID != req.DeliveryPartnerID {
+statusCode = http.StatusForbidden
+return errors.New("delivery partner does not match the partner assigned to this order")
+}
+var existing models.OrderHandover
+if err := tx.Where("order_id = ?", order.ID).First(&existing).Error; err == nil {
+statusCode = http.StatusConflict
+return errors.New("this order has already been handed over")
+}
 handover := models.OrderHandover{
 OrderID:           order.ID,
 WarehouseID:       warehouseID,
@@ -73,7 +82,7 @@ return tx.Save(&order).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record handover: " + txErr.Error()})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
