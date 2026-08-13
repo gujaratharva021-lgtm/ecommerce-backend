@@ -91,6 +91,8 @@ export interface WarehouseStaff {
   name: string
   phone: string
   warehouse_id: number
+  role?: string
+  is_active?: boolean
   status?: string
 }
 
