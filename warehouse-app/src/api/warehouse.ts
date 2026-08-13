@@ -212,3 +212,7 @@ export const adjustBatchQuantity = (id: number, data: { quantity: number; reason
 
 export const deleteBatch = (id: number) =>
   apiClient.delete(`/warehouse/batches/${id}`).then((r) => r.data)
+// ---- Staff overview ----
+
+export const getStaffOverview = () =>
+  apiClient.get('/warehouse/staff').then((r) => r.data as { staff: import('../types/warehouse').StaffOverviewRow[] })

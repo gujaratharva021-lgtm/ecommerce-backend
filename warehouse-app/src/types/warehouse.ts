@@ -395,3 +395,16 @@ export interface ExpiringBatchesResponse {
   days: number
   count: number
 }
+
+// ---- Staff overview ----
+
+export interface StaffOverviewRow {
+  id: number
+  name: string
+  phone: string
+  role: string
+  is_active: boolean
+  current_task?: string | null
+  orders_handled: number
+  last_activity?: string | null
+}

@@ -12,6 +12,7 @@ const navItems = [
   { to: '/batches', label: 'Batch & Expiry' },
   { to: '/exceptions', label: 'Exceptions' },
   { to: '/performance', label: 'Performance' },
+  { to: '/staff', label: 'Staff' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

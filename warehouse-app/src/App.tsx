@@ -11,6 +11,7 @@ import StockTransfers from './pages/StockTransfers'
 import Exceptions from './pages/Exceptions'
 import Performance from './pages/Performance'
 import ReceivingPage from './pages/Receiving'
+import Staff from './pages/Staff'
 import Locations from './pages/Locations'
 import StockOperations from './pages/StockOperations'
 import Batches from './pages/Batches'
@@ -37,6 +38,7 @@ function App() {
           <Route path="/exceptions" element={<Protected><Exceptions /></Protected>} />
           <Route path="/performance" element={<Protected><Performance /></Protected>} />
           <Route path="/receiving" element={<Protected><ReceivingPage /></Protected>} />
+          <Route path="/staff" element={<Protected><Staff /></Protected>} />
           <Route path="/locations" element={<Protected><Locations /></Protected>} />
           <Route path="/stock-operations" element={<Protected><StockOperations /></Protected>} />
           <Route path="/batches" element={<Protected><Batches /></Protected>} />
