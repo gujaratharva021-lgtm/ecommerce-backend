@@ -1,15 +1,17 @@
 ﻿package handlers
 
 import (
-	"fmt"
+	"errors"
+"fmt"
 "net/http"
-	"strconv"
+"strconv"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "gorm.io/gorm"
-	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+"gorm.io/gorm/clause"
 )
 
 // GetWarehouseOrders godoc
@@ -73,19 +75,24 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Order not found for your warehouse"}
 return
 }
 
-if order.Status != models.OrderStatusConfirmed {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only confirmed orders can be accepted into picking, current status: " + order.Status})
-return
-}
-
+statusCode := http.StatusInternalServerError
 var orderItems []models.OrderItem
-database.DB.Where("order_id = ?", order.ID).Find(&orderItems)
-if len(orderItems) == 0 {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Order has no items"})
-return
-}
-
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, order.ID).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("order not found")
+}
+if order.Status != models.OrderStatusConfirmed {
+statusCode = http.StatusBadRequest
+return errors.New("only confirmed orders can be accepted into picking, current status: " + order.Status)
+}
+if err := tx.Where("order_id = ?", order.ID).Find(&orderItems).Error; err != nil {
+return err
+}
+if len(orderItems) == 0 {
+statusCode = http.StatusBadRequest
+return errors.New("order has no items")
+}
 task := models.PickingTask{
 OrderID:     order.ID,
 WarehouseID: warehouseID,
@@ -111,7 +118,7 @@ return tx.Save(&order).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept order: " + txErr.Error()})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
