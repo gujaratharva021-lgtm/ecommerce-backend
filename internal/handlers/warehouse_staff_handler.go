@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -27,10 +27,20 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
 return
 }
 
+role := req.Role
+if role == "" {
+role = "picker"
+}
+if !models.ValidWarehouseStaffRoles[role] {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+return
+}
+
 staff := models.WarehouseStaff{
 Name:        req.Name,
 Phone:       req.Phone,
 WarehouseID: req.WarehouseID,
+Role:        role,
 IsActive:    true,
 }
 if req.IsActive != nil {
@@ -86,9 +96,19 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse not found"})
 return
 }
 
+role := req.Role
+if role == "" {
+role = staff.Role
+}
+if !models.ValidWarehouseStaffRoles[role] {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+return
+}
+
 staff.Name = req.Name
 staff.Phone = req.Phone
 staff.WarehouseID = req.WarehouseID
+staff.Role = role
 if req.IsActive != nil {
 staff.IsActive = *req.IsActive
 }
