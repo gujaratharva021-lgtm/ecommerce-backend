@@ -49,10 +49,18 @@ export type OrderStatus =
   | 'packing'
   | 'packed'
   | 'ready_for_dispatch'
+  | 'handed_over'
   | 'shipped'
   | 'delivered'
   | 'returned'
   | 'cancelled'
+
+export interface DeliveryPartner {
+  id: number
+  name: string
+  phone: string
+  vehicle_number?: string
+}
 
 export interface Address {
   id: number
@@ -86,6 +94,7 @@ export interface Order {
   payment_method: 'cod' | 'online'
   payment_status: 'pending' | 'paid' | 'failed'
   delivery_partner_id?: number | null
+  delivery_partner?: DeliveryPartner
   items?: OrderItem[]
   created_at: string
   updated_at: string

@@ -56,6 +56,14 @@ export const acceptOrder = (orderId: number) =>
     .put(`/warehouse/orders/${orderId}/accept`)
     .then((r) => r.data as { success: boolean; order_id: number; status: string })
 
+export const handoverOrder = (orderId: number, data: { package_count: number; delivery_partner_id: number }) =>
+  apiClient
+    .put(`/warehouse/orders/${orderId}/handover`, data)
+    .then((r) => r.data as { success: boolean; order_id: number; status: string })
+
+export const getHandover = (orderId: number) =>
+  apiClient.get(`/warehouse/orders/${orderId}/handover`).then((r) => r.data)
+
 // ---- Picking ----
 
 export const getPickingTask = (orderId: number) =>
