@@ -16,6 +16,7 @@ import Staff from './pages/Staff'
 import Locations from './pages/Locations'
 import StockOperations from './pages/StockOperations'
 import AuditLogs from './pages/AuditLogs'
+import Notifications from './pages/Notifications'
 import Batches from './pages/Batches'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ function App() {
           <Route path="/locations" element={<Protected><Locations /></Protected>} />
           <Route path="/stock-operations" element={<Protected><StockOperations /></Protected>} />
           <Route path="/audit-logs" element={<Protected><AuditLogs /></Protected>} />
+          <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
           <Route path="/batches" element={<Protected><Batches /></Protected>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

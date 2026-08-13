@@ -154,5 +154,9 @@ staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_packing", "order", orderID,
 "status=packing", "status=ready_for_dispatch")
 
+services.NotifyWarehouse(warehouseID, models.WhNotifyHandoverRequired,
+"Order #"+orderID+" ready for handover",
+"Packing complete - this order is ready to hand over to a delivery partner.", &task.OrderID, nil)
+
 c.JSON(http.StatusOK, gin.H{"success": true, "packing_task": task, "order_status": models.OrderStatusReadyForDispatch})
 }

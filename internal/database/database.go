@@ -97,6 +97,7 @@ func AutoMigrate() {
 		&models.Batch{},
 		&models.Invoice{},
 		&models.InvoiceItem{},
+		&models.WarehouseNotification{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -109,3 +110,4 @@ func AutoMigrate() {
 
 	log.Println("Database migration completed")
 }
+

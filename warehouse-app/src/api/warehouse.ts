@@ -256,3 +256,15 @@ export const listAuditLogs = (params: {
   page?: number
   limit?: number
 }) => apiClient.get('/warehouse/audit-logs', { params }).then((r) => r.data as AuditLogsResponse)
+export const listWarehouseNotifications = (params: {
+  is_read?: boolean
+  type?: string
+  page?: number
+  limit?: number
+}) => apiClient.get('/warehouse/notifications', { params }).then((r) => r.data as WarehouseNotificationsResponse)
+
+export const markNotificationRead = (id: number) =>
+  apiClient.put(`/warehouse/notifications/${id}/read`).then((r) => r.data)
+
+export const markAllNotificationsRead = () =>
+  apiClient.put('/warehouse/notifications/read-all').then((r) => r.data)

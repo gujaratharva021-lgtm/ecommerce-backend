@@ -503,3 +503,25 @@ export interface AuditLogsResponse {
   total: number
   total_pages: number
 }
+
+export interface WarehouseNotification {
+  id: number
+  warehouse_id: number
+  type: string
+  title: string
+  message: string
+  order_id?: number
+  product_id?: number
+  is_read: boolean
+  read_at?: string
+  created_at: string
+}
+
+export interface WarehouseNotificationsResponse {
+  notifications: WarehouseNotification[]
+  unread_count: number
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}

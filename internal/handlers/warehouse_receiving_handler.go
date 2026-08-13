@@ -52,6 +52,11 @@ staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "receiving_created", "receiving", strconv.Itoa(int(rec.ID)),
 "", fmt.Sprintf("expected=%d product=%s", rec.ExpectedQuantity, product.Name))
 
+services.NotifyWarehouse(warehouseID, models.WhNotifyReceiving,
+"New receiving logged",
+fmt.Sprintf("Expecting %d units of %s from %s.", rec.ExpectedQuantity, product.Name, rec.SupplierName),
+nil, &rec.ProductID)
+
 c.JSON(http.StatusCreated, rec)
 }
 

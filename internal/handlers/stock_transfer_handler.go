@@ -8,6 +8,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "gorm.io/gorm"
 "gorm.io/gorm/clause"
 )
@@ -64,6 +65,13 @@ if err := database.DB.Create(&transfer).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stock transfer request"})
 return
 }
+
+services.LogWarehouseAction(staff.WarehouseID, staffID, staff.Name, "request_stock_transfer", "stock_transfer",
+fmt.Sprint(transfer.ID), "", fmt.Sprintf("qty=%d to_warehouse=%d", transfer.Quantity, transfer.ToWarehouseID))
+services.NotifyWarehouse(req.ToWarehouseID, models.WhNotifyStockTransfer,
+"Incoming stock transfer request",
+fmt.Sprintf("Warehouse #%d requested a transfer of %d units - awaiting your approval.", staff.WarehouseID, transfer.Quantity),
+nil, &req.ProductID)
 
 c.JSON(http.StatusCreated, gin.H{"stock_transfer": transfer})
 }
@@ -169,6 +177,9 @@ c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
+services.LogWarehouseAction(staff.WarehouseID, staffID, staff.Name, "receive_stock_transfer", "stock_transfer",
+fmt.Sprint(transfer.ID), "status=in_transit", "status=received")
+
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
@@ -256,6 +267,13 @@ c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
+services.LogWarehouseAction(staff.WarehouseID, staffID, staff.Name, "approve_stock_transfer", "stock_transfer",
+fmt.Sprint(transfer.ID), "status=pending", "status=in_transit")
+services.NotifyWarehouse(transfer.FromWarehouseID, models.WhNotifyStockTransfer,
+"Stock transfer approved",
+fmt.Sprintf("Your transfer #%d to warehouse #%d was approved and is now in transit.", transfer.ID, transfer.ToWarehouseID),
+nil, &transfer.ProductID)
+
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
@@ -294,6 +312,13 @@ if err := database.DB.Save(&transfer).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject stock transfer"})
 return
 }
+
+services.LogWarehouseAction(staff.WarehouseID, staffID, staff.Name, "reject_stock_transfer", "stock_transfer",
+fmt.Sprint(transfer.ID), "status=pending", "status=rejected")
+services.NotifyWarehouse(transfer.FromWarehouseID, models.WhNotifyStockTransfer,
+"Stock transfer rejected",
+fmt.Sprintf("Your transfer #%d to warehouse #%d was rejected.", transfer.ID, transfer.ToWarehouseID),
+nil, &transfer.ProductID)
 
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
