@@ -123,6 +123,18 @@ func SetupRoutes(router *gin.Engine) {
 				warehousePacking.PUT("/:order_id/complete", handlers.CompletePacking)
 			}
 
+			warehouseLocations := warehouse.Group("")
+			warehouseLocations.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehouseLocations.GET("/zones", handlers.GetWarehouseZones)
+				warehouseLocations.POST("/zones", handlers.CreateWarehouseZone)
+				warehouseLocations.GET("/zones/:zone_id/racks", handlers.GetZoneRacks)
+				warehouseLocations.POST("/zones/:zone_id/racks", handlers.CreateRack)
+				warehouseLocations.GET("/racks/:rack_id/bins", handlers.GetRackBins)
+				warehouseLocations.POST("/racks/:rack_id/bins", handlers.CreateBin)
+				warehouseLocations.PUT("/inventory/:product_id/bin", handlers.AssignProductBin)
+			}
+
 			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseDashboard)
 			}
 		}

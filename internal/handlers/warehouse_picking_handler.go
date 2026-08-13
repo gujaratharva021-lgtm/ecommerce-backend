@@ -21,7 +21,46 @@ Preload("Items.Product").Preload("Order.Address").First(&task).Error; err != nil
 c.JSON(http.StatusNotFound, gin.H{"error": "Picking task not found for your warehouse"})
 return
 }
-c.JSON(http.StatusOK, task)
+
+// Attach bin location for each item so the picker can see where to go.
+productIDs := make([]uint, 0, len(task.Items))
+for _, item := range task.Items {
+productIDs = append(productIDs, item.ProductID)
+}
+var invRows []models.Inventory
+database.DB.Where("warehouse_id = ? AND product_id IN ?", warehouseID, productIDs).
+Preload("Bin.Rack.Zone").Find(&invRows)
+locationByProduct := make(map[uint]models.Inventory)
+for _, inv := range invRows {
+locationByProduct[inv.ProductID] = inv
+}
+
+type PickingTaskItemWithLocation struct {
+models.PickingTaskItem
+Location *models.Inventory `json:"location,omitempty"`
+}
+itemsWithLocation := make([]PickingTaskItemWithLocation, 0, len(task.Items))
+for _, item := range task.Items {
+entry := PickingTaskItemWithLocation{PickingTaskItem: item}
+if inv, ok := locationByProduct[item.ProductID]; ok && inv.Bin != nil {
+entry.Location = &inv
+}
+itemsWithLocation = append(itemsWithLocation, entry)
+}
+
+c.JSON(http.StatusOK, gin.H{
+"id":           task.ID,
+"order_id":     task.OrderID,
+"order":        task.Order,
+"warehouse_id": task.WarehouseID,
+"picker_id":    task.PickerID,
+"status":       task.Status,
+"started_at":   task.StartedAt,
+"completed_at": task.CompletedAt,
+"created_at":   task.CreatedAt,
+"updated_at":   task.UpdatedAt,
+"items":        itemsWithLocation,
+})
 }
 
 // StartPicking godoc
