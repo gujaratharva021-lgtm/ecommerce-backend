@@ -96,6 +96,13 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseStockTransfers.PUT("/:id/approve", handlers.ApproveStockTransferByWarehouseStaff)
 				warehouseStockTransfers.PUT("/:id/reject", handlers.RejectStockTransferByWarehouseStaff)
 			}
+
+			warehouseOrders := warehouse.Group("/orders")
+			warehouseOrders.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehouseOrders.GET("", handlers.GetWarehouseOrders)
+				warehouseOrders.PUT("/:id/accept", handlers.AcceptOrder)
+			}
 		}
 
 		// ---- Cart routes (protected) ----
