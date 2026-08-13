@@ -113,6 +113,7 @@ func SetupRoutes(router *gin.Engine) {
 				warehousePicking.PUT("/:order_id/start", handlers.StartPicking)
 				warehousePicking.PUT("/:order_id/complete", handlers.CompletePicking)
 				warehousePicking.PUT("/items/:item_id", handlers.MarkPickItem)
+				warehousePicking.PUT("/items/:item_id/scan", handlers.ScanPickItem)
 			}
 
 			warehousePacking := warehouse.Group("/packing")
