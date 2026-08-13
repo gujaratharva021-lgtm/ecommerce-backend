@@ -81,8 +81,20 @@ return
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "stock_adjustment", "inventory", productID,
 fmt.Sprintf("stock=%d", previousQty), fmt.Sprintf("stock=%d reason=%s", req.NewQuantity, req.Reason))
 
+if inv.Stock <= 0 {
+services.NotifyWarehouse(warehouseID, models.WhNotifyOutOfStock,
+"Product out of stock", fmt.Sprintf("Product #%d is now out of stock at your warehouse.", productIDUint64),
+nil, ptrUint(uint(productIDUint64)))
+} else if inv.Stock < lowStockThreshold {
+services.NotifyWarehouse(warehouseID, models.WhNotifyLowStock,
+"Low stock warning", fmt.Sprintf("Product #%d is running low (%d left).", productIDUint64, inv.Stock),
+nil, ptrUint(uint(productIDUint64)))
+}
+
 c.JSON(http.StatusOK, inv)
 }
+
+func ptrUint(v uint) *uint { return &v }
 
 // GetStockMovements godoc
 // GET /api/v1/warehouse/stock-movements?product_id=&movement_type=&page=&limit= (warehouse staff only)

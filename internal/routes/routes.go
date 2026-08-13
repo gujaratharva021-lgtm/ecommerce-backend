@@ -180,6 +180,14 @@ warehouseOrders.GET("/:id/invoice", middleware.RequireWarehouseRole(middleware.R
 			warehouse.GET("/staff/performance/me", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetMyPerformance)
 
 			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseDashboard)
+
+			warehouseNotifications := warehouse.Group("/notifications")
+			warehouseNotifications.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehouseNotifications.GET("", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseNotifications)
+				warehouseNotifications.PUT("/:id/read", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.MarkNotificationRead)
+				warehouseNotifications.PUT("/read-all", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.MarkAllNotificationsRead)
+			}
 			}
 		}
 

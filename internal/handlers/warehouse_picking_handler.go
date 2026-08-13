@@ -189,6 +189,10 @@ StaffID:     &staffID,
 Status:      models.ExceptionStatusOpen,
 }
 database.DB.Create(&exception)
+services.NotifyWarehouse(warehouseID, models.WhNotifyExceptionCreated,
+"Picking exception on order #"+fmt.Sprint(task.OrderID),
+fmt.Sprintf("Item marked %s during picking: %s", req.Status, req.Reason),
+&task.OrderID, &productID)
 }
 
 c.JSON(http.StatusOK, item)

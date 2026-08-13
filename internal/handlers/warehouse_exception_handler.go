@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
 "strconv"
 "time"
@@ -8,6 +9,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetWarehouseExceptions godoc
@@ -104,6 +106,7 @@ c.JSON(http.StatusBadRequest, gin.H{"error": "resolution is required when markin
 return
 }
 
+previousStatus := exception.Status
 exception.Status = req.Status
 if req.Resolution != "" {
 exception.Resolution = req.Resolution
@@ -119,6 +122,10 @@ if err := database.DB.Save(&exception).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update exception"})
 return
 }
+
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "update_exception", "warehouse_exception",
+strconv.Itoa(int(exception.ID)), "status="+previousStatus, "status="+exception.Status)
 
 c.JSON(http.StatusOK, exception)
 }

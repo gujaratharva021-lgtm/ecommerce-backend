@@ -256,6 +256,11 @@ utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
 services.SendPushToUser(order.UserID, "Order Placed", message)
 if order.Status == models.OrderStatusConfirmed {
 go services.AutoAssignDeliveryPartner(order.ID)
+if order.WarehouseID != nil {
+services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyNewOrder,
+"New order #"+strconv.Itoa(int(order.ID)),
+"A new order has been confirmed and is ready to accept.", &order.ID, nil)
+}
 }
 
 c.JSON(http.StatusCreated, order)
@@ -383,5 +388,10 @@ order.Status = models.OrderStatusCancelled
 message := "Your order #" + orderID + " has been cancelled."
 utils.SendNotification(order.Address.Phone, message, "order_cancelled", &order.ID)
 services.SendPushToUser(order.UserID, "Order Cancelled", message)
+if order.WarehouseID != nil {
+services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyOrderCancelled,
+"Order #"+orderID+" cancelled",
+"Customer cancelled this order before it left the warehouse.", &order.ID, nil)
+}
 c.JSON(http.StatusOK, order)
 }
