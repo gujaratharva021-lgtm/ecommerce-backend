@@ -4,6 +4,7 @@ import (
 "errors"
 "fmt"
 "net/http"
+"strconv"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
@@ -77,7 +78,7 @@ c.JSON(http.StatusCreated, gin.H{"stock_transfer": transfer})
 }
 
 // GetMyStockTransfers godoc
-// GET /api/v1/warehouse/stock-transfers (warehouse staff only)
+// GET /api/v1/warehouse/stock-transfers?status=&page=&limit= (warehouse staff only)
 // Returns transfers where the staff's warehouse is either the source or destination.
 func GetMyStockTransfers(c *gin.Context) {
 staffID := c.MustGet("user_id").(uint)
@@ -88,17 +89,45 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse staff not found"})
 return
 }
 
+page := 1
+limit := 20
+if p := c.Query("page"); p != "" {
+if v, err := strconv.Atoi(p); err == nil && v > 0 {
+page = v
+}
+}
+if l := c.Query("limit"); l != "" {
+if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
+limit = v
+}
+}
+
+db := database.DB.Model(&models.StockTransfer{}).
+Where("from_warehouse_id = ? OR to_warehouse_id = ?", staff.WarehouseID, staff.WarehouseID)
+if status := c.Query("status"); status != "" {
+db = db.Where("status = ?", status)
+}
+
+var total int64
+db.Count(&total)
+
 var transfers []models.StockTransfer
-if err := database.DB.
+offset := (page - 1) * limit
+if err := db.
 Preload("Product").Preload("FromWarehouse").Preload("ToWarehouse").
-Where("from_warehouse_id = ? OR to_warehouse_id = ?", staff.WarehouseID, staff.WarehouseID).
-Order("created_at DESC").
+Order("created_at DESC").Offset(offset).Limit(limit).
 Find(&transfers).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load stock transfers"})
 return
 }
 
-c.JSON(http.StatusOK, gin.H{"stock_transfers": transfers})
+c.JSON(http.StatusOK, gin.H{
+"stock_transfers": transfers,
+"page":            page,
+"limit":           limit,
+"total":           total,
+"total_pages":     int((total + int64(limit) - 1) / int64(limit)),
+})
 }
 
 // ReceiveStockTransfer godoc

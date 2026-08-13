@@ -35,13 +35,13 @@ UserID            uint             `gorm:"not null;index" json:"user_id"`
 User              User             `gorm:"foreignKey:UserID" json:"-"`
 AddressID         uint             `gorm:"not null" json:"address_id"`
 Address           Address          `gorm:"foreignKey:AddressID" json:"address,omitempty"`
-WarehouseID       *uint            `gorm:"index" json:"warehouse_id,omitempty"`
+WarehouseID       *uint            `gorm:"index;index:idx_orders_warehouse_status,priority:1" json:"warehouse_id,omitempty"`
 Warehouse         *Warehouse       `gorm:"foreignKey:WarehouseID" json:"warehouse,omitempty"`
 ItemsAmount       float64          `gorm:"not null" json:"items_amount"`
 DeliveryCharge    float64          `gorm:"not null;default:0" json:"delivery_charge"`
 WalletAmountUsed  float64          `gorm:"not null;default:0" json:"wallet_amount_used"`
 TotalAmount       float64          `gorm:"not null" json:"total_amount"`
-Status            string           `gorm:"default:pending" json:"status"`         // pending/confirmed/shipped/delivered/cancelled
+Status            string           `gorm:"default:pending;index:idx_orders_warehouse_status,priority:2" json:"status"`         // pending/confirmed/shipped/delivered/cancelled
 PaymentMethod     string           `gorm:"default:cod" json:"payment_method"`     // cod/online
 PaymentStatus     string           `gorm:"default:pending" json:"payment_status"` // pending/paid/failed
 DeliveryPartnerID *uint            `gorm:"index" json:"delivery_partner_id,omitempty"`

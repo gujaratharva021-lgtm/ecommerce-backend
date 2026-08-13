@@ -1,8 +1,8 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
-	"errors"
 "net/http"
 "time"
 
@@ -10,8 +10,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // GetPickingTask godoc
@@ -136,25 +136,31 @@ return
 }
 
 var item models.PickingTaskItem
-if err := database.DB.First(&item, itemID).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Picking item not found"})
-return
+var task models.PickingTask
+var previousStatus string
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&item, itemID).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Picking item not found")
 }
 
 // Verify this item's picking task belongs to the caller's warehouse.
-var task models.PickingTask
-if err := database.DB.Where("id = ? AND warehouse_id = ?", item.PickingTaskID, warehouseID).First(&task).Error; err != nil {
-c.JSON(http.StatusForbidden, gin.H{"error": "This item does not belong to your warehouse"})
-return
+if err := tx.Where("id = ? AND warehouse_id = ?", item.PickingTaskID, warehouseID).First(&task).Error; err != nil {
+statusCode = http.StatusForbidden
+return errors.New("This item does not belong to your warehouse")
 }
+
+previousStatus = item.Status
 
 switch req.Status {
 case models.PickItemPicked:
 item.QuantityPicked = item.QuantityNeeded
 case models.PickItemShort:
 if req.QuantityPicked <= 0 || req.QuantityPicked >= item.QuantityNeeded {
-c.JSON(http.StatusBadRequest, gin.H{"error": "quantity_picked must be between 1 and quantity_needed-1 for a short pick"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("quantity_picked must be between 1 and quantity_needed-1 for a short pick")
 }
 item.QuantityPicked = req.QuantityPicked
 case models.PickItemUnavailable:
@@ -162,15 +168,24 @@ item.QuantityPicked = 0
 }
 item.Status = req.Status
 item.Reason = req.Reason
-database.DB.Save(&item)
+return tx.Save(&item).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
 
 staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "mark_pick_item", "picking_task_item", itemID,
-"status=pending", fmt.Sprintf("status=%s qty_picked=%d", item.Status, item.QuantityPicked))
+"status="+previousStatus, fmt.Sprintf("status=%s qty_picked=%d", item.Status, item.QuantityPicked))
 
 // Auto-create a WarehouseException for unavailable/short picks so staff
 // don't have to double-enter what they already reported inline here.
-if req.Status == models.PickItemUnavailable || req.Status == models.PickItemShort {
+// Guarded on previousStatus so a double-click / retried request that
+// lands after the row lock above (item already moved off "pending")
+// doesn't create a second duplicate exception for the same pick.
+if previousStatus == models.PickItemPending && (req.Status == models.PickItemUnavailable || req.Status == models.PickItemShort) {
 productID := item.ProductID
 exceptionType := models.ExceptionUnavailable
 priority := models.ExceptionPriorityMedium

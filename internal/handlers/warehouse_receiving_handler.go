@@ -134,13 +134,16 @@ return
 }
 
 var rec models.Receiving
-if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Receiving record not found for your warehouse"})
-return
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Receiving record not found for your warehouse")
 }
 if rec.Status != models.ReceivingStatusPending {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending receiving records can be marked received, current status: " + rec.Status})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Only pending receiving records can be marked received, current status: " + rec.Status)
 }
 
 now := time.Now()
@@ -152,8 +155,11 @@ rec.ReceivedAt = &now
 if req.Notes != "" {
 rec.Notes = req.Notes
 }
-if err := database.DB.Save(&rec).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update receiving record"})
+return tx.Save(&rec).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
@@ -178,22 +184,25 @@ return
 }
 
 var rec models.Receiving
-if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Receiving record not found for your warehouse"})
-return
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Receiving record not found for your warehouse")
 }
 if rec.Status != models.ReceivingStatusReceived {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only received records can go through QC, current status: " + rec.Status})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Only received records can go through QC, current status: " + rec.Status)
 }
 
 if req.Action == "accept" && (req.AcceptedQuantity <= 0 || req.AcceptedQuantity > rec.ReceivedQuantity) {
-c.JSON(http.StatusBadRequest, gin.H{"error": "accepted_quantity must be between 1 and received_quantity"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("accepted_quantity must be between 1 and received_quantity")
 }
 if req.Action == "reject" && req.RejectionReason == "" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "rejection_reason is required when rejecting"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("rejection_reason is required when rejecting")
 }
 
 now := time.Now()
@@ -206,8 +215,11 @@ rec.Status = models.ReceivingStatusAccepted
 rec.Status = models.ReceivingStatusRejected
 rec.RejectionReason = req.RejectionReason
 }
-if err := database.DB.Save(&rec).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update receiving record"})
+return tx.Save(&rec).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
