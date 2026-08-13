@@ -314,3 +314,12 @@ export interface StockMovementsResponse {
   total: number
   total_pages: number
 }
+
+// ---- Barcode scan ----
+
+export interface ScanResult {
+  match: boolean
+  item_id: number
+  product_id: number
+  product_name: string
+}

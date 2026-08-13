@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { completePicking, getPickingTask, markPickItem, startPicking } from '../api/warehouse'
+import { completePicking, getPickingTask, markPickItem, scanPickItem, startPicking } from '../api/warehouse'
 import type { PickingTask, PickingTaskItem } from '../types/warehouse'
 import StatusBadge from '../components/StatusBadge'
 import { getErrorMessage } from '../utils/errors'
@@ -18,8 +18,31 @@ function ItemRow({
   const [shortQty, setShortQty] = useState('')
   const [showUnavailableReason, setShowUnavailableReason] = useState(false)
   const [reason, setReason] = useState('')
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanState, setScanState] = useState<'idle' | 'match' | 'mismatch'>('idle')
 
   const isDone = item.status !== 'pending'
+
+  const handleScan = async () => {
+    if (!barcodeInput.trim()) return
+    setIsScanning(true)
+    setScanState('idle')
+    try {
+      const result = await scanPickItem(item.id, barcodeInput.trim())
+      if (result.match) {
+        setScanState('match')
+        onMark('picked')
+      } else {
+        setScanState('mismatch')
+      }
+    } catch {
+      setScanState('mismatch')
+    } finally {
+      setIsScanning(false)
+      setBarcodeInput('')
+    }
+  }
 
   return (
     <div className="border border-slate-800 rounded-xl bg-slate-900 p-4">
@@ -41,13 +64,43 @@ function ItemRow({
       </div>
 
       {!isDone && (
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            autoFocus
+            placeholder="Scan barcode or SKU..."
+            value={barcodeInput}
+            onChange={(e) => setBarcodeInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleScan()
+            }}
+            disabled={isBusy || isScanning}
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            disabled={isBusy || isScanning || !barcodeInput.trim()}
+            onClick={handleScan}
+            className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-xs font-medium disabled:opacity-40"
+          >
+            {isScanning ? 'Scanning...' : 'Scan'}
+          </button>
+        </div>
+      )}
+
+      {scanState === 'mismatch' && !isDone && (
+        <div className="mt-2 text-xs text-rose-400">
+          Product mismatch — verify SKU.
+        </div>
+      )}
+
+      {!isDone && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             disabled={isBusy}
             onClick={() => onMark('picked')}
             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
           >
-            Mark Picked
+            Mark Picked (manual)
           </button>
           <button
             disabled={isBusy}

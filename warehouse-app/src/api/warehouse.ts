@@ -8,6 +8,7 @@ import type {
   PackingTask,
   WarehouseDashboardStats,
   PickItemStatus,
+  ScanResult,
   ExceptionsResponse,
   WarehouseException,
   StaffPerformanceRow,
@@ -152,3 +153,8 @@ export const deleteRack = (rackId: number) =>
 
 export const deleteBin = (binId: number) =>
   apiClient.delete(`/warehouse/bins/${binId}`).then((r) => r.data)
+
+// ---- Barcode scan ----
+
+export const scanPickItem = (itemId: number, barcode: string) =>
+  apiClient.put(`/warehouse/picking/items/${itemId}/scan`, { barcode }).then((r) => r.data as ScanResult)
