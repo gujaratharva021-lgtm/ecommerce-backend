@@ -88,7 +88,7 @@ func SetupRoutes(router *gin.Engine) {
 			warehouse.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyWarehouseStaffOTP)
 
 			warehouseStockTransfers := warehouse.Group("/stock-transfers")
-			warehouseStockTransfers.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly())
+			warehouseStockTransfers.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 			{
 				warehouseStockTransfers.POST("", handlers.RequestStockTransfer)
 				warehouseStockTransfers.GET("", handlers.GetMyStockTransfers)
