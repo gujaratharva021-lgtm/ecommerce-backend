@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -6,6 +6,8 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/orders', label: 'Orders' },
   { to: '/stock-transfers', label: 'Stock Transfers' },
+  { to: '/exceptions', label: 'Exceptions' },
+  { to: '/performance', label: 'Performance' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

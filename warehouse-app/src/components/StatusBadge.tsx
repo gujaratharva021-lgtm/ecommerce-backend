@@ -1,4 +1,4 @@
-const STYLES: Record<string, string> = {
+﻿const STYLES: Record<string, string> = {
   confirmed: 'bg-sky-500/15 text-sky-300',
   picking: 'bg-amber-500/15 text-amber-300',
   picked: 'bg-amber-500/15 text-amber-300',
@@ -15,6 +15,15 @@ const STYLES: Record<string, string> = {
   picked_item: 'bg-emerald-500/15 text-emerald-300',
   unavailable: 'bg-rose-500/15 text-rose-300',
   short: 'bg-amber-500/15 text-amber-300',
+  // Exception statuses
+  open: 'bg-rose-500/15 text-rose-300',
+  investigating: 'bg-amber-500/15 text-amber-300',
+  resolved: 'bg-emerald-500/15 text-emerald-300',
+  closed: 'bg-slate-700 text-slate-300',
+  // Exception priorities
+  high: 'bg-rose-500/15 text-rose-300',
+  medium: 'bg-amber-500/15 text-amber-300',
+  low: 'bg-slate-700 text-slate-300',
 }
 
 export default function StatusBadge({ status }: { status: string }) {

@@ -8,6 +8,9 @@ import type {
   PackingTask,
   WarehouseDashboardStats,
   PickItemStatus,
+  ExceptionsResponse,
+  WarehouseException,
+  StaffPerformanceRow,
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>
@@ -71,3 +74,27 @@ export const completePacking = (orderId: number) =>
   apiClient
     .put(`/warehouse/packing/${orderId}/complete`)
     .then((r) => r.data as { success: boolean; packing_task: PackingTask; order_status: string })
+
+
+// ---- Exceptions ----
+
+export const listExceptions = (params: {
+  status?: string
+  priority?: string
+  type?: string
+  page?: number
+  limit?: number
+}) => apiClient.get('/warehouse/exceptions', { params }).then((r) => r.data as ExceptionsResponse)
+
+export const updateException = (id: number, data: { status: string; resolution?: string }) =>
+  apiClient.put(`/warehouse/exceptions/${id}`, data).then((r) => r.data as WarehouseException)
+
+// ---- Staff performance ----
+
+export const getStaffPerformance = () =>
+  apiClient
+    .get('/warehouse/staff/performance')
+    .then((r) => r.data as { staff_performance: StaffPerformanceRow[] })
+
+export const getMyPerformance = () =>
+  apiClient.get('/warehouse/staff/performance/me').then((r) => r.data as StaffPerformanceRow)

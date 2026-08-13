@@ -170,3 +170,62 @@ export interface WarehouseDashboardStats {
   avg_packing_minutes: number
   fulfillment_rate: number
 }
+
+// ---- Exceptions ----
+
+export type ExceptionType =
+  | 'unavailable'
+  | 'short_quantity'
+  | 'damaged'
+  | 'wrong_product'
+  | 'barcode_mismatch'
+  | 'picking_failure'
+  | 'packing_failure'
+  | 'order_cancellation'
+  | 'delivery_partner_unavailable'
+  | 'order_delayed'
+
+export type ExceptionPriority = 'low' | 'medium' | 'high'
+export type ExceptionStatus = 'open' | 'investigating' | 'resolved' | 'closed'
+
+export interface WarehouseException {
+  id: number
+  order_id: number
+  order?: Order
+  product_id?: number | null
+  product?: Product
+  warehouse_id: number
+  type: ExceptionType
+  reason?: string
+  priority: ExceptionPriority
+  staff_id?: number | null
+  status: ExceptionStatus
+  resolution?: string
+  resolved_by_id?: number | null
+  resolved_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ExceptionsResponse {
+  exceptions: WarehouseException[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+// ---- Staff performance ----
+
+export interface StaffPerformanceRow {
+  staff_id: number
+  staff_name: string
+  orders_picked: number
+  orders_packed: number
+  avg_picking_minutes: number
+  avg_packing_minutes: number
+  total_items_picked: number
+  clean_picks: number
+  accuracy_rate: number
+  exceptions_caused: number
+}
