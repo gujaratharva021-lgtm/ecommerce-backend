@@ -152,6 +152,7 @@ func SetupRoutes(router *gin.Engine) {
 
 			warehouse.GET("/audit-logs", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseAuditLogs)
 			warehouse.GET("/staff", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseStaffOverview)
+			warehouse.GET("/inventory", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseInventory)
 
 			warehouseReceiving := warehouse.Group("/receiving")
 			warehouseReceiving.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
