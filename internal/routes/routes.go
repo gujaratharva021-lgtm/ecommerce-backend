@@ -1,4 +1,4 @@
-package routes
+﻿package routes
 
 import (
 	"time"
@@ -52,6 +52,7 @@ func SetupRoutes(router *gin.Engine) {
 		// ---- Serviceability routes (public) ----
 		api.GET("/serviceability", handlers.CheckServiceability)
 	api.GET("/debug-postgis", handlers.DebugCheckPostGIS)
+	api.GET("/debug-run-migration-19", handlers.DebugRunMigration019)
 	api.GET("/offers", handlers.GetActiveOffers)
 	api.GET("/banners", handlers.GetActiveBanners)
 	api.GET("/delivery-zones/check", handlers.CheckPincode)
