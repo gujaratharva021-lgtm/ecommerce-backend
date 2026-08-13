@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS warehouse_exceptions (
+CREATE TABLE IF NOT EXISTS warehouse_exceptions (
     id BIGSERIAL PRIMARY KEY,
     order_id BIGINT NOT NULL REFERENCES orders(id),
     product_id BIGINT REFERENCES products(id),

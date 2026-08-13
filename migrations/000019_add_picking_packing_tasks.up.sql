@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS picking_tasks (
+CREATE TABLE IF NOT EXISTS picking_tasks (
     id BIGSERIAL PRIMARY KEY,
     order_id BIGINT NOT NULL UNIQUE REFERENCES orders(id),
     warehouse_id BIGINT NOT NULL,

@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS warehouse_audit_logs (
+CREATE TABLE IF NOT EXISTS warehouse_audit_logs (
     id BIGSERIAL PRIMARY KEY,
     warehouse_id BIGINT NOT NULL,
     staff_id BIGINT NOT NULL,

@@ -1,0 +1,264 @@
+diff --git a/internal/handlers/stock_transfer_handler.go b/internal/handlers/stock_transfer_handler.go
+index a0d80d4..2340815 100644
+--- a/internal/handlers/stock_transfer_handler.go
++++ b/internal/handlers/stock_transfer_handler.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ "errors"
++"fmt"
+ "net/http"
+ 
+ "github.com/gin-gonic/gin"
+@@ -137,12 +138,28 @@ ProductID:   transfer.ProductID,
+ WarehouseID: transfer.ToWarehouseID,
+ }
+ }
++previousQty := inventory.Stock
+ inventory.Stock += transfer.Quantity
+ inventory.InStock = inventory.Stock > 0
+ if err := tx.Save(&inventory).Error; err != nil {
+ return err
+ }
+ 
++movement := models.StockMovement{
++ProductID:    transfer.ProductID,
++WarehouseID:  transfer.ToWarehouseID,
++PreviousQty:  previousQty,
++Change:       transfer.Quantity,
++NewQty:       inventory.Stock,
++MovementType: models.MovementTransfer,
++StaffID:      &staffID,
++ReferenceID:  &transfer.ID,
++Notes:        fmt.Sprintf("Stock transfer #%d received from warehouse #%d", transfer.ID, transfer.FromWarehouseID),
++}
++if err := tx.Create(&movement).Error; err != nil {
++return err
++}
++
+ transfer.Status = models.StockTransferReceived
+ return tx.Save(&transfer).Error
+ })
+@@ -205,6 +222,7 @@ statusCode = http.StatusBadRequest
+ return errors.New("insufficient stock at source warehouse to approve this transfer")
+ }
+ 
++previousQty := inventory.Stock
+ inventory.Stock -= transfer.Quantity
+ if inventory.Stock <= 0 {
+ inventory.InStock = false
+@@ -213,6 +231,21 @@ if err := tx.Save(&inventory).Error; err != nil {
+ return err
+ }
+ 
++movement := models.StockMovement{
++ProductID:    transfer.ProductID,
++WarehouseID:  transfer.FromWarehouseID,
++PreviousQty:  previousQty,
++Change:       -transfer.Quantity,
++NewQty:       inventory.Stock,
++MovementType: models.MovementTransfer,
++StaffID:      &staffID,
++ReferenceID:  &transfer.ID,
++Notes:        fmt.Sprintf("Stock transfer #%d approved, dispatched to warehouse #%d", transfer.ID, transfer.ToWarehouseID),
++}
++if err := tx.Create(&movement).Error; err != nil {
++return err
++}
++
+ transfer.Status = models.StockTransferInTransit
+ transfer.ApprovedBy = &staffID
+ return tx.Save(&transfer).Error
+@@ -329,6 +362,7 @@ statusCode = http.StatusBadRequest
+ return errors.New("insufficient stock at source warehouse to approve this transfer")
+ }
+ 
++previousQty := inventory.Stock
+ inventory.Stock -= transfer.Quantity
+ if inventory.Stock <= 0 {
+ inventory.InStock = false
+@@ -337,6 +371,21 @@ if err := tx.Save(&inventory).Error; err != nil {
+ return err
+ }
+ 
++movement := models.StockMovement{
++ProductID:    transfer.ProductID,
++WarehouseID:  transfer.FromWarehouseID,
++PreviousQty:  previousQty,
++Change:       -transfer.Quantity,
++NewQty:       inventory.Stock,
++MovementType: models.MovementTransfer,
++StaffID:      &adminID,
++ReferenceID:  &transfer.ID,
++Notes:        fmt.Sprintf("Stock transfer #%d approved by admin, dispatched to warehouse #%d", transfer.ID, transfer.ToWarehouseID),
++}
++if err := tx.Create(&movement).Error; err != nil {
++return err
++}
++
+ transfer.Status = models.StockTransferInTransit
+ transfer.ApprovedBy = &adminID
+ return tx.Save(&transfer).Error
+@@ -410,12 +459,27 @@ ProductID:   transfer.ProductID,
+ WarehouseID: transfer.FromWarehouseID,
+ }
+ }
++previousQty := inventory.Stock
+ inventory.Stock += transfer.Quantity
+ inventory.InStock = inventory.Stock > 0
+ if err := tx.Save(&inventory).Error; err != nil {
+ return err
+ }
+ 
++movement := models.StockMovement{
++ProductID:    transfer.ProductID,
++WarehouseID:  transfer.FromWarehouseID,
++PreviousQty:  previousQty,
++Change:       transfer.Quantity,
++NewQty:       inventory.Stock,
++MovementType: models.MovementCorrection,
++ReferenceID:  &transfer.ID,
++Notes:        fmt.Sprintf("Stock transfer #%d cancelled - stock restored to source warehouse", transfer.ID),
++}
++if err := tx.Create(&movement).Error; err != nil {
++return err
++}
++
+ transfer.Status = models.StockTransferCancelled
+ return tx.Save(&transfer).Error
+ })
+diff --git a/internal/handlers/warehouse_batch_handler.go b/internal/handlers/warehouse_batch_handler.go
+index b779702..a5c6834 100644
+--- a/internal/handlers/warehouse_batch_handler.go
++++ b/internal/handlers/warehouse_batch_handler.go
+@@ -1,6 +1,7 @@
+ ﻿package handlers
+ 
+ import (
++"errors"
+ "fmt"
+ "net/http"
+ "strconv"
+@@ -10,6 +11,8 @@ import (
+ "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+ "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+ "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
++"gorm.io/gorm"
++"gorm.io/gorm/clause"
+ )
+ 
+ // CreateBatch godoc
+@@ -151,15 +154,20 @@ return
+ }
+ 
+ var batch models.Batch
+-if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&batch).Error; err != nil {
+-c.JSON(http.StatusNotFound, gin.H{"error": "Batch not found for your warehouse"})
+-return
+-}
+-
+-previousQty := batch.Quantity
++var previousQty int
++statusCode := http.StatusInternalServerError
++txErr := database.DB.Transaction(func(tx *gorm.DB) error {
++if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
++Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&batch).Error; err != nil {
++statusCode = http.StatusNotFound
++return errors.New("batch not found for your warehouse")
++}
++previousQty = batch.Quantity
+ batch.Quantity = req.Quantity
+-if err := database.DB.Save(&batch).Error; err != nil {
+-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update batch quantity"})
++return tx.Save(&batch).Error
++})
++if txErr != nil {
++c.JSON(statusCode, gin.H{"error": txErr.Error()})
+ return
+ }
+ 
+diff --git a/internal/handlers/warehouse_receiving_handler.go b/internal/handlers/warehouse_receiving_handler.go
+index 90f1ea8..d84de7a 100644
+--- a/internal/handlers/warehouse_receiving_handler.go
++++ b/internal/handlers/warehouse_receiving_handler.go
+@@ -1,6 +1,7 @@
+ ﻿package handlers
+ 
+ import (
++"errors"
+ "fmt"
+ "net/http"
+ "strconv"
+@@ -225,6 +226,10 @@ id := c.Param("id")
+ var req models.PutAwayReceivingRequest
+ _ = c.ShouldBindJSON(&req)
+ 
++// Existence/ownership pre-check only - the authoritative status check
++// happens inside the transaction below, under a row lock, so two
++// concurrent put-away calls for the same receiving record can't both
++// pass and both add stock (duplicate receiving / double addition).
+ var rec models.Receiving
+ if err := database.DB.Where("id = ? AND warehouse_id = ?", id, warehouseID).First(&rec).Error; err != nil {
+ c.JSON(http.StatusNotFound, gin.H{"error": "Receiving record not found for your warehouse"})
+@@ -237,6 +242,20 @@ return
+ 
+ statusCode := http.StatusInternalServerError
+ txErr := database.DB.Transaction(func(tx *gorm.DB) error {
++// Re-fetch and lock the receiving row itself, then re-check its status.
++// This closes the race where two simultaneous requests both read
++// status=accepted before either commits.
++if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
++Where("id = ? AND warehouse_id = ?", id, warehouseID).
++First(&rec).Error; err != nil {
++statusCode = http.StatusNotFound
++return errors.New("receiving record not found for your warehouse")
++}
++if rec.Status != models.ReceivingStatusAccepted {
++statusCode = http.StatusBadRequest
++return errors.New("only accepted records can be put away - it may have already been put away, current status: " + rec.Status)
++}
++
+ var inv models.Inventory
+ err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+ Where("product_id = ? AND warehouse_id = ?", rec.ProductID, warehouseID).
+diff --git a/migrations/000028_add_stock_check_constraints.down.sql b/migrations/000028_add_stock_check_constraints.down.sql
+new file mode 100644
+index 0000000..19ae082
+--- /dev/null
++++ b/migrations/000028_add_stock_check_constraints.down.sql
+@@ -0,0 +1,5 @@
++ALTER TABLE public.inventories DROP CONSTRAINT IF EXISTS chk_inventories_stock_non_negative;
++ALTER TABLE public.batches DROP CONSTRAINT IF EXISTS chk_batches_quantity_non_negative;
++ALTER TABLE public.receivings DROP CONSTRAINT IF EXISTS chk_receivings_quantities_non_negative;
++ALTER TABLE public.receivings DROP CONSTRAINT IF EXISTS chk_receivings_accepted_le_received;
++ALTER TABLE public.stock_transfers DROP CONSTRAINT IF EXISTS chk_stock_transfers_quantity_positive;
+diff --git a/migrations/000028_add_stock_check_constraints.up.sql b/migrations/000028_add_stock_check_constraints.up.sql
+new file mode 100644
+index 0000000..2ec8796
+--- /dev/null
++++ b/migrations/000028_add_stock_check_constraints.up.sql
+@@ -0,0 +1,24 @@
++-- Defense-in-depth: the application already prevents negative stock via
++-- transactions + row locks + validated deltas, but a DB-level CHECK
++-- constraint guarantees it even if a future code path forgets to check,
++-- a manual data fix goes wrong, or a bug slips through review.
++
++ALTER TABLE public.inventories
++    ADD CONSTRAINT chk_inventories_stock_non_negative
++    CHECK (stock >= 0);
++
++ALTER TABLE public.batches
++    ADD CONSTRAINT chk_batches_quantity_non_negative
++    CHECK (quantity >= 0);
++
++ALTER TABLE public.receivings
++    ADD CONSTRAINT chk_receivings_quantities_non_negative
++    CHECK (expected_quantity >= 0 AND received_quantity >= 0 AND damaged_quantity >= 0 AND accepted_quantity >= 0);
++
++ALTER TABLE public.receivings
++    ADD CONSTRAINT chk_receivings_accepted_le_received
++    CHECK (accepted_quantity <= received_quantity);
++
++ALTER TABLE public.stock_transfers
++    ADD CONSTRAINT chk_stock_transfers_quantity_positive
++    CHECK (quantity > 0);

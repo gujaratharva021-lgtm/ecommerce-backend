@@ -15,6 +15,7 @@ import ReceivingPage from './pages/Receiving'
 import Staff from './pages/Staff'
 import Locations from './pages/Locations'
 import StockOperations from './pages/StockOperations'
+import AuditLogs from './pages/AuditLogs'
 import Batches from './pages/Batches'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -43,6 +44,7 @@ function App() {
           <Route path="/staff" element={<Protected><Staff /></Protected>} />
           <Route path="/locations" element={<Protected><Locations /></Protected>} />
           <Route path="/stock-operations" element={<Protected><StockOperations /></Protected>} />
+          <Route path="/audit-logs" element={<Protected><AuditLogs /></Protected>} />
           <Route path="/batches" element={<Protected><Batches /></Protected>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

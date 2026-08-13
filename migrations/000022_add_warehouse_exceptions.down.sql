@@ -1,1 +1,1 @@
-﻿DROP TABLE IF EXISTS warehouse_exceptions;
+DROP TABLE IF EXISTS warehouse_exceptions;

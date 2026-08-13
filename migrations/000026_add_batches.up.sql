@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS batches (
+CREATE TABLE IF NOT EXISTS batches (
     id BIGSERIAL PRIMARY KEY,
     product_id BIGINT NOT NULL REFERENCES products(id),
     warehouse_id BIGINT NOT NULL,

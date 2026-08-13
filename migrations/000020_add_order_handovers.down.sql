@@ -1,1 +1,1 @@
-﻿DROP TABLE IF EXISTS order_handovers;
+DROP TABLE IF EXISTS order_handovers;

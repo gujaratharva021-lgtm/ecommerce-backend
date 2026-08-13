@@ -1,4 +1,4 @@
-﻿ALTER TABLE public.warehouse_staffs
+ALTER TABLE public.warehouse_staffs
     ADD COLUMN role text NOT NULL DEFAULT 'picker';
 
 ALTER TABLE public.warehouse_staffs
