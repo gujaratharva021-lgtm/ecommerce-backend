@@ -188,3 +188,79 @@ return
 }
 c.JSON(http.StatusOK, inv)
 }
+// DeleteZone godoc
+// DELETE /api/v1/warehouse/zones/:zone_id (warehouse staff only)
+// Refuses to delete a zone that still has racks under it.
+func DeleteZone(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+zoneID := c.Param("zone_id")
+
+var zone models.WarehouseZone
+if err := database.DB.Where("id = ? AND warehouse_id = ?", zoneID, warehouseID).First(&zone).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Zone not found for your warehouse"})
+return
+}
+
+var rackCount int64
+database.DB.Model(&models.WarehouseRack{}).Where("zone_id = ?", zoneID).Count(&rackCount)
+if rackCount > 0 {
+c.JSON(http.StatusConflict, gin.H{"error": "Cannot delete a zone that still has racks - delete its racks first"})
+return
+}
+
+database.DB.Delete(&zone)
+c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// DeleteRack godoc
+// DELETE /api/v1/warehouse/racks/:rack_id (warehouse staff only)
+// Refuses to delete a rack that still has bins under it.
+func DeleteRack(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+rackID := c.Param("rack_id")
+
+var rack models.WarehouseRack
+if err := database.DB.Joins("JOIN warehouse_zones ON warehouse_zones.id = warehouse_racks.zone_id").
+Where("warehouse_racks.id = ? AND warehouse_zones.warehouse_id = ?", rackID, warehouseID).
+First(&rack).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Rack not found for your warehouse"})
+return
+}
+
+var binCount int64
+database.DB.Model(&models.WarehouseBin{}).Where("rack_id = ?", rackID).Count(&binCount)
+if binCount > 0 {
+c.JSON(http.StatusConflict, gin.H{"error": "Cannot delete a rack that still has bins - delete its bins first"})
+return
+}
+
+database.DB.Delete(&rack)
+c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// DeleteBin godoc
+// DELETE /api/v1/warehouse/bins/:bin_id (warehouse staff only)
+// Refuses to delete a bin that's still assigned to a product's inventory row.
+func DeleteBin(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+binID := c.Param("bin_id")
+
+var bin models.WarehouseBin
+if err := database.DB.Joins("JOIN warehouse_racks ON warehouse_racks.id = warehouse_bins.rack_id").
+Joins("JOIN warehouse_zones ON warehouse_zones.id = warehouse_racks.zone_id").
+Where("warehouse_bins.id = ? AND warehouse_zones.warehouse_id = ?", binID, warehouseID).
+First(&bin).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Bin not found for your warehouse"})
+return
+}
+
+var assignedCount int64
+database.DB.Model(&models.Inventory{}).Where("bin_id = ?", binID).Count(&assignedCount)
+if assignedCount > 0 {
+c.JSON(http.StatusConflict, gin.H{"error": "Cannot delete a bin that's still assigned to a product - unassign it first"})
+return
+}
+
+database.DB.Delete(&bin)
+c.JSON(http.StatusOK, gin.H{"success": true})
+}

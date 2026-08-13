@@ -134,6 +134,9 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseLocations.POST("/racks/:rack_id/bins", handlers.CreateBin)
 				warehouseLocations.PUT("/inventory/:product_id/bin", handlers.AssignProductBin)
 				warehouseLocations.GET("/inventory/:product_id", handlers.GetProductInventory)
+				warehouseLocations.DELETE("/zones/:zone_id", handlers.DeleteZone)
+				warehouseLocations.DELETE("/racks/:rack_id", handlers.DeleteRack)
+				warehouseLocations.DELETE("/bins/:bin_id", handlers.DeleteBin)
 				warehouseLocations.POST("/inventory/:product_id/adjust", handlers.AdjustStock)
 				warehouseLocations.GET("/stock-movements", handlers.GetStockMovements)
 			}
