@@ -1,13 +1,17 @@
 ﻿package handlers
 
 import (
+"errors"
+"fmt"
 "net/http"
 "strconv"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // AdjustStock godoc
@@ -19,6 +23,7 @@ import (
 func AdjustStock(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
+staffName, _ := c.Get("staff_name")
 productID := c.Param("product_id")
 
 var req models.StockAdjustmentRequest
@@ -27,23 +32,28 @@ c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 return
 }
 
-var inv models.Inventory
-if err := database.DB.Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).First(&inv).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "No inventory record for this product in your warehouse"})
-return
-}
-
-previousQty := inv.Stock
-change := req.NewQuantity - previousQty
-if change == 0 {
-c.JSON(http.StatusBadRequest, gin.H{"error": "New quantity is the same as current stock - nothing to adjust"})
-return
-}
-
 productIDUint64, _ := strconv.ParseUint(productID, 10, 64)
 staffIDCopy := staffID
 
+var inv models.Inventory
+var previousQty int
+statusCode := http.StatusInternalServerError
+
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).
+First(&inv).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("No inventory record for this product in your warehouse")
+}
+
+previousQty = inv.Stock
+change := req.NewQuantity - previousQty
+if change == 0 {
+statusCode = http.StatusBadRequest
+return errors.New("New quantity is the same as current stock - nothing to adjust")
+}
+
 inv.Stock = req.NewQuantity
 inv.InStock = req.NewQuantity > 0
 if err := tx.Save(&inv).Error; err != nil {
@@ -64,9 +74,12 @@ return tx.Create(&movement).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to adjust stock: " + txErr.Error()})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
+
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "stock_adjustment", "inventory", productID,
+fmt.Sprintf("stock=%d", previousQty), fmt.Sprintf("stock=%d reason=%s", req.NewQuantity, req.Reason))
 
 c.JSON(http.StatusOK, inv)
 }
