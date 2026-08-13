@@ -1,8 +1,8 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
-	"errors"
 "net/http"
 "time"
 
@@ -10,8 +10,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // GetPackingTask godoc
@@ -33,8 +33,8 @@ var pickingTask models.PickingTask
 database.DB.Where("order_id = ?", orderID).Preload("Items.Product").First(&pickingTask)
 
 c.JSON(http.StatusOK, gin.H{
-"packing_task":  task,
-"picked_items":  pickingTask.Items,
+"packing_task": task,
+"picked_items": pickingTask.Items,
 })
 }
 
@@ -62,6 +62,26 @@ return errors.New("Packing already completed for this order")
 if task.PackerID != nil && *task.PackerID != staffID {
 statusCode = http.StatusConflict
 return errors.New("This order is already being packed by another staff member")
+}
+
+// Move the order into the "packing" state so the lifecycle reflects
+// picked -> packing -> packed -> ready_for_dispatch, rather than
+// jumping from picked straight to ready_for_dispatch on completion.
+if task.Status != "in_progress" {
+var order models.Order
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", orderID, warehouseID).First(&order).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Order not found for your warehouse")
+}
+if order.Status != models.OrderStatusPicked {
+statusCode = http.StatusBadRequest
+return errors.New("only picked orders can be packed, current status: " + order.Status)
+}
+if err := tx.Model(&models.Order{}).Where("id = ?", orderID).
+Update("status", models.OrderStatusPacking).Error; err != nil {
+return err
+}
 }
 
 now := time.Now()
@@ -116,6 +136,12 @@ if err := tx.Save(&task).Error; err != nil {
 return err
 }
 
+// Pass through "packed" before "ready_for_dispatch" so the order
+// lifecycle records the distinct milestone, matching
+// picked -> packing -> packed -> ready_for_dispatch.
+if err := tx.Model(&models.Order{}).Where("id = ?", orderID).Update("status", models.OrderStatusPacked).Error; err != nil {
+return err
+}
 return tx.Model(&models.Order{}).Where("id = ?", orderID).Update("status", models.OrderStatusReadyForDispatch).Error
 })
 

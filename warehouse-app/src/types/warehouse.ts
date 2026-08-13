@@ -456,3 +456,27 @@ export interface WarehouseInventoryResponse {
   expired_count: number
   low_stock_threshold: number
 }
+
+export interface InvoiceItem {
+  id: number
+  product_id: number
+  product_name: string
+  quantity: number
+  price: number
+}
+
+export interface OrderInvoice {
+  invoice_number: string
+  order_id: number
+  order_status: OrderStatus
+  customer_name: string
+  customer_phone: string
+  items_amount: number
+  delivery_charge: number
+  wallet_used: number
+  total_amount: number
+  payment_method: 'cod' | 'online'
+  payment_status: 'pending' | 'paid' | 'failed'
+  generated_at: string
+  items: InvoiceItem[]
+}

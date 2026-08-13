@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { acceptOrder, listWarehouseOrders, handoverOrder as handoverOrderApi } from '../api/warehouse'
-import type { Order, OrderStatus } from '../types/warehouse'
+import { acceptOrder, listWarehouseOrders, handoverOrder as handoverOrderApi, getOrderInvoice } from '../api/warehouse'
+import type { Order, OrderStatus, OrderInvoice } from '../types/warehouse'
 import StatusBadge from '../components/StatusBadge'
 import { getErrorMessage } from '../utils/errors'
 
@@ -39,6 +39,11 @@ export default function Orders() {
   const [packageCount, setPackageCount] = useState(1)
   const [handoverSubmitting, setHandoverSubmitting] = useState(false)
   const [handoverError, setHandoverError] = useState<string | null>(null)
+
+  const [invoiceTarget, setInvoiceTarget] = useState<number | null>(null)
+  const [invoice, setInvoice] = useState<OrderInvoice | null>(null)
+  const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [invoiceError, setInvoiceError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -112,6 +117,21 @@ export default function Orders() {
     else if (order.status === 'packing' || order.status === 'packed') navigate(`/packing/${order.id}`)
   }
 
+  async function openInvoice(order: Order) {
+    setInvoiceTarget(order.id)
+    setInvoice(null)
+    setInvoiceError(null)
+    setInvoiceLoading(true)
+    try {
+      const data = await getOrderInvoice(order.id)
+      setInvoice(data)
+    } catch (err) {
+      setInvoiceError(getErrorMessage(err, 'Failed to load invoice.'))
+    } finally {
+      setInvoiceLoading(false)
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl">
       <h1 className="text-lg font-semibold mb-4">Orders</h1>
@@ -176,7 +196,7 @@ export default function Orders() {
                     <td className="px-4 py-3 text-slate-400">
                       {itemCount} lines &middot; {totalQty} qty
                     </td>
-                    <td className="px-4 py-3">â‚¹{order.total_amount.toFixed(2)}</td>
+                    <td className="px-4 py-3">₹{order.total_amount.toFixed(2)}</td>
                     <td className="px-4 py-3 text-slate-400 uppercase text-xs">
                       {order.payment_method} &middot; {order.payment_status}
                     </td>
@@ -184,7 +204,16 @@ export default function Orders() {
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {order.status === 'confirmed' ? (
+                      <div className="flex justify-end items-center gap-2">
+                        {order.status !== 'confirmed' && order.status !== 'pending' && (
+                          <button
+                            onClick={() => openInvoice(order)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-medium transition-colors text-slate-300"
+                          >
+                            Invoice
+                          </button>
+                        )}
+                        {order.status === 'confirmed' ? (
                         <button
                           onClick={() => handleAccept(order)}
                           disabled={acceptingId === order.id}
@@ -206,9 +235,10 @@ export default function Orders() {
                         >
                           {action.label}
                         </button>
-                      ) : (
-                        <span className="text-xs text-slate-600">&mdash;</span>
-                      )}
+                        ) : (
+                          <span className="text-xs text-slate-600">&mdash;</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -290,6 +320,85 @@ export default function Orders() {
                 {handoverSubmitting ? 'Confirming...' : 'Confirm Handover'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {invoiceTarget !== null && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold">Invoice — Order #{invoiceTarget}</h2>
+              <button
+                onClick={() => setInvoiceTarget(null)}
+                className="text-slate-400 hover:text-slate-200 text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            {invoiceLoading ? (
+              <p className="text-sm text-slate-400">Loading invoice...</p>
+            ) : invoiceError ? (
+              <div className="border border-rose-900 bg-rose-950/40 text-rose-300 text-sm rounded-lg px-3 py-2">
+                {invoiceError}
+              </div>
+            ) : invoice ? (
+              <div className="text-sm space-y-4">
+                <div className="flex items-center justify-between border border-slate-800 rounded-lg p-3">
+                  <div>
+                    <p className="text-slate-400 text-xs uppercase mb-1">Invoice Number</p>
+                    <p className="font-medium">{invoice.invoice_number}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-400 text-xs uppercase mb-1">Payment</p>
+                    <p className="font-medium uppercase text-xs">
+                      {invoice.payment_method} &middot; {invoice.payment_status}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-slate-400 text-xs uppercase mb-2">Items</p>
+                  <div className="border border-slate-800 rounded-lg divide-y divide-slate-800">
+                    {invoice.items.map((item) => (
+                      <div key={item.id} className="flex justify-between px-3 py-2">
+                        <span>
+                          {item.product_name} <span className="text-slate-500">x{item.quantity}</span>
+                        </span>
+                        <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border border-slate-800 rounded-lg p-3 space-y-1">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Items Amount</span>
+                    <span>₹{invoice.items_amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Delivery Charge</span>
+                    <span>₹{invoice.delivery_charge.toFixed(2)}</span>
+                  </div>
+                  {invoice.wallet_used > 0 && (
+                    <div className="flex justify-between text-slate-400">
+                      <span>Wallet Used</span>
+                      <span>-₹{invoice.wallet_used.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold pt-1 border-t border-slate-800">
+                    <span>Total</span>
+                    <span>₹{invoice.total_amount.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Generated {new Date(invoice.generated_at).toLocaleString()}. Warehouse staff cannot edit
+                  invoice values.
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

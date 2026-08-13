@@ -104,6 +104,7 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseOrders.PUT("/:id/accept", handlers.AcceptOrder)
 				warehouseOrders.PUT("/:id/handover", handlers.HandoverOrder)
 				warehouseOrders.GET("/:id/handover", handlers.GetHandover)
+warehouseOrders.GET("/:id/invoice", handlers.GetOrderInvoice)
 			}
 
 			warehousePicking := warehouse.Group("/picking")
