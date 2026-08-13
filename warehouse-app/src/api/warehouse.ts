@@ -23,6 +23,7 @@ import type {
   WarehouseBin,
   Inventory,
   StockMovementsResponse,
+  OrderInvoice,
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>
@@ -239,3 +240,7 @@ export const getWarehouseInventory = (params: {
   page?: number
   limit?: number
 }) => apiClient.get('/warehouse/inventory', { params }).then((r) => r.data as WarehouseInventoryResponse)
+
+export const getOrderInvoice = (orderId: number) =>
+  apiClient.get(`/warehouse/orders/${orderId}/invoice`).then((r) => r.data as OrderInvoice)
+
