@@ -181,20 +181,27 @@ c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination warehouse can 
 return
 }
 
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&transfer, id).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("stock transfer not found")
+}
 if transfer.Status != models.StockTransferPending {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending transfers can be approved"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("only pending transfers can be approved - it may have already been processed")
 }
 
-txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 var inventory models.Inventory
 if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.FromWarehouseID).
 First(&inventory).Error; err != nil {
+statusCode = http.StatusBadRequest
 return errors.New("source warehouse has no inventory record for this product")
 }
 
 if inventory.Stock < transfer.Quantity {
+statusCode = http.StatusBadRequest
 return errors.New("insufficient stock at source warehouse to approve this transfer")
 }
 
@@ -212,7 +219,7 @@ return tx.Save(&transfer).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
