@@ -91,6 +91,7 @@ func AutoMigrate() {
 		&models.WarehouseRack{},
 		&models.WarehouseBin{},
 		&models.StockMovement{},
+		&models.WarehouseException{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)

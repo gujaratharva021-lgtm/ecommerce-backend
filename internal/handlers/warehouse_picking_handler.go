@@ -110,6 +110,7 @@ Reason         string `json:"reason"`
 // job is to record the outcome, not to re-verify hardware input.
 func MarkPickItem(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
+staffID := c.MustGet("staff_id").(uint)
 itemID := c.Param("item_id")
 
 var req PickItemRequest
@@ -146,6 +147,29 @@ item.QuantityPicked = 0
 item.Status = req.Status
 item.Reason = req.Reason
 database.DB.Save(&item)
+
+// Auto-create a WarehouseException for unavailable/short picks so staff
+// don't have to double-enter what they already reported inline here.
+if req.Status == models.PickItemUnavailable || req.Status == models.PickItemShort {
+productID := item.ProductID
+exceptionType := models.ExceptionUnavailable
+priority := models.ExceptionPriorityMedium
+if req.Status == models.PickItemShort {
+exceptionType = models.ExceptionShortQuantity
+priority = models.ExceptionPriorityLow
+}
+exception := models.WarehouseException{
+OrderID:     task.OrderID,
+ProductID:   &productID,
+WarehouseID: warehouseID,
+Type:        exceptionType,
+Reason:      req.Reason,
+Priority:    priority,
+StaffID:     &staffID,
+Status:      models.ExceptionStatusOpen,
+}
+database.DB.Create(&exception)
+}
 
 c.JSON(http.StatusOK, item)
 }
