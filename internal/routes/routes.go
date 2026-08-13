@@ -137,6 +137,14 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseLocations.GET("/stock-movements", handlers.GetStockMovements)
 			}
 
+			warehouseExceptions := warehouse.Group("/exceptions")
+			warehouseExceptions.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
+			{
+				warehouseExceptions.GET("", handlers.GetWarehouseExceptions)
+				warehouseExceptions.GET("/:id", handlers.GetWarehouseException)
+				warehouseExceptions.PUT("/:id", handlers.UpdateWarehouseException)
+			}
+
 			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseDashboard)
 			}
 		}
