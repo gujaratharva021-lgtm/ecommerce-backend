@@ -14,6 +14,7 @@ import type {
   Batch,
   BatchesResponse,
   ExpiringBatchesResponse,
+  WarehouseInventoryResponse,
   ExceptionsResponse,
   WarehouseException,
   StaffPerformanceRow,
@@ -216,3 +217,17 @@ export const deleteBatch = (id: number) =>
 
 export const getStaffOverview = () =>
   apiClient.get('/warehouse/staff').then((r) => r.data as { staff: import('../types/warehouse').StaffOverviewRow[] })
+
+
+// ---- Warehouse Inventory ----
+
+export const getWarehouseInventory = (params: {
+  search?: string
+  category_id?: number
+  stock_status?: string
+  zone_id?: number
+  rack_id?: number
+  bin_id?: number
+  page?: number
+  limit?: number
+}) => apiClient.get('/warehouse/inventory', { params }).then((r) => r.data as WarehouseInventoryResponse)

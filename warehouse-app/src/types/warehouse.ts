@@ -408,3 +408,42 @@ export interface StaffOverviewRow {
   orders_handled: number
   last_activity?: string | null
 }
+
+// ---- Warehouse Inventory ----
+
+export type WarehouseStockStatus = 'in_stock' | 'low' | 'out'
+
+export interface WarehouseInventoryRow {
+  product_id: number
+  product_name: string
+  barcode?: string
+  image_url?: string
+  category_id: number
+  category_name: string
+  stock: number
+  reserved: number
+  available: number
+  in_stock: boolean
+  stock_status: WarehouseStockStatus
+  bin_id?: number | null
+  bin_name?: string
+  rack_name?: string
+  zone_name?: string
+  expired_qty: number
+  last_damaged_at?: string | null
+  last_damaged_qty?: number
+}
+
+export interface WarehouseInventoryResponse {
+  rows: WarehouseInventoryRow[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+  in_stock_count: number
+  low_stock_count: number
+  out_of_stock_count: number
+  damaged_count: number
+  expired_count: number
+  low_stock_threshold: number
+}

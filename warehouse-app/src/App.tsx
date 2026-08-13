@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
+import Inventory from './pages/Inventory'
 import Picking from './pages/Picking'
 import Packing from './pages/Packing'
 import StockTransfers from './pages/StockTransfers'
@@ -32,6 +33,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
+          <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
           <Route path="/picking/:orderId" element={<Protected><Picking /></Protected>} />
           <Route path="/packing/:orderId" element={<Protected><Packing /></Protected>} />
           <Route path="/stock-transfers" element={<Protected><StockTransfers /></Protected>} />
