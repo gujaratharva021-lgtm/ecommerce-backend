@@ -2,6 +2,7 @@
 
 import (
 "fmt"
+	"errors"
 "net/http"
 "time"
 
@@ -9,6 +10,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetPickingTask godoc
@@ -73,17 +76,22 @@ staffID := c.MustGet("staff_id").(uint)
 orderID := c.Param("order_id")
 
 var task models.PickingTask
-if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).First(&task).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Picking task not found for your warehouse"})
-return
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+First(&task).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Picking task not found for your warehouse")
 }
 if task.Status == "completed" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Picking already completed for this order"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Picking already completed for this order")
 }
 if task.PickerID != nil && *task.PickerID != staffID {
-c.JSON(http.StatusConflict, gin.H{"error": "This order is already being picked by another staff member"})
-return
+statusCode = http.StatusConflict
+return errors.New("This order is already being picked by another staff member")
 }
 
 now := time.Now()
@@ -92,7 +100,13 @@ task.Status = "in_progress"
 if task.StartedAt == nil {
 task.StartedAt = &now
 }
-database.DB.Save(&task)
+return tx.Save(&task).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
 
 c.JSON(http.StatusOK, task)
 }
@@ -187,43 +201,58 @@ c.JSON(http.StatusOK, item)
 func CompletePicking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 orderID := c.Param("order_id")
-	staffID := c.MustGet("staff_id").(uint)
+staffID := c.MustGet("staff_id").(uint)
 
 var task models.PickingTask
-if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+var packTask models.PackingTask
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
 Preload("Items").First(&task).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Picking task not found for your warehouse"})
-return
+statusCode = http.StatusNotFound
+return errors.New("Picking task not found for your warehouse")
 }
 if task.Status == "completed" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Picking already completed"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Picking already completed")
 }
 
 for _, item := range task.Items {
 if item.Status == models.PickItemPending {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot complete picking - not all items have been marked"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Cannot complete picking - not all items have been marked")
 }
 }
 
 now := time.Now()
 task.Status = "completed"
 task.CompletedAt = &now
-database.DB.Save(&task)
+if err := tx.Save(&task).Error; err != nil {
+return err
+}
 
-packTask := models.PackingTask{
+packTask = models.PackingTask{
 OrderID:     task.OrderID,
 WarehouseID: warehouseID,
 Status:      "pending",
 }
-database.DB.Create(&packTask)
+if err := tx.Create(&packTask).Error; err != nil {
+return err
+}
 
-database.DB.Model(&models.Order{}).Where("id = ?", task.OrderID).Update("status", models.OrderStatusPicked)
+return tx.Model(&models.Order{}).Where("id = ?", task.OrderID).Update("status", models.OrderStatusPicked).Error
+})
 
-	staffName, _ := c.Get("staff_name")
-	services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
-		"status=picking", "status=picked")
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
+
+staffName, _ := c.Get("staff_name")
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
+"status=picking", "status=picked")
 
 c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask})
 }

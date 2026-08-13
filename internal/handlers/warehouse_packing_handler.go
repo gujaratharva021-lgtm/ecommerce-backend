@@ -2,6 +2,7 @@
 
 import (
 "fmt"
+	"errors"
 "net/http"
 "time"
 
@@ -9,6 +10,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GetPackingTask godoc
@@ -43,17 +46,22 @@ staffID := c.MustGet("staff_id").(uint)
 orderID := c.Param("order_id")
 
 var task models.PackingTask
-if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).First(&task).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Packing task not found for your warehouse"})
-return
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+First(&task).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Packing task not found for your warehouse")
 }
 if task.Status == "completed" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Packing already completed for this order"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Packing already completed for this order")
 }
 if task.PackerID != nil && *task.PackerID != staffID {
-c.JSON(http.StatusConflict, gin.H{"error": "This order is already being packed by another staff member"})
-return
+statusCode = http.StatusConflict
+return errors.New("This order is already being packed by another staff member")
 }
 
 now := time.Now()
@@ -62,7 +70,13 @@ task.Status = "in_progress"
 if task.StartedAt == nil {
 task.StartedAt = &now
 }
-database.DB.Save(&task)
+return tx.Save(&task).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
 
 c.JSON(http.StatusOK, task)
 }
@@ -77,25 +91,38 @@ staffID := c.MustGet("staff_id").(uint)
 orderID := c.Param("order_id")
 
 var task models.PackingTask
-if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).First(&task).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Packing task not found for your warehouse"})
-return
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+First(&task).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Packing task not found for your warehouse")
 }
 if task.Status == "completed" {
-c.JSON(http.StatusConflict, gin.H{"error": "This order has already been packed"})
-return
+statusCode = http.StatusConflict
+return errors.New("This order has already been packed")
 }
 if task.Status != "in_progress" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Packing must be started before it can be completed"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("Packing must be started before it can be completed")
 }
 
 now := time.Now()
 task.Status = "completed"
 task.CompletedAt = &now
-database.DB.Save(&task)
+if err := tx.Save(&task).Error; err != nil {
+return err
+}
 
-database.DB.Model(&models.Order{}).Where("id = ?", orderID).Update("status", models.OrderStatusReadyForDispatch)
+return tx.Model(&models.Order{}).Where("id = ?", orderID).Update("status", models.OrderStatusReadyForDispatch).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
 
 staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_packing", "order", orderID,
