@@ -133,6 +133,8 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseLocations.GET("/racks/:rack_id/bins", handlers.GetRackBins)
 				warehouseLocations.POST("/racks/:rack_id/bins", handlers.CreateBin)
 				warehouseLocations.PUT("/inventory/:product_id/bin", handlers.AssignProductBin)
+				warehouseLocations.POST("/inventory/:product_id/adjust", handlers.AdjustStock)
+				warehouseLocations.GET("/stock-movements", handlers.GetStockMovements)
 			}
 
 			warehouse.GET("/dashboard", middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope(), handlers.GetWarehouseDashboard)

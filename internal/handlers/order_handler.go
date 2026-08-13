@@ -102,6 +102,7 @@ var order models.Order
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 itemsAmount := 0.0
 orderItems := make([]models.OrderItem, 0, len(cartItems))
+			pendingMovements := make([]models.StockMovement, 0, len(cartItems))
 
 for _, ci := range cartItems {
 var inventory models.Inventory
@@ -118,6 +119,7 @@ return errors.New("this product is not available for purchase at your nearest wa
 if !inventory.InStock || inventory.Stock < ci.Quantity {
 return errors.New("insufficient stock for " + ci.Product.Name)
 }
+				previousQty := inventory.Stock
 
 inventory.Stock -= ci.Quantity
 if inventory.Stock <= 0 {
@@ -126,6 +128,14 @@ inventory.InStock = false
 if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
+				pendingMovements = append(pendingMovements, models.StockMovement{
+					ProductID:    ci.ProductID,
+					WarehouseID:  nearestWarehouse.ID,
+					PreviousQty:  previousQty,
+					Change:       -ci.Quantity,
+					NewQty:       inventory.Stock,
+					MovementType: models.MovementSale,
+				})
 
 itemsAmount += ci.Product.Price * float64(ci.Quantity)
 orderItems = append(orderItems, models.OrderItem{
@@ -195,6 +205,14 @@ Items:            orderItems,
 if err := tx.Create(&order).Error; err != nil {
 return err
 }
+			for i := range pendingMovements {
+				pendingMovements[i].ReferenceID = &order.ID
+			}
+			if len(pendingMovements) > 0 {
+				if err := tx.Create(&pendingMovements).Error; err != nil {
+					return err
+				}
+			}
 
 if walletUsed > 0 {
 refID := order.ID
