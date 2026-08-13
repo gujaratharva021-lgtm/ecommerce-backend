@@ -187,6 +187,7 @@ c.JSON(http.StatusOK, item)
 func CompletePicking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 orderID := c.Param("order_id")
+	staffID := c.MustGet("staff_id").(uint)
 
 var task models.PickingTask
 if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
@@ -219,6 +220,10 @@ Status:      "pending",
 database.DB.Create(&packTask)
 
 database.DB.Model(&models.Order{}).Where("id = ?", task.OrderID).Update("status", models.OrderStatusPicked)
+
+	staffName, _ := c.Get("staff_name")
+	services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
+		"status=picking", "status=picked")
 
 c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask})
 }

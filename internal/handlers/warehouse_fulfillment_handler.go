@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+	"fmt"
 "net/http"
 	"strconv"
 
@@ -8,6 +9,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "gorm.io/gorm"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetWarehouseOrders godoc
@@ -62,6 +64,8 @@ c.JSON(http.StatusOK, gin.H{
 func AcceptOrder(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 orderID := c.Param("id")
+	staffID := c.MustGet("staff_id").(uint)
+	staffName, _ := c.Get("staff_name")
 
 var order models.Order
 if err := database.DB.Where("warehouse_id = ?", warehouseID).First(&order, orderID).Error; err != nil {
@@ -110,6 +114,9 @@ if txErr != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept order: " + txErr.Error()})
 return
 }
+
+	services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "accept_order", "order", orderID,
+		"status=confirmed", "status="+order.Status)
 
 c.JSON(http.StatusOK, gin.H{"success": true, "order_id": order.ID, "status": order.Status})
 }
