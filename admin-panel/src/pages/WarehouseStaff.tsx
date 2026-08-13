@@ -10,11 +10,24 @@ import {
 } from '../api/admin'
 import type { WarehouseStaff, Warehouse } from '../types/admin'
 
+const ROLES = [
+  { value: 'picker', label: 'Picker' },
+  { value: 'packer', label: 'Packer' },
+  { value: 'inventory_staff', label: 'Inventory Staff' },
+  { value: 'supervisor', label: 'Supervisor' },
+  { value: 'warehouse_manager', label: 'Warehouse Manager' },
+]
+
 const emptyForm = {
   name: '',
   phone: '',
   warehouse_id: '',
+  role: 'picker',
   status: 'active',
+}
+
+function roleLabel(role?: string) {
+  return ROLES.find((r) => r.value === role)?.label ?? role ?? 'Picker'
 }
 
 export default function WarehouseStaffPage() {
@@ -67,6 +80,7 @@ export default function WarehouseStaffPage() {
       name: s.name,
       phone: s.phone,
       warehouse_id: String(s.warehouse_id),
+      role: s.role ?? 'picker',
       status: s.status ?? 'active',
     })
     setFormError(null)
@@ -94,6 +108,7 @@ export default function WarehouseStaffPage() {
         name: form.name.trim(),
         phone: form.phone.trim(),
         warehouse_id: parseInt(form.warehouse_id, 10),
+        role: form.role,
         status: form.status,
       }
       if (editingStaff) {
@@ -159,6 +174,7 @@ export default function WarehouseStaffPage() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Phone</th>
                   <th className="px-4 py-3 font-medium">Warehouse</th>
+                  <th className="px-4 py-3 font-medium">Role</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
@@ -169,6 +185,11 @@ export default function WarehouseStaffPage() {
                     <td className="px-4 py-3">{s.name}</td>
                     <td className="px-4 py-3">{s.phone}</td>
                     <td className="px-4 py-3">{warehouseName(s.warehouse_id)}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs px-2 py-1 rounded-full bg-indigo-500/15 text-indigo-300">
+                        {roleLabel(s.role)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
@@ -235,6 +256,20 @@ export default function WarehouseStaffPage() {
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Role</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              >
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
                   </option>
                 ))}
               </select>
