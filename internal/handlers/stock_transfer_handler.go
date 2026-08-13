@@ -117,14 +117,19 @@ c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination warehouse can 
 return
 }
 
+statusCode := http.StatusInternalServerError
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&transfer, id).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("stock transfer not found")
+}
 if transfer.Status != models.StockTransferInTransit {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only in-transit transfers can be received"})
-return
+statusCode = http.StatusBadRequest
+return errors.New("only in-transit transfers can be received - it may have already been received")
 }
 
-txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 var inventory models.Inventory
-err := tx.Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.ToWarehouseID).
+err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.ToWarehouseID).
 First(&inventory).Error
 if err != nil {
 inventory = models.Inventory{
@@ -143,7 +148,7 @@ return tx.Save(&transfer).Error
 })
 
 if txErr != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to receive stock transfer"})
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
