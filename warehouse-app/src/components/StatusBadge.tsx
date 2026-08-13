@@ -5,6 +5,7 @@
   packing: 'bg-violet-500/15 text-violet-300',
   packed: 'bg-violet-500/15 text-violet-300',
   ready_for_dispatch: 'bg-emerald-500/15 text-emerald-300',
+  handed_over: 'bg-cyan-500/15 text-cyan-300',
   shipped: 'bg-emerald-500/15 text-emerald-300',
   delivered: 'bg-emerald-500/15 text-emerald-300',
   cancelled: 'bg-rose-500/15 text-rose-300',

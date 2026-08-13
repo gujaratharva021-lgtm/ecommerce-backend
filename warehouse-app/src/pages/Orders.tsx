@@ -10,6 +10,7 @@ const TABS: { label: string; status?: OrderStatus }[] = [
   { label: 'Picking', status: 'picking' },
   { label: 'Packing', status: 'packing' },
   { label: 'Ready for Dispatch', status: 'ready_for_dispatch' },
+  { label: 'Handed Over', status: 'handed_over' },
   { label: 'Completed', status: 'delivered' },
   { label: 'All', status: undefined },
 ]
