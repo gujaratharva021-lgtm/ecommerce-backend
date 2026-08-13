@@ -11,6 +11,9 @@ import type {
   ScanResult,
   Receiving,
   ReceivingsResponse,
+  Batch,
+  BatchesResponse,
+  ExpiringBatchesResponse,
   ExceptionsResponse,
   WarehouseException,
   StaffPerformanceRow,
@@ -186,3 +189,26 @@ export const qcReceiving = (id: number, data: { action: 'accept' | 'reject'; acc
 
 export const putAwayReceiving = (id: number, binId: number | null) =>
   apiClient.put(`/warehouse/receiving/${id}/putaway`, { bin_id: binId }).then((r) => r.data as Receiving)
+
+// ---- Batch & Expiry ----
+
+export const createBatch = (data: {
+  product_id: number
+  batch_number: string
+  manufacture_date?: string
+  expiry_date: string
+  quantity: number
+  bin_id?: number | null
+}) => apiClient.post('/warehouse/batches', data).then((r) => r.data as Batch)
+
+export const listBatches = (params: { product_id?: number; expiring_within_days?: number; page?: number; limit?: number }) =>
+  apiClient.get('/warehouse/batches', { params }).then((r) => r.data as BatchesResponse)
+
+export const listExpiringBatches = (days = 7) =>
+  apiClient.get('/warehouse/batches/expiring', { params: { days } }).then((r) => r.data as ExpiringBatchesResponse)
+
+export const adjustBatchQuantity = (id: number, data: { quantity: number; reason: string }) =>
+  apiClient.put(`/warehouse/batches/${id}/quantity`, data).then((r) => r.data as Batch)
+
+export const deleteBatch = (id: number) =>
+  apiClient.delete(`/warehouse/batches/${id}`).then((r) => r.data)

@@ -362,3 +362,36 @@ export interface ReceivingsResponse {
   total: number
   total_pages: number
 }
+
+// ---- Batch & Expiry ----
+
+export interface Batch {
+  id: number
+  product_id: number
+  product?: Product
+  warehouse_id: number
+  batch_number: string
+  manufacture_date?: string | null
+  expiry_date: string
+  quantity: number
+  bin_id?: number | null
+  bin?: WarehouseBin | null
+  created_by_staff_id: number
+  receiving_id?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BatchesResponse {
+  batches: Batch[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+export interface ExpiringBatchesResponse {
+  batches: Batch[]
+  days: number
+  count: number
+}

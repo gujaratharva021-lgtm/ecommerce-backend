@@ -9,6 +9,7 @@ const navItems = [
   { to: '/locations', label: 'Locations' },
   { to: '/stock-operations', label: 'Stock Operations' },
   { to: '/receiving', label: 'Receiving' },
+  { to: '/batches', label: 'Batch & Expiry' },
   { to: '/exceptions', label: 'Exceptions' },
   { to: '/performance', label: 'Performance' },
 ]
