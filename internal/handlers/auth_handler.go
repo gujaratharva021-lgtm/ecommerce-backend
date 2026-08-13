@@ -3,11 +3,13 @@
 import (
 "crypto/rand"
 "fmt"
+"log"
 "math/big"
 "net/http"
 "time"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -24,13 +26,28 @@ return "", err
 return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
+// otpDebugResponse builds the OTP-send response. In any non-release
+// environment it echoes the code back so local/staging testing works
+// without a real SMS gateway wired up. In production (GIN_MODE=release)
+// the code is NEVER included in the response - only logged server-side -
+// since returning it in the API response would let anyone log in as any
+// phone number without ever receiving an SMS.
+func otpDebugResponse(code string, phone string) gin.H {
+log.Printf("[OTP] %s -> %s", phone, code)
+resp := gin.H{
+"message":            "OTP sent successfully",
+"expires_in_minutes": otpValidityMinutes,
+}
+if config.AppConfig.GinMode != "release" {
+resp["otp"] = code
+}
+return resp
+}
+
 // SendOTP godoc
 // POST /api/v1/auth/send-otp
-// TEST MODE: no real SMS is sent. A 6-digit OTP is generated, stored locally
-// (old codes for the same phone are cleared first), and returned directly in
-// the response so the frontend can display/auto-fill it. Swap this back to a
-// real SMS provider before shipping to real users -- returning the code in
-// the API response is only safe for internal testing.
+// No real SMS gateway is wired up yet, so the OTP is logged server-side and
+// only echoed in the response outside production - see otpDebugResponse.
 func SendOTP(c *gin.Context) {
 var req models.SendOTPRequest
 if err := c.ShouldBindJSON(&req); err != nil {
@@ -56,10 +73,7 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save OTP"})
 return
 }
 
-c.JSON(http.StatusOK, gin.H{
-"message": "OTP sent successfully",
-"otp":     code, // TEST MODE ONLY -- remove this field once real SMS is wired up
-})
+c.JSON(http.StatusOK, otpDebugResponse(code, req.Phone))
 }
 
 // VerifyOTP godoc

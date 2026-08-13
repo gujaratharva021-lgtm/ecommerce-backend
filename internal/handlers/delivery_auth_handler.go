@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -50,12 +50,7 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create OTP"})
 return
 }
 
-resp := gin.H{
-"message":            "OTP sent successfully",
-"expires_in_minutes": otpValidityMinutes,
-}
-resp["otp"] = code
-c.JSON(http.StatusOK, resp)
+c.JSON(http.StatusOK, otpDebugResponse(code, req.Phone))
 }
 
 // VerifyPartnerOTP godoc
