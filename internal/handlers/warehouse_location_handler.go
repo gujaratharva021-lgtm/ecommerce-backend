@@ -170,3 +170,21 @@ inv.BinID = req.BinID
 database.DB.Save(&inv)
 c.JSON(http.StatusOK, inv)
 }
+
+// GetProductInventory godoc
+// GET /api/v1/warehouse/inventory/:product_id (warehouse staff only)
+// Returns the caller's warehouse inventory row for one product, including
+// its bin/rack/zone location if assigned. Used by the frontend to show
+// current stock + location before an adjustment or bin (re)assignment.
+func GetProductInventory(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+productID := c.Param("product_id")
+
+var inv models.Inventory
+if err := database.DB.Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).
+Preload("Product").Preload("Bin.Rack.Zone").First(&inv).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "No inventory record for this product in your warehouse"})
+return
+}
+c.JSON(http.StatusOK, inv)
+}
