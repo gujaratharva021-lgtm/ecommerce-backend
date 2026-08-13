@@ -36,6 +36,6 @@ BinID           *uint      `json:"bin_id"`
 // AdjustBatchQuantityRequest is the body for PUT /warehouse/batches/:id/quantity
 // Used when a batch's quantity is consumed (e.g. FEFO pick) or corrected.
 type AdjustBatchQuantityRequest struct {
-Quantity int    `json:"quantity" binding:"required,gte=0"`
+Quantity int    `json:"quantity" binding:"gte=0"`
 Reason   string `json:"reason" binding:"required"`
 }
