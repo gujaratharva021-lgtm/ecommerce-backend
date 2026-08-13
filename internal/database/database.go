@@ -83,6 +83,9 @@ func AutoMigrate() {
 		&models.DeliveryZone{},
 		&models.SupportTicket{},
 		&models.SupportMessage{},
+		&models.PickingTask{},
+		&models.PickingTaskItem{},
+		&models.PackingTask{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
