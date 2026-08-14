@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "fmt"
@@ -118,31 +118,21 @@ defer xf.Close()
 
 summarySheet := "Summary"
 xf.SetSheetName("Sheet1", summarySheet)
-rows := [][]interface{}{
-{"Daily Sales Report", label},
-{},
-{"Total Orders", summary.TotalOrders},
-{"Delivered Orders", summary.DeliveredOrders},
-{"Cancelled Orders", summary.CancelledOrders},
-{"Pending Orders", summary.PendingOrders},
-{},
-{"Total Revenue (excl. cancelled)", summary.TotalRevenue},
-{"COD Revenue", summary.CODRevenue},
-{"Online Revenue", summary.OnlineRevenue},
-{"COD Orders", summary.CODOrders},
-{"Online Orders", summary.OnlineOrders},
-{},
-{"Total Delivery Charges Collected", summary.TotalDeliveryFee},
-{"Total Wallet Amount Used", summary.TotalWalletUsed},
-{"Average Order Value", summary.AvgOrderValue},
+summaryHeader := []interface{}{
+"Date", "Total Orders", "Delivered Orders", "Cancelled Orders", "Pending Orders",
+"Total Revenue", "COD Revenue", "Online Revenue", "COD Orders", "Online Orders",
+"Total Delivery Charges", "Total Wallet Used", "Average Order Value",
 }
-for i, row := range rows {
-cell, _ := excelize.CoordinatesToCellName(1, i+1)
-r := row
-xf.SetSheetRow(summarySheet, cell, &r)
+summaryDataRow := []interface{}{
+label, summary.TotalOrders, summary.DeliveredOrders, summary.CancelledOrders, summary.PendingOrders,
+summary.TotalRevenue, summary.CODRevenue, summary.OnlineRevenue, summary.CODOrders, summary.OnlineOrders,
+summary.TotalDeliveryFee, summary.TotalWalletUsed, summary.AvgOrderValue,
 }
-xf.SetColWidth(summarySheet, "A", "A", 32)
-xf.SetColWidth(summarySheet, "B", "B", 20)
+xf.SetSheetRow(summarySheet, "A1", &summaryHeader)
+xf.SetSheetRow(summarySheet, "A2", &summaryDataRow)
+for col := 'A'; col <= 'M'; col++ {
+xf.SetColWidth(summarySheet, string(col), string(col), 18)
+}
 
 ordersSheet := "Orders"
 xf.NewSheet(ordersSheet)
