@@ -265,3 +265,32 @@ export const updateAdminPaymentStatus = (orderId: number, status: string, refund
       ...(refundedAmount !== undefined ? { refunded_amount: refundedAmount } : {}),
     })
     .then((r) => r.data)
+export const searchAdminInvoices = (params: {
+  invoice_number?: string
+  order_id?: string
+  payment_status?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  limit?: number
+}) => apiClient.get('/admin/invoices', { params }).then((r) => r.data)
+
+export const getAdminInvoiceById = (id: number) =>
+  apiClient.get(`/admin/invoices/${id}`).then((r) => r.data)
+
+// Downloads the invoice PDF and triggers a browser save - a plain <a href>
+// can't be used because the request needs the Authorization header, so we
+// fetch it as a blob and hand the browser a local object URL instead.
+export const downloadAdminInvoicePDF = async (id: number, invoiceNumber?: string) => {
+  const res = await apiClient.get(`/admin/invoices/${id}/pdf`, { responseType: 'blob' })
+  const url = window.URL.createObjectURL(new Blob([res.data]))
+  const link = document.createElement('a')
+  link.href = url
+  const disposition = res.headers['content-disposition'] as string | undefined
+  const match = disposition?.match(/filename="(.+)"/)
+  link.download = match?.[1] ?? `${invoiceNumber ?? 'invoice-' + id}.pdf`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
