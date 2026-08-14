@@ -283,7 +283,11 @@ return
 }
 database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice)
 }
-servePDF(c, invoice, order.Warehouse)
+warehouse := models.Warehouse{}
+	if order.Warehouse != nil {
+		warehouse = *order.Warehouse
+	}
+	servePDF(c, invoice, warehouse)
 }
 
 // GetWarehouseOrderInvoicePDF godoc
@@ -303,7 +307,11 @@ if err := database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&in
 c.JSON(http.StatusNotFound, gin.H{"error": "No invoice found for this order yet"})
 return
 }
-servePDF(c, invoice, order.Warehouse)
+warehouse := models.Warehouse{}
+	if order.Warehouse != nil {
+		warehouse = *order.Warehouse
+	}
+	servePDF(c, invoice, warehouse)
 }
 
 // GetAdminInvoicePDF godoc
@@ -320,5 +328,9 @@ return
 var order models.Order
 database.DB.Preload("Warehouse").First(&order, invoice.OrderID)
 
-servePDF(c, invoice, order.Warehouse)
+warehouse := models.Warehouse{}
+	if order.Warehouse != nil {
+		warehouse = *order.Warehouse
+	}
+	servePDF(c, invoice, warehouse)
 }
