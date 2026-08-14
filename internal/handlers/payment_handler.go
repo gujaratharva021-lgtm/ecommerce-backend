@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -137,6 +138,12 @@ func VerifyPayment(c *gin.Context) {
                 services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyNewOrder,
                         "New order #"+orderID,
                         "Payment received and order confirmed - ready to accept.", &order.ID, nil)
+        }
+        // Online payment just confirmed - this is the one moment the invoice
+        // can legally be generated (payment proof exists now), so do it here
+        // rather than waiting for someone to view it.
+        if _, err := services.GenerateInvoiceIfNotExists(order.ID); err != nil {
+                log.Printf("failed to generate invoice for order %s: %v", orderID, err)
         }
 
 	var addr models.Address
