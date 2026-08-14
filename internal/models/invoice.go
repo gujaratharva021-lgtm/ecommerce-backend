@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -27,6 +27,11 @@ ItemsAmount    float64       `json:"items_amount"`
 DiscountAmount float64       `json:"discount_amount"`
 DeliveryCharge float64       `json:"delivery_charge"`
 WalletUsed     float64       `gorm:"column:wallet_amount_used" json:"wallet_amount_used"`
+IsInterState   bool          `json:"is_inter_state"`
+TaxableAmount  float64       `json:"taxable_amount"`
+CGSTAmount     float64       `json:"cgst_amount"`
+SGSTAmount     float64       `json:"sgst_amount"`
+IGSTAmount     float64       `json:"igst_amount"`
 TotalAmount    float64       `json:"total_amount"`
 PaymentMethod  string        `json:"payment_method"`
 // PaymentReference is the gateway transaction ID (e.g. Razorpay payment
@@ -52,4 +57,6 @@ ProductName string `json:"product_name"`
 SKU      string  `json:"sku,omitempty"`
 Quantity int     `json:"quantity"`
 Price    float64 `json:"price"`
+GSTPercent float64 `json:"gst_percent"`
+GSTAmount  float64 `json:"gst_amount"`
 }

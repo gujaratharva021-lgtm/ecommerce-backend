@@ -1,9 +1,11 @@
-﻿package services
+package services
 
 import (
 "fmt"
+"strings"
 "time"
 
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -74,7 +76,14 @@ addColumnStatements := []string{
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_state VARCHAR(100) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_pincode VARCHAR(20) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_inter_state BOOLEAN NOT NULL DEFAULT false`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS taxable_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS igst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
 }
 for _, stmt := range addColumnStatements {
 if err := tx.Exec(stmt).Error; err != nil {
@@ -103,30 +112,79 @@ paymentReference = payment.RazorpayPaymentID
 }
 }
 
+// GST calculation. Product.Price is treated as GST-inclusive (MRP),
+// which is standard for Indian retail listings - so the tax amount
+// is derived out of the line total rather than added on top of it.
+// Place of supply is the delivery address's state; if it matches the
+// seller's registered state (config.SellerState) this is an
+// intra-state sale (CGST+SGST, split equally), otherwise inter-state
+// (IGST, full amount). Comparison is case/whitespace-insensitive
+// since state names are free text on both sides.
+sellerState := strings.TrimSpace(strings.ToLower(config.AppConfig.SellerState))
+buyerState := strings.TrimSpace(strings.ToLower(order.Address.State))
+isInterState := sellerState != "" && buyerState != "" && sellerState != buyerState
+
+totalTaxable := 0.0
+totalGST := 0.0
+type gstLine struct {
+percent float64
+amount  float64
+}
+itemGST := make([]gstLine, len(order.Items))
+
+for i, item := range order.Items {
+lineTotal := item.Price * float64(item.Quantity)
+gstPercent := item.Product.GSTPercent
+taxableLine := lineTotal
+gstLineAmount := 0.0
+if gstPercent > 0 {
+taxableLine = lineTotal / (1 + gstPercent/100)
+gstLineAmount = lineTotal - taxableLine
+}
+totalTaxable += taxableLine
+totalGST += gstLineAmount
+itemGST[i] = gstLine{percent: gstPercent, amount: gstLineAmount}
+}
+
+cgstAmount := 0.0
+sgstAmount := 0.0
+igstAmount := 0.0
+if isInterState {
+igstAmount = totalGST
+} else {
+cgstAmount = totalGST / 2
+sgstAmount = totalGST / 2
+}
+
 invoice = models.Invoice{
-InvoiceNumber:    invoiceNumber,
-OrderID:          order.ID,
-CustomerName:     order.Address.FullName,
-CustomerPhone:    order.Address.Phone,
-AddressLine1:     order.Address.Line1,
-AddressLine2:     order.Address.Line2,
-AddressCity:      order.Address.City,
-AddressState:     order.Address.State,
-AddressPincode:   order.Address.Pincode,
-ItemsAmount:      order.ItemsAmount,
-DiscountAmount:   discountAmount,
-DeliveryCharge:   order.DeliveryCharge,
-WalletUsed:       order.WalletAmountUsed,
-TotalAmount:      order.TotalAmount,
-PaymentMethod:    order.PaymentMethod,
-PaymentReference: paymentReference,
-GeneratedAt:      time.Now(),
+InvoiceNumber:     invoiceNumber,
+OrderID:           order.ID,
+CustomerName:      order.Address.FullName,
+CustomerPhone:     order.Address.Phone,
+AddressLine1:      order.Address.Line1,
+AddressLine2:      order.Address.Line2,
+AddressCity:       order.Address.City,
+AddressState:      order.Address.State,
+AddressPincode:    order.Address.Pincode,
+ItemsAmount:       order.ItemsAmount,
+DiscountAmount:    discountAmount,
+DeliveryCharge:    order.DeliveryCharge,
+WalletUsed:        order.WalletAmountUsed,
+IsInterState:      isInterState,
+TaxableAmount:     totalTaxable,
+CGSTAmount:        cgstAmount,
+SGSTAmount:        sgstAmount,
+IGSTAmount:        igstAmount,
+TotalAmount:       order.TotalAmount,
+PaymentMethod:     order.PaymentMethod,
+PaymentReference:  paymentReference,
+GeneratedAt:       time.Now(),
 }
 if err := tx.Create(&invoice).Error; err != nil {
 return fmt.Errorf("failed to create invoice: %w", err)
 }
 
-for _, item := range order.Items {
+for i, item := range order.Items {
 invoiceItem := models.InvoiceItem{
 InvoiceID:   invoice.ID,
 ProductID:   item.ProductID,
@@ -134,6 +192,8 @@ ProductName: item.Product.Name,
 SKU:         item.Product.Barcode,
 Quantity:    item.Quantity,
 Price:       item.Price,
+GSTPercent:  itemGST[i].percent,
+GSTAmount:   itemGST[i].amount,
 }
 if err := tx.Create(&invoiceItem).Error; err != nil {
 return fmt.Errorf("failed to create invoice item: %w", err)

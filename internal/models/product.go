@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import (
 	"time"
@@ -11,6 +11,7 @@ type Product struct {
 	Name        string     `gorm:"not null;index" json:"name"`
 	Description string     `json:"description"`
 	Price       float64    `gorm:"not null;index" json:"price"`
+	GSTPercent  float64    `gorm:"not null;default:0" json:"gst_percent"`
 	ImageURL    string     `json:"image_url"`
 Barcode     string     `gorm:"index" json:"barcode,omitempty"`
 	CategoryID  uint       `gorm:"index" json:"category_id"`
@@ -22,12 +23,13 @@ Barcode     string     `gorm:"index" json:"barcode,omitempty"`
 }
 
 // ProductRequest is the body for POST/PUT /admin/products (admin only).
-// Stock is only used on create, to seed the product's Inventory row ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+// Stock is only used on create, to seed the product's Inventory row Ã¢â‚¬â€
 // use PUT /admin/products/:id/inventory to adjust stock afterwards.
 type ProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
+	GSTPercent  float64 `json:"gst_percent" binding:"gte=0,lte=100"`
 	ImageURL    string  `json:"image_url"`
 	CategoryID  uint    `json:"category_id" binding:"required"`
 	Stock       int     `json:"stock" binding:"gte=0"`

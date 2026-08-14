@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "bytes"
@@ -19,11 +19,12 @@ import (
 // with HSN/GST columns, totals, and an "Order Delivered From" +
 // "E-commerce Platform Info" footer.
 //
-// GST/CGST/SGST columns are always printed as 0.00 - this project has no
-// tax calculation configured anywhere in the order flow, so showing a
-// non-zero rate would be fabricated. HSN is left blank per item since the
-// product catalog has no HSN field. Both are safe to wire up for real once
-// that data exists - don't invent it here.
+// GST is calculated per line item from each product's GSTPercent
+// (treated as already included in Price/MRP) and split into CGST+SGST
+// for intra-state orders or IGST for inter-state orders, based on
+// invoice.IsInterState (set at generation time by comparing the
+// delivery address state against the seller's registered state). HSN is
+// left blank per item since the product catalog has no HSN field.
 //
 // warehouseAddress is the "Order Delivered From" address - passed in
 // separately since Invoice doesn't snapshot the warehouse (only the
@@ -40,13 +41,13 @@ pdf.SetMargins(12, 12, 12)
 // warehouse or delivery staff quickly verify the invoice against the
 // order without typing anything. Placed top-right so it doesn't
 // interfere with the seller/address text on the left.
-	qrContent := fmt.Sprintf("Invoice: %s\nOrder: #%d\nAmount: Rs.%.2f", invoice.InvoiceNumber, invoice.OrderID, invoice.TotalAmount)
-	if qrPNG, err := qrcode.Encode(qrContent, qrcode.Medium, 256); err == nil {
-		qrReader := bytes.NewReader(qrPNG)
-		opts := gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
-		pdf.RegisterImageOptionsReader("invoice_qr", opts, qrReader)
-		pdf.ImageOptions("invoice_qr", 170, 12, 26, 26, false, opts, 0, "")
-	}
+qrContent := fmt.Sprintf("Invoice: %s\nOrder: #%d\nAmount: Rs.%.2f", invoice.InvoiceNumber, invoice.OrderID, invoice.TotalAmount)
+if qrPNG, err := qrcode.Encode(qrContent, qrcode.Medium, 256); err == nil {
+qrReader := bytes.NewReader(qrPNG)
+opts := gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
+pdf.RegisterImageOptionsReader("invoice_qr", opts, qrReader)
+pdf.ImageOptions("invoice_qr", 170, 12, 26, 26, false, opts, 0, "")
+}
 
 // ---- Seller header ----
 pdf.SetFont("Arial", "B", 12)
@@ -86,6 +87,11 @@ pdf.CellFormat(0, 5, "Date : "+invoice.GeneratedAt.Format("02-01-2006"), "", 1, 
 if invoice.PaymentReference != "" {
 pdf.CellFormat(0, 5, "Payment Reference: "+invoice.PaymentReference, "", 1, "L", false, 0, "")
 }
+taxType := "CGST + SGST (Intra-State)"
+if invoice.IsInterState {
+taxType = "IGST (Inter-State)"
+}
+pdf.CellFormat(0, 5, "Tax Type: "+taxType, "", 1, "L", false, 0, "")
 pdf.Ln(2)
 pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
 pdf.Ln(3)
@@ -116,8 +122,14 @@ pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
 pdf.Ln(3)
 
 // ---- Items table ----
-colW := []float64{8, 47, 16, 10, 8, 18, 16, 12, 10, 12, 9, 20}
-headers := []string{"SR\nNo", "Item &\nDescription", "Unit\nMRP/RSP", "HSN", "Qty", "Product\nRate", "Disc.", "Taxable\nAmt.", "CGST", "S/UT\nGST", "GST\nAmt.", "Total\nAmt."}
+colW := []float64{8, 45, 15, 10, 8, 16, 16, 10, 10, 10, 10, 20}
+taxCol1Header := "CGST"
+taxCol2Header := "S/UT\nGST"
+if invoice.IsInterState {
+taxCol1Header = "IGST"
+taxCol2Header = "-"
+}
+headers := []string{"SR\nNo", "Item &\nDescription", "Unit\nMRP/RSP", "HSN", "Qty", "Product\nRate", "Taxable\nAmt.", taxCol1Header, taxCol2Header, "GST\n%", "GST\nAmt.", "Total\nAmt."}
 
 pdf.SetFont("Arial", "B", 6.5)
 pdf.SetFillColor(235, 235, 235)
@@ -129,10 +141,26 @@ pdf.MultiCell(colW[i], 3.5, h, "1", "C", true)
 pdf.SetXY(12, headerY+7)
 
 pdf.SetFont("Arial", "", 7.5)
-itemsTotal := 0.0
+taxableTotal := 0.0
+gstTotal := 0.0
+grandTotal := 0.0
 for i, item := range invoice.Items {
 lineTotal := item.Price * float64(item.Quantity)
-itemsTotal += lineTotal
+taxableLine := lineTotal - item.GSTAmount
+taxableTotal += taxableLine
+gstTotal += item.GSTAmount
+grandTotal += lineTotal
+
+cgstDisplay := "-"
+sgstDisplay := "-"
+if invoice.IsInterState {
+cgstDisplay = fmt.Sprintf("%.2f", item.GSTAmount)
+} else {
+half := item.GSTAmount / 2
+cgstDisplay = fmt.Sprintf("%.2f", half)
+sgstDisplay = fmt.Sprintf("%.2f", half)
+}
+
 rowY := pdf.GetY()
 hsn := item.SKU
 if hsn == "" {
@@ -145,14 +173,14 @@ fmt.Sprintf("%.2f", item.Price),
 hsn,
 fmt.Sprintf("%d", item.Quantity),
 fmt.Sprintf("%.2f", item.Price),
-"0.00%",
-fmt.Sprintf("%.2f", lineTotal),
-"0.00%",
-"0.00%",
-"0.00",
+fmt.Sprintf("%.2f", taxableLine),
+cgstDisplay,
+sgstDisplay,
+fmt.Sprintf("%.1f%%", item.GSTPercent),
+fmt.Sprintf("%.2f", item.GSTAmount),
 fmt.Sprintf("%.2f", lineTotal),
 }
-aligns := []string{"C", "L", "R", "C", "C", "R", "C", "R", "C", "C", "R", "R"}
+aligns := []string{"C", "L", "R", "C", "C", "R", "R", "R", "R", "C", "R", "R"}
 maxH := 5.0
 for j, v := range values {
 pdf.SetXY(pdf.GetX(), rowY)
@@ -165,18 +193,33 @@ pdf.SetXY(12, rowY+maxH)
 // Item Total row inside the table
 totalRowY := pdf.GetY()
 pdf.SetFont("Arial", "B", 7.5)
-pdf.SetXY(sumWidths(colW[:7])+12, totalRowY)
-pdf.CellFormat(colW[7], 5, fmt.Sprintf("%.2f", itemsTotal), "1", 0, "R", false, 0, "")
+pdf.SetXY(sumWidths(colW[:6])+12, totalRowY)
+pdf.CellFormat(colW[6], 5, fmt.Sprintf("%.2f", taxableTotal), "1", 0, "R", false, 0, "")
+pdf.CellFormat(colW[7], 5, "", "1", 0, "C", false, 0, "")
 pdf.CellFormat(colW[8], 5, "", "1", 0, "C", false, 0, "")
 pdf.CellFormat(colW[9], 5, "", "1", 0, "C", false, 0, "")
-pdf.CellFormat(colW[10], 5, "0.00", "1", 0, "R", false, 0, "")
-pdf.CellFormat(colW[11], 5, fmt.Sprintf("%.2f", itemsTotal), "1", 1, "R", false, 0, "")
+pdf.CellFormat(colW[10], 5, fmt.Sprintf("%.2f", gstTotal), "1", 0, "R", false, 0, "")
+pdf.CellFormat(colW[11], 5, fmt.Sprintf("%.2f", grandTotal), "1", 1, "R", false, 0, "")
 pdf.SetX(12)
 pdf.Ln(4)
 
 // ---- Item Total / Invoice Value ----
 pdf.SetFont("Arial", "B", 9)
-pdf.CellFormat(150, 5, "Item Total", "", 0, "L", false, 0, "")
+pdf.CellFormat(150, 5, "Taxable Value", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.TaxableAmount), "", 1, "R", false, 0, "")
+if invoice.IsInterState {
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "IGST", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.IGSTAmount), "", 1, "R", false, 0, "")
+} else {
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "CGST", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.CGSTAmount), "", 1, "R", false, 0, "")
+pdf.CellFormat(150, 5, "SGST", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.SGSTAmount), "", 1, "R", false, 0, "")
+}
+pdf.SetFont("Arial", "B", 9)
+pdf.CellFormat(150, 5, "Item Total (incl. GST)", "", 0, "L", false, 0, "")
 pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.ItemsAmount), "", 1, "R", false, 0, "")
 if invoice.DiscountAmount > 0 {
 pdf.SetFont("Arial", "", 9)
@@ -297,10 +340,10 @@ return
 database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice)
 }
 warehouse := models.Warehouse{}
-	if order.Warehouse != nil {
-		warehouse = *order.Warehouse
-	}
-	servePDF(c, invoice, warehouse)
+if order.Warehouse != nil {
+warehouse = *order.Warehouse
+}
+servePDF(c, invoice, warehouse)
 }
 
 // GetWarehouseOrderInvoicePDF godoc
@@ -321,10 +364,10 @@ c.JSON(http.StatusNotFound, gin.H{"error": "No invoice found for this order yet"
 return
 }
 warehouse := models.Warehouse{}
-	if order.Warehouse != nil {
-		warehouse = *order.Warehouse
-	}
-	servePDF(c, invoice, warehouse)
+if order.Warehouse != nil {
+warehouse = *order.Warehouse
+}
+servePDF(c, invoice, warehouse)
 }
 
 // GetAdminInvoicePDF godoc
@@ -342,8 +385,8 @@ var order models.Order
 database.DB.Preload("Warehouse").First(&order, invoice.OrderID)
 
 warehouse := models.Warehouse{}
-	if order.Warehouse != nil {
-		warehouse = *order.Warehouse
-	}
-	servePDF(c, invoice, warehouse)
+if order.Warehouse != nil {
+warehouse = *order.Warehouse
+}
+servePDF(c, invoice, warehouse)
 }

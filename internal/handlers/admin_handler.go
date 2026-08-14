@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"fmt"
@@ -129,6 +129,7 @@ func CreateProduct(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
+		GSTPercent:  req.GSTPercent,
 		ImageURL:    req.ImageURL,
 		CategoryID:  req.CategoryID,
 	}
@@ -187,6 +188,7 @@ func UpdateProduct(c *gin.Context) {
 	product.Name = req.Name
 	product.Description = req.Description
 	product.Price = req.Price
+	product.GSTPercent = req.GSTPercent
 	product.ImageURL = req.ImageURL
 	product.CategoryID = req.CategoryID
 
