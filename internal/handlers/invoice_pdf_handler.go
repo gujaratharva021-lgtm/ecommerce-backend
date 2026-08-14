@@ -5,109 +5,217 @@ import (
 "net/http"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/jung-kurt/gofpdf"
 )
 
-// Static seller/company details shown on every invoice PDF. There's no
-// company-settings table in this project, so these are constants rather
-// than an invented per-invoice value - update them to the real business
-// details before shipping this to production.
-const (
-sellerName    = "QuickCommerce Pvt Ltd"
-sellerAddress = "Registered Office Address, City, State, PIN"
-sellerGSTIN   = "" // leave blank if not GST-registered; do not fabricate one
-)
+// buildInvoicePDF renders a GST-style tax invoice matching the standard
+// marketplace invoice layout: seller header, Bill To/Ship To, item table
+// with HSN/GST columns, totals, and an "Order Delivered From" +
+// "E-commerce Platform Info" footer.
+//
+// GST/CGST/SGST columns are always printed as 0.00 - this project has no
+// tax calculation configured anywhere in the order flow, so showing a
+// non-zero rate would be fabricated. HSN is left blank per item since the
+// product catalog has no HSN field. Both are safe to wire up for real once
+// that data exists - don't invent it here.
+//
+// warehouseAddress is the "Order Delivered From" address - passed in
+// separately since Invoice doesn't snapshot the warehouse (only the
+// customer's delivery address), and warehouse address can differ from
+// order to order.
+func buildInvoicePDF(invoice models.Invoice, warehouse models.Warehouse) ([]byte, error) {
+cfg := config.AppConfig
 
-// buildInvoicePDF renders the invoice exactly as stored - it must never
-// compute or display a figure that isn't already on the Invoice/InvoiceItem
-// rows, since those are the legal record. No tax line is printed: this
-// project has no tax/GST calculation anywhere in the order flow, so
-// inventing a rate here would make the PDF wrong, not more complete.
-func buildInvoicePDF(invoice models.Invoice) ([]byte, error) {
 pdf := gofpdf.New("P", "mm", "A4", "")
 pdf.AddPage()
-pdf.SetFont("Arial", "B", 16)
-pdf.Cell(0, 10, "TAX INVOICE")
-pdf.Ln(12)
+pdf.SetMargins(12, 12, 12)
 
-pdf.SetFont("Arial", "B", 11)
-pdf.Cell(0, 6, sellerName)
-pdf.Ln(6)
+// ---- Seller header ----
+pdf.SetFont("Arial", "B", 12)
+pdf.CellFormat(150, 6, "Seller Name: "+cfg.SellerCompanyName, "", 1, "L", false, 0, "")
 pdf.SetFont("Arial", "", 9)
-pdf.Cell(0, 5, sellerAddress)
-pdf.Ln(5)
-if sellerGSTIN != "" {
-pdf.Cell(0, 5, "GSTIN: "+sellerGSTIN)
-pdf.Ln(5)
+pdf.CellFormat(150, 5, cfg.SellerAddress, "", 1, "L", false, 0, "")
+pdf.SetFont("Arial", "B", 9)
+if cfg.SellerGSTIN != "" {
+pdf.CellFormat(0, 5, "GSTIN: "+cfg.SellerGSTIN, "", 1, "L", false, 0, "")
 }
-pdf.Ln(4)
+if cfg.SellerFSSAINumber != "" {
+pdf.CellFormat(0, 5, "FSSAI: "+cfg.SellerFSSAINumber, "", 1, "L", false, 0, "")
+}
+pdf.Ln(2)
+pdf.SetDrawColor(0, 0, 0)
+pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
+pdf.Ln(3)
 
-pdf.SetFont("Arial", "B", 10)
-pdf.CellFormat(95, 6, "Invoice Number: "+invoice.InvoiceNumber, "", 0, "L", false, 0, "")
-pdf.CellFormat(95, 6, "Invoice Date: "+invoice.GeneratedAt.Format("02 Jan 2006"), "", 1, "L", false, 0, "")
-pdf.CellFormat(95, 6, fmt.Sprintf("Order ID: #%d", invoice.OrderID), "", 0, "L", false, 0, "")
-pdf.CellFormat(95, 6, "Payment Method: "+invoice.PaymentMethod, "", 1, "L", false, 0, "")
-pdf.Ln(6)
+// ---- Title ----
+pdf.SetFont("Arial", "B", 12)
+pdf.CellFormat(0, 7, "TAX INVOICE / BILL OF SUPPLY", "", 1, "C", false, 0, "")
+pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
+pdf.Ln(3)
 
-pdf.SetFont("Arial", "B", 10)
-pdf.Cell(0, 6, "Bill To")
-pdf.Ln(6)
+// ---- Invoice meta row ----
 pdf.SetFont("Arial", "", 9)
-pdf.Cell(0, 5, invoice.CustomerName)
-pdf.Ln(5)
-pdf.Cell(0, 5, invoice.CustomerPhone)
-pdf.Ln(5)
+metaY := pdf.GetY()
+pdf.CellFormat(95, 5, "Invoice No.: "+invoice.InvoiceNumber, "", 0, "L", false, 0, "")
+placeOfSupply := invoice.AddressState
+if placeOfSupply == "" {
+placeOfSupply = "-"
+}
+pdf.CellFormat(0, 5, "Place Of Supply : "+placeOfSupply, "", 1, "L", false, 0, "")
+pdf.SetXY(12, metaY+5)
+pdf.CellFormat(95, 5, fmt.Sprintf("Order No.: %d", invoice.OrderID), "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, "Date : "+invoice.GeneratedAt.Format("02-01-2006"), "", 1, "L", false, 0, "")
+if invoice.PaymentReference != "" {
+pdf.CellFormat(0, 5, "Payment Reference: "+invoice.PaymentReference, "", 1, "L", false, 0, "")
+}
+pdf.Ln(2)
+pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
+pdf.Ln(3)
+
+// ---- Bill To / Ship To ----
+billShipY := pdf.GetY()
 addressLine := invoice.AddressLine1
 if invoice.AddressLine2 != "" {
 addressLine += ", " + invoice.AddressLine2
 }
-pdf.MultiCell(0, 5, addressLine, "", "L", false)
-pdf.Cell(0, 5, fmt.Sprintf("%s, %s - %s", invoice.AddressCity, invoice.AddressState, invoice.AddressPincode))
-pdf.Ln(10)
+cityLine := fmt.Sprintf("%s, %s, %s", invoice.AddressCity, invoice.AddressState, invoice.AddressPincode)
 
-// Items table
 pdf.SetFont("Arial", "B", 9)
-pdf.SetFillColor(230, 230, 230)
-pdf.CellFormat(90, 7, "Item", "1", 0, "L", true, 0, "")
-pdf.CellFormat(25, 7, "Qty", "1", 0, "C", true, 0, "")
-pdf.CellFormat(35, 7, "Unit Price", "1", 0, "R", true, 0, "")
-pdf.CellFormat(40, 7, "Line Total", "1", 1, "R", true, 0, "")
-
+pdf.CellFormat(93, 5, "Bill To", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, "Ship To", "", 1, "L", false, 0, "")
 pdf.SetFont("Arial", "", 9)
-for _, item := range invoice.Items {
+pdf.SetXY(12, billShipY+5)
+pdf.CellFormat(93, 5, invoice.CustomerName, "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, invoice.CustomerName, "", 1, "L", false, 0, "")
+pdf.SetXY(12, billShipY+10)
+pdf.CellFormat(93, 5, addressLine, "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, addressLine, "", 1, "L", false, 0, "")
+pdf.SetXY(12, billShipY+15)
+pdf.CellFormat(93, 5, cityLine, "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, cityLine, "", 1, "L", false, 0, "")
+pdf.Ln(2)
+pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
+pdf.Ln(3)
+
+// ---- Items table ----
+colW := []float64{8, 47, 16, 10, 8, 18, 16, 12, 10, 12, 9, 20}
+headers := []string{"SR\nNo", "Item &\nDescription", "Unit\nMRP/RSP", "HSN", "Qty", "Product\nRate", "Disc.", "Taxable\nAmt.", "CGST", "S/UT\nGST", "GST\nAmt.", "Total\nAmt."}
+
+pdf.SetFont("Arial", "B", 6.5)
+pdf.SetFillColor(235, 235, 235)
+headerY := pdf.GetY()
+for i, h := range headers {
+pdf.SetXY(pdf.GetX(), headerY)
+pdf.MultiCell(colW[i], 3.5, h, "1", "C", true)
+pdf.SetXY(pdf.GetX()+colW[i], headerY)
+}
+pdf.SetXY(12, headerY+7)
+
+pdf.SetFont("Arial", "", 7.5)
+itemsTotal := 0.0
+for i, item := range invoice.Items {
 lineTotal := item.Price * float64(item.Quantity)
-pdf.CellFormat(90, 7, item.ProductName, "1", 0, "L", false, 0, "")
-pdf.CellFormat(25, 7, fmt.Sprintf("%d", item.Quantity), "1", 0, "C", false, 0, "")
-pdf.CellFormat(35, 7, fmt.Sprintf("%.2f", item.Price), "1", 0, "R", false, 0, "")
-pdf.CellFormat(40, 7, fmt.Sprintf("%.2f", lineTotal), "1", 1, "R", false, 0, "")
+itemsTotal += lineTotal
+rowY := pdf.GetY()
+hsn := item.SKU
+if hsn == "" {
+hsn = "-"
 }
-pdf.Ln(6)
+values := []string{
+fmt.Sprintf("%d", i+1),
+item.ProductName,
+fmt.Sprintf("%.2f", item.Price),
+hsn,
+fmt.Sprintf("%d", item.Quantity),
+fmt.Sprintf("%.2f", item.Price),
+"0.00%",
+fmt.Sprintf("%.2f", lineTotal),
+"0.00%",
+"0.00%",
+"0.00",
+fmt.Sprintf("%.2f", lineTotal),
+}
+aligns := []string{"C", "L", "R", "C", "C", "R", "C", "R", "C", "C", "R", "R"}
+maxH := 5.0
+for j, v := range values {
+pdf.SetXY(pdf.GetX(), rowY)
+pdf.MultiCell(colW[j], maxH, v, "1", aligns[j], false)
+pdf.SetXY(sumWidths(colW[:j+1])+12, rowY)
+}
+pdf.SetXY(12, rowY+maxH)
+}
 
-// Totals - mirrors exactly what's stored, no recomputation.
-totalsX := 120.0
-rowH := 6.0
-printTotalRow := func(label string, value float64, bold bool) {
-pdf.SetX(totalsX)
-if bold {
-pdf.SetFont("Arial", "B", 10)
-} else {
-pdf.SetFont("Arial", "", 9)
-}
-pdf.CellFormat(45, rowH, label, "", 0, "L", false, 0, "")
-pdf.CellFormat(30, rowH, fmt.Sprintf("%.2f", value), "", 1, "R", false, 0, "")
-}
-printTotalRow("Subtotal", invoice.ItemsAmount, false)
+// Item Total row inside the table
+totalRowY := pdf.GetY()
+pdf.SetFont("Arial", "B", 7.5)
+pdf.SetXY(sumWidths(colW[:7])+12, totalRowY)
+pdf.CellFormat(colW[7], 5, fmt.Sprintf("%.2f", itemsTotal), "1", 0, "R", false, 0, "")
+pdf.CellFormat(colW[8], 5, "", "1", 0, "C", false, 0, "")
+pdf.CellFormat(colW[9], 5, "", "1", 0, "C", false, 0, "")
+pdf.CellFormat(colW[10], 5, "0.00", "1", 0, "R", false, 0, "")
+pdf.CellFormat(colW[11], 5, fmt.Sprintf("%.2f", itemsTotal), "1", 1, "R", false, 0, "")
+pdf.SetX(12)
+pdf.Ln(4)
+
+// ---- Item Total / Invoice Value ----
+pdf.SetFont("Arial", "B", 9)
+pdf.CellFormat(150, 5, "Item Total", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.ItemsAmount), "", 1, "R", false, 0, "")
 if invoice.DiscountAmount > 0 {
-printTotalRow("Discount", -invoice.DiscountAmount, false)
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "Discount", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("-%.2f", invoice.DiscountAmount), "", 1, "R", false, 0, "")
 }
-printTotalRow("Delivery Charge", invoice.DeliveryCharge, false)
+if invoice.DeliveryCharge > 0 {
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "Delivery Charge", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.DeliveryCharge), "", 1, "R", false, 0, "")
+}
 if invoice.WalletUsed > 0 {
-printTotalRow("Wallet Used", -invoice.WalletUsed, false)
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "Wallet Used", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("-%.2f", invoice.WalletUsed), "", 1, "R", false, 0, "")
 }
-printTotalRow("Grand Total", invoice.TotalAmount, true)
+pdf.SetFont("Arial", "B", 10)
+pdf.CellFormat(150, 6, "Invoice Value", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 6, fmt.Sprintf("%.2f", invoice.TotalAmount), "", 1, "R", false, 0, "")
+pdf.Ln(3)
+
+pdf.SetFont("Arial", "", 7.5)
+pdf.CellFormat(0, 4, "Whether GST is payable on reverse-charge - No.", "", 1, "L", false, 0, "")
+pdf.CellFormat(0, 4, "For IMEI / Serial number information, please refer to packaging / warranty slip.", "", 1, "L", false, 0, "")
+pdf.Ln(3)
+pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
+pdf.Ln(3)
+
+// ---- Footer: Order Delivered From / E-commerce Platform Info ----
+footerY := pdf.GetY()
+pdf.SetFont("Arial", "B", 8)
+pdf.CellFormat(93, 4, "Order Delivered From -", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 4, "E-commerce Platform (FBO) Information -", "", 1, "L", false, 0, "")
+pdf.SetFont("Arial", "", 8)
+pdf.SetXY(12, footerY+4)
+pdf.CellFormat(93, 4, warehouse.Name, "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 4, cfg.SellerCompanyName, "", 1, "L", false, 0, "")
+pdf.SetXY(12, footerY+8)
+pdf.MultiCell(90, 4, warehouse.Address, "", "L", false)
+pdf.SetXY(105, footerY+8)
+pdf.MultiCell(90, 4, cfg.SellerAddress, "", "L", false)
+fssaiY := pdf.GetY()
+if fssaiY < footerY+16 {
+fssaiY = footerY + 16
+}
+pdf.SetXY(12, fssaiY)
+pdf.CellFormat(93, 4, "FSSAI: "+valueOrDash(cfg.SellerFSSAINumber), "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 4, "FSSAI Lic. No.: "+valueOrDash(cfg.SellerFSSAINumber), "", 1, "L", false, 0, "")
+pdf.SetXY(105, fssaiY+4)
+if cfg.SellerEmail != "" {
+pdf.CellFormat(0, 4, "Email: "+cfg.SellerEmail, "", 1, "L", false, 0, "")
+}
 
 var buf []byte
 w := &pdfBufferWriter{}
@@ -116,6 +224,21 @@ return nil, err
 }
 buf = w.buf
 return buf, nil
+}
+
+func sumWidths(widths []float64) float64 {
+total := 0.0
+for _, w := range widths {
+total += w
+}
+return total
+}
+
+func valueOrDash(v string) string {
+if v == "" {
+return "-"
+}
+return v
 }
 
 // pdfBufferWriter is a minimal io.Writer that gofpdf writes the finished
@@ -128,8 +251,8 @@ w.buf = append(w.buf, p...)
 return len(p), nil
 }
 
-func servePDF(c *gin.Context, invoice models.Invoice) {
-pdfBytes, err := buildInvoicePDF(invoice)
+func servePDF(c *gin.Context, invoice models.Invoice, warehouse models.Warehouse) {
+pdfBytes, err := buildInvoicePDF(invoice, warehouse)
 if err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate invoice PDF"})
 return
@@ -146,7 +269,7 @@ userID := c.MustGet("user_id").(uint)
 orderID := c.Param("id")
 
 var order models.Order
-if err := database.DB.Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+if err := database.DB.Preload("Warehouse").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 return
 }
@@ -160,7 +283,7 @@ return
 }
 database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice)
 }
-servePDF(c, invoice)
+servePDF(c, invoice, order.Warehouse)
 }
 
 // GetWarehouseOrderInvoicePDF godoc
@@ -170,7 +293,7 @@ warehouseID := c.MustGet("warehouse_id").(uint)
 orderID := c.Param("id")
 
 var order models.Order
-if err := database.DB.Where("warehouse_id = ?", warehouseID).First(&order, orderID).Error; err != nil {
+if err := database.DB.Preload("Warehouse").Where("warehouse_id = ?", warehouseID).First(&order, orderID).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Order not found for your warehouse"})
 return
 }
@@ -180,7 +303,7 @@ if err := database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&in
 c.JSON(http.StatusNotFound, gin.H{"error": "No invoice found for this order yet"})
 return
 }
-servePDF(c, invoice)
+servePDF(c, invoice, order.Warehouse)
 }
 
 // GetAdminInvoicePDF godoc
@@ -193,5 +316,9 @@ if err := database.DB.Preload("Items").First(&invoice, id).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Invoice not found"})
 return
 }
-servePDF(c, invoice)
+
+var order models.Order
+database.DB.Preload("Warehouse").First(&order, invoice.OrderID)
+
+servePDF(c, invoice, order.Warehouse)
 }

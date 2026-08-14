@@ -6,10 +6,30 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
+
+// sellerDetails returns the configured seller/business details for
+// display on invoices - every field is env-configured (see
+// internal/config/config.go), never invented. A blank config field is
+// passed through as blank rather than substituted with a placeholder, so
+// the frontend/PDF can show "Not configured" instead of fake data.
+func sellerDetails() gin.H {
+cfg := config.AppConfig
+return gin.H{
+"company_name":   cfg.SellerCompanyName,
+"address":        cfg.SellerAddress,
+"gstin":          cfg.SellerGSTIN,
+"contact_number": cfg.SellerContactNumber,
+"email":          cfg.SellerEmail,
+"state":          cfg.SellerState,
+"state_code":     cfg.SellerStateCode,
+"fssai_number":   cfg.SellerFSSAINumber,
+}
+}
 
 // invoiceResponse is the shared read-only shape returned to every caller
 // (customer, warehouse, admin) - same fields regardless of role, since an
@@ -17,25 +37,33 @@ import (
 // of them once they're authorized to see it at all.
 func invoiceResponse(invoice models.Invoice, orderStatus, paymentStatus string) gin.H {
 return gin.H{
-"invoice_number":  invoice.InvoiceNumber,
-"order_id":        invoice.OrderID,
-"order_status":    orderStatus,
-"customer_name":   invoice.CustomerName,
-"customer_phone":  invoice.CustomerPhone,
-"address_line1":   invoice.AddressLine1,
-"address_line2":   invoice.AddressLine2,
-"address_city":    invoice.AddressCity,
-"address_state":   invoice.AddressState,
-"address_pincode": invoice.AddressPincode,
-"items_amount":    invoice.ItemsAmount,
-"discount_amount": invoice.DiscountAmount,
-"delivery_charge": invoice.DeliveryCharge,
-"wallet_used":     invoice.WalletUsed,
-"total_amount":    invoice.TotalAmount,
-"payment_method":  invoice.PaymentMethod,
-"payment_status":  paymentStatus,
-"generated_at":    invoice.GeneratedAt,
-"items":           invoice.Items,
+"invoice_number":    invoice.InvoiceNumber,
+"order_id":          invoice.OrderID,
+"order_status":      orderStatus,
+"customer_name":     invoice.CustomerName,
+"customer_phone":    invoice.CustomerPhone,
+"address_line1":     invoice.AddressLine1,
+"address_line2":     invoice.AddressLine2,
+"address_city":      invoice.AddressCity,
+"address_state":     invoice.AddressState,
+"address_pincode":   invoice.AddressPincode,
+"place_of_supply":   invoice.AddressState,
+"items_amount":      invoice.ItemsAmount,
+"discount_amount":   invoice.DiscountAmount,
+"delivery_charge":   invoice.DeliveryCharge,
+"wallet_used":       invoice.WalletUsed,
+"total_amount":      invoice.TotalAmount,
+"payment_method":    invoice.PaymentMethod,
+"payment_reference": invoice.PaymentReference,
+"payment_status":    paymentStatus,
+"generated_at":      invoice.GeneratedAt,
+"items":             invoice.Items,
+"seller":            sellerDetails(),
+// This project has no tax/GST calculation configured anywhere in the
+// order flow, so no tax line is computed or shown - reported honestly
+// rather than inventing a rate. Set up real tax logic before this can
+// say anything else here.
+"tax_status": "Configuration required - no GST/tax rate is configured for this store",
 }
 }
 
