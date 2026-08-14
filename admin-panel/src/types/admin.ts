@@ -470,3 +470,85 @@ export interface DashboardOverview {
   stats: DashboardStats
   charts: DashboardCharts
 }
+
+export interface InvoiceItem {
+  id: number
+  invoice_id: number
+  product_id: number
+  product_name: string
+  sku?: string
+  quantity: number
+  price: number
+}
+
+export interface InvoiceSeller {
+  company_name: string
+  address: string
+  gstin: string
+  contact_number: string
+  email: string
+  state: string
+  state_code: string
+  fssai_number: string
+}
+
+export interface AdminInvoice {
+  id?: number
+  invoice_number: string
+  order_id: number
+  order_status: string
+  customer_name: string
+  customer_phone: string
+  address_line1: string
+  address_line2?: string
+  address_city: string
+  address_state: string
+  address_pincode: string
+  place_of_supply: string
+  items_amount: number
+  discount_amount: number
+  delivery_charge: number
+  wallet_used: number
+  total_amount: number
+  payment_method: string
+  payment_reference?: string
+  payment_status: string
+  generated_at: string
+  items: InvoiceItem[]
+  seller: InvoiceSeller
+  tax_status: string
+}
+
+export interface AdminInvoiceListResponse {
+  invoices: AdminInvoiceListItem[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+// Shape returned by GET /admin/invoices (search/list) - raw DB rows,
+// different from AdminInvoice (which is the formatted GET /admin/invoices/:id
+// detail shape). Notably this has wallet_amount_used, not wallet_used, and
+// no order_status/seller/tax_status since those are computed only for detail view.
+export interface AdminInvoiceListItem {
+  id: number
+  invoice_number: string
+  order_id: number
+  customer_name: string
+  customer_phone: string
+  address_line1: string
+  address_line2?: string
+  address_city: string
+  address_state: string
+  address_pincode: string
+  items_amount: number
+  discount_amount: number
+  delivery_charge: number
+  wallet_amount_used: number
+  total_amount: number
+  payment_method: string
+  payment_reference?: string
+  generated_at: string
+  created_at: string
+}
