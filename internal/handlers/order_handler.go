@@ -2,6 +2,7 @@
 
 import (
 "errors"
+"log"
 "net/http"
 "strconv"
 
@@ -260,6 +261,14 @@ if order.WarehouseID != nil {
 services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyNewOrder,
 "New order #"+strconv.Itoa(int(order.ID)),
 "A new order has been confirmed and is ready to accept.", &order.ID, nil)
+}
+// COD orders are billable immediately - no separate payment-confirmation
+// step is coming, so the invoice must be generated here rather than
+// waiting for something that will never happen for COD.
+if order.PaymentMethod == models.PaymentMethodCOD {
+if _, err := services.GenerateInvoiceIfNotExists(order.ID); err != nil {
+log.Printf("failed to generate invoice for COD order %d: %v", order.ID, err)
+}
 }
 }
 

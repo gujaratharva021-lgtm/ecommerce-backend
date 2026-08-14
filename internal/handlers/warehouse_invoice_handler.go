@@ -95,8 +95,15 @@ return
 
 var invoice models.Invoice
 if err := database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice).Error; err != nil {
+// Invoice generation is triggered at Checkout (COD) / VerifyPayment
+// (online), so a missing invoice here is unexpected - self-heal by
+// generating on demand instead of leaving the customer stuck.
+generated, genErr := services.GenerateInvoiceIfNotExists(order.ID)
+if genErr != nil || generated == nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "No invoice found for this order yet"})
 return
+}
+database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice)
 }
 
 c.JSON(http.StatusOK, invoiceResponse(invoice, order.Status, order.PaymentStatus))

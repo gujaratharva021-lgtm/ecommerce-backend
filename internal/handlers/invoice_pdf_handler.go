@@ -7,6 +7,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/jung-kurt/gofpdf"
 )
 
@@ -152,8 +153,12 @@ return
 
 var invoice models.Invoice
 if err := database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice).Error; err != nil {
+generated, genErr := services.GenerateInvoiceIfNotExists(order.ID)
+if genErr != nil || generated == nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "No invoice found for this order yet"})
 return
+}
+database.DB.Where("order_id = ?", order.ID).Preload("Items").First(&invoice)
 }
 servePDF(c, invoice)
 }
