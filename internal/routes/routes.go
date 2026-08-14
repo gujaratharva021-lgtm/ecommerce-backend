@@ -1,4 +1,4 @@
-﻿package routes
+package routes
 
 import (
 	"time"
@@ -364,6 +364,11 @@ adminOffers := admin.Group("/offers")
 				adminAnalytics.GET("/products", handlers.GetProductPerformance)
 				adminAnalytics.GET("/dashboard", handlers.GetDashboardOverview)
 			}
+            adminReports := admin.Group("/reports")
+            {
+                adminReports.GET("/daily-sales", handlers.GetDailySalesReport)
+                adminReports.GET("/daily-sales/export", handlers.ExportDailySalesReport)
+            }
 
 			adminDeliveryPartners := admin.Group("/delivery-partners")
 			{
