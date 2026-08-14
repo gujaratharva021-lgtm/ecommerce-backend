@@ -6,6 +6,7 @@ import (
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 "gorm.io/gorm"
 "gorm.io/gorm/clause"
 )
@@ -72,6 +73,8 @@ addColumnStatements := []string{
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_city VARCHAR(100) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_state VARCHAR(100) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_pincode VARCHAR(20) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NOT NULL DEFAULT ''`,
 }
 for _, stmt := range addColumnStatements {
 if err := tx.Exec(stmt).Error; err != nil {
@@ -90,23 +93,34 @@ if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == n
 discountAmount = orderCoupon.DiscountAmount
 }
 
+// Gateway transaction reference for online payments only - COD has no
+// gateway leg, so this stays blank rather than a fabricated value.
+paymentReference := ""
+if order.PaymentMethod == models.PaymentMethodOnline {
+var payment models.Payment
+if err := tx.Where("order_id = ?", order.ID).First(&payment).Error; err == nil {
+paymentReference = payment.RazorpayPaymentID
+}
+}
+
 invoice = models.Invoice{
-InvoiceNumber:  invoiceNumber,
-OrderID:        order.ID,
-CustomerName:   order.Address.FullName,
-CustomerPhone:  order.Address.Phone,
-AddressLine1:   order.Address.Line1,
-AddressLine2:   order.Address.Line2,
-AddressCity:    order.Address.City,
-AddressState:   order.Address.State,
-AddressPincode: order.Address.Pincode,
-ItemsAmount:    order.ItemsAmount,
-DiscountAmount: discountAmount,
-DeliveryCharge: order.DeliveryCharge,
-WalletUsed:     order.WalletAmountUsed,
-TotalAmount:    order.TotalAmount,
-PaymentMethod:  order.PaymentMethod,
-GeneratedAt:    time.Now(),
+InvoiceNumber:    invoiceNumber,
+OrderID:          order.ID,
+CustomerName:     order.Address.FullName,
+CustomerPhone:    order.Address.Phone,
+AddressLine1:     order.Address.Line1,
+AddressLine2:     order.Address.Line2,
+AddressCity:      order.Address.City,
+AddressState:     order.Address.State,
+AddressPincode:   order.Address.Pincode,
+ItemsAmount:      order.ItemsAmount,
+DiscountAmount:   discountAmount,
+DeliveryCharge:   order.DeliveryCharge,
+WalletUsed:       order.WalletAmountUsed,
+TotalAmount:      order.TotalAmount,
+PaymentMethod:    order.PaymentMethod,
+PaymentReference: paymentReference,
+GeneratedAt:      time.Now(),
 }
 if err := tx.Create(&invoice).Error; err != nil {
 return fmt.Errorf("failed to create invoice: %w", err)
@@ -117,6 +131,7 @@ invoiceItem := models.InvoiceItem{
 InvoiceID:   invoice.ID,
 ProductID:   item.ProductID,
 ProductName: item.Product.Name,
+SKU:         item.Product.Barcode,
 Quantity:    item.Quantity,
 Price:       item.Price,
 }
@@ -124,6 +139,13 @@ if err := tx.Create(&invoiceItem).Error; err != nil {
 return fmt.Errorf("failed to create invoice item: %w", err)
 }
 }
+
+// System-generated event, not a specific admin/staff action - recorded
+// with admin_id 0 / "system" so it's still visible in the audit trail
+// (spec explicitly asks that invoice generation be logged) without
+// attributing it to a person who didn't trigger it.
+utils.LogAudit(0, "system", "generate_invoice", "invoice", fmt.Sprint(invoice.ID),
+fmt.Sprintf("order_id=%d invoice_number=%s total=%.2f", order.ID, invoiceNumber, order.TotalAmount))
 
 return nil
 })
