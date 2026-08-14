@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getOrder, requestReturn, getOrderTracking } from '../api/orders'
+import { getOrder, requestReturn, getOrderTracking, downloadOrderInvoicePDF } from '../api/orders'
 import { IMAGE_ORIGIN } from '../api/client'
 import type { Order, OrderTracking } from '../types'
 
@@ -14,6 +14,8 @@ export default function OrderDetail() {
   const [message, setMessage] = useState<string | null>(null)
   const [tracking, setTracking] = useState<OrderTracking | null>(null)
   const [isLoadingTracking, setIsLoadingTracking] = useState(false)
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false)
+  const [invoiceError, setInvoiceError] = useState<string | null>(null)
 
   function load() {
     if (!id) return
@@ -40,6 +42,19 @@ export default function OrderDetail() {
   function imageUrl(path: string) {
     if (!path) return ''
     return path.startsWith('http') ? path : `${IMAGE_ORIGIN}${path}`
+  }
+
+  async function handleDownloadInvoice() {
+    if (!order) return
+    setInvoiceError(null)
+    setIsDownloadingInvoice(true)
+    try {
+      await downloadOrderInvoicePDF(order.id)
+    } catch (err: any) {
+      setInvoiceError(err.response?.data?.error ?? 'Invoice is not available yet.')
+    } finally {
+      setIsDownloadingInvoice(false)
+    }
   }
 
   async function handleReturnSubmit(e: React.FormEvent) {
@@ -83,6 +98,19 @@ export default function OrderDetail() {
           year: 'numeric',
         })}
       </p>
+
+      {order.status !== 'pending' && order.status !== 'cancelled' && (
+        <div className="mb-6">
+          <button
+            onClick={handleDownloadInvoice}
+            disabled={isDownloadingInvoice}
+            className="text-sm font-medium text-ink border border-line rounded-lg px-4 py-2 hover:border-ink transition-colors disabled:opacity-50"
+          >
+            {isDownloadingInvoice ? 'Downloading...' : 'Download Invoice (PDF)'}
+          </button>
+          {invoiceError && <p className="text-xs text-clay mt-2">{invoiceError}</p>}
+        </div>
+      )}
 
       <section className="border border-line rounded-xl divide-y divide-line mb-6">
         {order.items?.map((item) => (
