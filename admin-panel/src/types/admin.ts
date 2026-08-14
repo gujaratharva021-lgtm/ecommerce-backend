@@ -5,6 +5,7 @@
   price: number
   category_id: number
   image_url?: string
+  barcode?: string
   created_at?: string
   inventories?: { id: number; warehouse_id: number; stock: number; in_stock: boolean }[]
 }
