@@ -203,19 +203,19 @@ export default function Products() {
   // trivial to render client-side with no extra rendering dependencies.
   async function handlePrintLabel(product: Product) {
     if (!product.barcode) return
-    const qrDataUrl = await QRCode.toDataURL(product.barcode, { width: 220, margin: 1 })
+    const qrDataUrl = await QRCode.toDataURL(product.barcode, { width: 500, margin: 2 })
 
-    const win = window.open('', '_blank', 'width=320,height=420')
+    const win = window.open('', '_blank', 'width=500,height=650')
     if (!win) return
     win.document.write(`
       <html>
         <head>
           <title>Label - ${product.name}</title>
           <style>
-            body { font-family: sans-serif; text-align: center; padding: 16px; }
-            img { width: 180px; height: 180px; }
-            h2 { font-size: 14px; margin: 8px 0 2px; }
-            p { font-size: 12px; color: #444; margin: 0 0 8px; letter-spacing: 1px; }
+            body { font-family: sans-serif; text-align: center; padding: 24px; }
+            img { width: 380px; height: 380px; }
+            h2 { font-size: 20px; margin: 12px 0 4px; }
+            p { font-size: 16px; color: #444; margin: 0 0 12px; letter-spacing: 2px; }
           </style>
         </head>
         <body>
