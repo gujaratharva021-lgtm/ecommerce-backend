@@ -134,7 +134,7 @@ export default function Orders() {
 
   return (
     <div className="p-6 max-w-6xl">
-      <h1 className="text-lg font-semibold mb-4">Orders</h1>
+      <h1 className="font-display text-2xl font-semibold mb-4">Orders</h1>
 
       <div className="flex gap-1 border-b border-slate-800 mb-4 overflow-x-auto">
         {TABS.map((tab) => {

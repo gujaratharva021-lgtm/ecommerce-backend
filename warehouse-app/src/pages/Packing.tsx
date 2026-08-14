@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { completePacking, getPackingTask, startPacking } from '../api/warehouse'
 import type { PackingTaskResponse } from '../types/warehouse'
@@ -81,7 +81,7 @@ export default function Packing() {
         &larr; Back to orders
       </button>
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-lg font-semibold">Packing &mdash; Order #{task.order_id}</h1>
+        <h1 className="font-display text-2xl font-semibold">Packing &mdash; Order #{task.order_id}</h1>
         <StatusBadge status={task.status} />
       </div>
       <p className="text-xs text-slate-500 mb-6">

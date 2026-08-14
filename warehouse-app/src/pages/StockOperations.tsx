@@ -118,7 +118,7 @@ export default function StockOperations() {
 
   return (
     <div className="p-6 max-w-6xl">
-      <h1 className="text-lg font-semibold mb-6">Stock Operations</h1>
+      <h1 className="font-display text-2xl font-semibold mb-6">Stock Operations</h1>
 
       {/* Adjustment form */}
       <div className="border border-slate-800 rounded-xl bg-slate-900 p-5 max-w-2xl mb-8">

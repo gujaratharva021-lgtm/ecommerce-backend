@@ -172,7 +172,7 @@ export default function Batches() {
   return (
     <div className="p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-lg font-semibold">Batch & Expiry</h1>
+        <h1 className="font-display text-2xl font-semibold">Batch & Expiry</h1>
         <div className="flex gap-2">
           <button onClick={load} className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors">
             Refresh

@@ -33,7 +33,7 @@ export default function Performance() {
   return (
     <div className="p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-semibold">Staff Performance</h1>
+        <h1 className="font-display text-2xl font-semibold">Staff Performance</h1>
         <button
           onClick={load}
           className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"

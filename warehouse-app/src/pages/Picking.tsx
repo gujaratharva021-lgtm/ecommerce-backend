@@ -290,7 +290,7 @@ export default function Picking() {
         &larr; Back to orders
       </button>
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-lg font-semibold">Picking &mdash; Order #{task.order_id}</h1>
+        <h1 className="font-display text-2xl font-semibold">Picking &mdash; Order #{task.order_id}</h1>
         <StatusBadge status={task.status} />
       </div>
       <p className="text-xs text-slate-500 mb-6">

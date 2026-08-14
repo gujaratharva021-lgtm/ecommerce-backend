@@ -73,7 +73,7 @@ export default function Notifications() {
   return (
     <div className="p-6 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-semibold">
+        <h1 className="font-display text-2xl font-semibold">
           Notifications
           {unreadCount > 0 && (
             <span className="ml-2 text-xs bg-indigo-500 text-white rounded-full px-2 py-0.5 align-middle">
