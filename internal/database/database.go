@@ -1,4 +1,4 @@
-﻿package database
+package database
 
 import (
 	"log"
@@ -105,9 +105,24 @@ func AutoMigrate() {
 	if err := DB.Exec(`ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS service_area geometry(Polygon, 4326)`).Error; err != nil {
 		log.Fatalf("Failed to add service_area column: %v", err)
 	}
+	if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+		log.Fatalf("Failed to add gst_percent column: %v", err)
+	}
 
 	seedDefaultSettings()
 
 	log.Println("Database migration completed")
 }
 
+
+// EnsureProductionSchemaPatches applies small, idempotent schema patches
+// that are needed even in production (GIN_MODE=release), where the full
+// AutoMigrate() is skipped in favor of versioned migrations. This lets a
+// column land immediately on deploy without requiring someone to run the
+// migrate CLI by hand first - safe because ADD COLUMN IF NOT EXISTS is a
+// no-op once the versioned migration has actually been applied.
+func EnsureProductionSchemaPatches() {
+if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add gst_percent column: %v", err)
+}
+}

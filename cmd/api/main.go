@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 "context"
@@ -34,6 +34,10 @@ database.ConnectRedis(cfg)
 if cfg.GinMode != gin.ReleaseMode {
 database.AutoMigrate()
 }
+
+// 3b. Apply small production-safe schema patches even when full
+// AutoMigrate is skipped (GIN_MODE=release) - see EnsureProductionSchemaPatches.
+database.EnsureProductionSchemaPatches()
 
 // 4. Initialize Firebase (push notifications)
 fb.InitFirebase(cfg.FirebaseCredentialsPath)
