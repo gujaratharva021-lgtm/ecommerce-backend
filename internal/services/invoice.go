@@ -49,6 +49,13 @@ return nil
 // both read the same COUNT() before either commits and then collide on
 // the unique invoice_number constraint - nextval() is atomic across
 // concurrent transactions and can never hand out the same value twice.
+// CREATE SEQUENCE IF NOT EXISTS is self-healing: the sequence is created
+// automatically the first time this runs, so there's no manual DB step
+// required after deploying this - useful since AutoMigrate doesn't manage
+// sequences and production migrations aren't always run immediately.
+if err := tx.Exec("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1").Error; err != nil {
+return fmt.Errorf("failed to ensure invoice sequence exists: %w", err)
+}
 var seqVal int64
 if err := tx.Raw("SELECT nextval('invoice_number_seq')").Scan(&seqVal).Error; err != nil {
 return fmt.Errorf("failed to allocate invoice number: %w", err)
