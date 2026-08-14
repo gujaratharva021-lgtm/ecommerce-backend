@@ -1,9 +1,10 @@
-package handlers
+﻿package handlers
 
 import (
 "bytes"
 "fmt"
 "net/http"
+"strings"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
@@ -122,7 +123,13 @@ pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
 pdf.Ln(3)
 
 // ---- Items table ----
-colW := []float64{8, 45, 15, 10, 8, 16, 16, 10, 10, 10, 10, 20}
+// Column widths widened for HSN (was 10mm, too narrow and caused HSN
+// codes like "PRD00393" to wrap onto a second line while every other
+// cell in the row kept a fixed 5mm height - this produced the
+// mismatched/broken-looking cell borders. SR and Item&Description were
+// trimmed slightly to compensate so the table's total width (178mm)
+// is unchanged.
+colW := []float64{6, 41, 15, 16, 8, 16, 16, 10, 10, 10, 10, 20}
 taxCol1Header := "CGST"
 taxCol2Header := "S/UT\nGST"
 if invoice.IsInterState {
@@ -131,16 +138,36 @@ taxCol2Header = "-"
 }
 headers := []string{"SR\nNo", "Item &\nDescription", "Unit\nMRP/RSP", "HSN", "Qty", "Product\nRate", "Taxable\nAmt.", taxCol1Header, taxCol2Header, "GST\n%", "GST\nAmt.", "Total\nAmt."}
 
+// ---- Header row: draw all cells at one uniform height ----
 pdf.SetFont("Arial", "B", 6.5)
 pdf.SetFillColor(235, 235, 235)
+pdf.SetDrawColor(0, 0, 0)
+headerLineH := 3.5
 headerY := pdf.GetY()
-for i, h := range headers {
-pdf.SetXY(sumWidths(colW[:i])+12, headerY)
-pdf.MultiCell(colW[i], 3.5, h, "1", "C", true)
+maxHeaderLines := 1
+for _, h := range headers {
+n := len(strings.Split(h, "\n"))
+if n > maxHeaderLines {
+maxHeaderLines = n
 }
-pdf.SetXY(12, headerY+7)
+}
+headerH := float64(maxHeaderLines) * headerLineH
+for i, h := range headers {
+x := sumWidths(colW[:i]) + 12
+pdf.Rect(x, headerY, colW[i], headerH, "FD")
+pdf.SetXY(x, headerY)
+pdf.MultiCell(colW[i], headerLineH, h, "", "C", false)
+}
+pdf.SetXY(12, headerY+headerH)
 
+// ---- Item rows: compute each row's height from its tallest cell
+// (after word-wrapping), then draw every cell in that row as a
+// uniform-height bordered box so the grid lines stay aligned even
+// when a cell (e.g. a long product name or HSN code) wraps to
+// multiple lines. ----
 pdf.SetFont("Arial", "", 7.5)
+rowLineH := 3.6
+minRowH := 5.0
 taxableTotal := 0.0
 gstTotal := 0.0
 grandTotal := 0.0
@@ -161,7 +188,6 @@ cgstDisplay = fmt.Sprintf("%.2f", half)
 sgstDisplay = fmt.Sprintf("%.2f", half)
 }
 
-rowY := pdf.GetY()
 hsn := item.SKU
 if hsn == "" {
 hsn = "-"
@@ -181,13 +207,45 @@ fmt.Sprintf("%.2f", item.GSTAmount),
 fmt.Sprintf("%.2f", lineTotal),
 }
 aligns := []string{"C", "L", "R", "C", "C", "R", "R", "R", "R", "C", "R", "R"}
-maxH := 5.0
+
+// Work out how many lines each cell needs at its column width, and
+// use the tallest one as the row height for every cell.
+maxLines := 1
 for j, v := range values {
-pdf.SetXY(pdf.GetX(), rowY)
-pdf.MultiCell(colW[j], maxH, v, "1", aligns[j], false)
-pdf.SetXY(sumWidths(colW[:j+1])+12, rowY)
+splitLines := pdf.SplitLines([]byte(v), colW[j])
+if len(splitLines) > maxLines {
+maxLines = len(splitLines)
 }
-pdf.SetXY(12, rowY+maxH)
+}
+rowH := float64(maxLines) * rowLineH
+if rowH < minRowH {
+rowH = minRowH
+}
+
+// Page-break check: if this row won't fit before the bottom margin,
+// start a fresh page and re-draw the header there.
+if pdf.GetY()+rowH > 275 {
+pdf.AddPage()
+newHeaderY := pdf.GetY()
+for hi, h := range headers {
+x := sumWidths(colW[:hi]) + 12
+pdf.SetFont("Arial", "B", 6.5)
+pdf.Rect(x, newHeaderY, colW[hi], headerH, "FD")
+pdf.SetXY(x, newHeaderY)
+pdf.MultiCell(colW[hi], headerLineH, h, "", "C", false)
+}
+pdf.SetXY(12, newHeaderY+headerH)
+pdf.SetFont("Arial", "", 7.5)
+}
+
+rowY := pdf.GetY()
+for j, v := range values {
+x := sumWidths(colW[:j]) + 12
+pdf.Rect(x, rowY, colW[j], rowH, "D")
+pdf.SetXY(x, rowY)
+pdf.MultiCell(colW[j], rowLineH, v, "", aligns[j], false)
+}
+pdf.SetXY(12, rowY+rowH)
 }
 
 // Item Total row inside the table
