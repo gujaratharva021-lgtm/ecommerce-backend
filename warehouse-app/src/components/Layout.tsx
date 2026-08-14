@@ -14,6 +14,8 @@ const navItems = [
   { to: '/exceptions', label: 'Exceptions' },
   { to: '/performance', label: 'Performance' },
   { to: '/staff', label: 'Staff' },
+  { to: '/notifications', label: 'Notifications' },
+  { to: '/audit-logs', label: 'Audit Logs' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
