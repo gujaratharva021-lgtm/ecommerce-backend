@@ -174,6 +174,11 @@ export interface WarehouseDashboardStats {
   low_stock_products: number
   out_of_stock_products: number
   pending_stock_transfers: number
+  pending_receivings: number
+  open_exceptions: number
+  pending_handovers: number
+  delayed_orders: number
+  expiring_stock_batches: number
   active_staff: number
   avg_picking_minutes: number
   avg_packing_minutes: number

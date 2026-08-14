@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+﻿import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboard } from '../api/warehouse'
 import type { WarehouseDashboardStats } from '../types/warehouse'
@@ -82,6 +82,41 @@ export default function Dashboard() {
         onClick: () => navigate('/stock-transfers'),
       })
     }
+    if (stats.open_exceptions > 0) {
+      alerts.push({
+        label: `${stats.open_exceptions} exception(s) need attention`,
+        tone: 'danger',
+        onClick: () => navigate('/exceptions'),
+      })
+    }
+    if (stats.pending_handovers > 0) {
+      alerts.push({
+        label: `${stats.pending_handovers} order(s) ready for handover`,
+        tone: 'warning',
+        onClick: () => navigate('/orders?status=ready_for_dispatch'),
+      })
+    }
+    if (stats.delayed_orders > 0) {
+      alerts.push({
+        label: `${stats.delayed_orders} order(s) running behind schedule`,
+        tone: 'danger',
+        onClick: () => navigate('/orders'),
+      })
+    }
+    if (stats.pending_receivings > 0) {
+      alerts.push({
+        label: `${stats.pending_receivings} receiving record(s) pending`,
+        tone: 'warning',
+        onClick: () => navigate('/receiving'),
+      })
+    }
+    if (stats.expiring_stock_batches > 0) {
+      alerts.push({
+        label: `${stats.expiring_stock_batches} batch(es) expiring within 7 days`,
+        tone: 'warning',
+        onClick: () => navigate('/batches'),
+      })
+    }
   }
 
   return (
@@ -134,6 +169,15 @@ export default function Dashboard() {
             <StatCard label="Completed Today" value={stats.completed_today} tone="success" />
             <StatCard label="Cancelled Today" value={stats.cancelled_today} tone={stats.cancelled_today > 0 ? 'danger' : 'default'} />
             <StatCard label="Fulfillment Rate" value={stats.fulfillment_rate.toFixed(0)} suffix="%" tone="success" />
+          </div>
+
+          <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Operational Alerts</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <StatCard label="Open Exceptions" value={stats.open_exceptions} tone={stats.open_exceptions > 0 ? 'danger' : 'default'} />
+            <StatCard label="Pending Handovers" value={stats.pending_handovers} tone={stats.pending_handovers > 0 ? 'warning' : 'default'} />
+            <StatCard label="Delayed Orders" value={stats.delayed_orders} tone={stats.delayed_orders > 0 ? 'danger' : 'default'} />
+            <StatCard label="Pending Receivings" value={stats.pending_receivings} tone={stats.pending_receivings > 0 ? 'warning' : 'default'} />
+            <StatCard label="Expiring Batches (7d)" value={stats.expiring_stock_batches} tone={stats.expiring_stock_batches > 0 ? 'warning' : 'default'} />
           </div>
 
           <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Performance</p>
