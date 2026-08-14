@@ -24,12 +24,26 @@ function StatCard({
           ? 'text-emerald-300'
           : 'text-slate-100'
 
+  // Hazard-corner signature: a small diagonal stripe flag in the top-right
+  // corner, echoing warehouse hazard tape - reserved for warning/danger
+  // cards only so it stays a signal, not decoration.
+  const flagColor = tone === 'danger' ? '#e5484d' : tone === 'warning' ? '#f5a623' : null
+
   return (
-    <div className="border border-slate-800 rounded-xl bg-slate-900 p-4">
+    <div className="relative border border-slate-800 bg-slate-900 p-4 overflow-hidden">
+      {flagColor && (
+        <div
+          className="absolute top-0 right-0 w-6 h-6"
+          style={{
+            background: `repeating-linear-gradient(45deg, ${flagColor}, ${flagColor} 3px, #15171b 3px, #15171b 6px)`,
+            clipPath: 'polygon(100% 0, 0 0, 100% 100%)',
+          }}
+        />
+      )}
       <p className="text-xs text-slate-400 mb-2">{label}</p>
-      <p className={`text-2xl font-semibold ${toneClass}`}>
+      <p className={`font-mono text-2xl font-semibold ${toneClass}`}>
         {value}
-        {suffix ? <span className="text-sm font-normal text-slate-500 ml-1">{suffix}</span> : null}
+        {suffix ? <span className="font-sans text-sm font-normal text-slate-500 ml-1">{suffix}</span> : null}
       </p>
     </div>
   )

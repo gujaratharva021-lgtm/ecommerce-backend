@@ -20,26 +20,27 @@ const navItems = [
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { staff, logout } = useAuth()
+  const warehouseLabel = staff?.warehouse?.name ?? `WAREHOUSE #${staff?.warehouse_id ?? '—'}`
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <aside className="w-56 shrink-0 border-r border-slate-800 bg-slate-900 flex flex-col">
+      <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-900 flex flex-col">
         <div className="px-5 py-5 border-b border-slate-800">
-          <p className="text-sm font-semibold">Warehouse Panel</p>
-          <p className="text-xs text-slate-400 mt-1">
-            {staff?.warehouse?.name ?? `Warehouse #${staff?.warehouse_id ?? ''}`}
+          <p className="font-mono text-[10px] tracking-widest text-indigo-500 uppercase mb-1">
+            {warehouseLabel}
           </p>
+          <p className="font-display text-xl leading-none">Warehouse Panel</p>
         </div>
-        <nav className="flex-1 px-2 py-4 space-y-1">
+        <nav className="flex-1 px-2 py-4 space-y-0.5">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                `flex items-center gap-2.5 pl-3 pr-3 py-2 text-sm border-l-2 transition-colors ${
                   isActive
-                    ? 'bg-indigo-500/15 text-indigo-300 font-medium'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300 font-medium'
+                    : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`
               }
             >
@@ -49,10 +50,10 @@ export default function Layout({ children }: { children: ReactNode }) {
         </nav>
         <div className="px-4 py-4 border-t border-slate-800">
           <p className="text-xs font-medium text-slate-200">{staff?.name}</p>
-          <p className="text-xs text-slate-500 mb-3">{staff?.phone}</p>
+          <p className="font-mono text-xs text-slate-500 mb-3">{staff?.phone}</p>
           <button
             onClick={logout}
-            className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+            className="w-full text-xs px-3 py-2 border border-slate-700 hover:border-slate-600 hover:bg-slate-800 transition-colors"
           >
             Log out
           </button>
