@@ -31,4 +31,4 @@ secrets/
 secrets/
 warehouse-app/src_backup_*/
 
-invoice-test*.pdf
+invoice-*.pdf
