@@ -9,7 +9,6 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
-"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -34,12 +33,16 @@ return fmt.Sprintf("%06d", n.Int64()), nil
 // phone number without ever receiving an SMS.
 func otpDebugResponse(code string, phone string) gin.H {
 log.Printf("[OTP] %s -> %s", phone, code)
+// TEMPORARY: no real SMS gateway is wired up yet, so the OTP is echoed
+// in the response in ALL environments (including production) so the app
+// can display/auto-fill it. This is NOT safe for real users - anyone
+// could log in as any phone number without receiving an SMS. Remove this
+// echo (go back to gating it behind config.AppConfig.GinMode != "release")
+// once a real SMS provider is integrated.
 resp := gin.H{
 "message":            "OTP sent successfully",
 "expires_in_minutes": otpValidityMinutes,
-}
-if config.AppConfig.GinMode != "release" {
-resp["otp"] = code
+"otp":                code,
 }
 return resp
 }
