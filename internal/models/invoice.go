@@ -26,7 +26,7 @@ AddressPincode string        `json:"address_pincode"`
 ItemsAmount    float64       `json:"items_amount"`
 DiscountAmount float64       `json:"discount_amount"`
 DeliveryCharge float64       `json:"delivery_charge"`
-WalletUsed     float64       `json:"wallet_amount_used"`
+WalletUsed     float64       `gorm:"column:wallet_amount_used" json:"wallet_amount_used"`
 TotalAmount    float64       `json:"total_amount"`
 PaymentMethod  string        `json:"payment_method"`
 Items          []InvoiceItem `gorm:"foreignKey:InvoiceID" json:"items,omitempty"`
