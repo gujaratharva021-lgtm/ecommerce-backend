@@ -109,9 +109,8 @@ pdf.SetFont("Arial", "B", 6.5)
 pdf.SetFillColor(235, 235, 235)
 headerY := pdf.GetY()
 for i, h := range headers {
-pdf.SetXY(pdf.GetX(), headerY)
+pdf.SetXY(sumWidths(colW[:i])+12, headerY)
 pdf.MultiCell(colW[i], 3.5, h, "1", "C", true)
-pdf.SetXY(pdf.GetX()+colW[i], headerY)
 }
 pdf.SetXY(12, headerY+7)
 
