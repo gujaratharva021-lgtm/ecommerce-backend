@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"bytes"
 "fmt"
 "net/http"
 
@@ -10,6 +11,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/jung-kurt/gofpdf"
+"github.com/skip2/go-qrcode"
 )
 
 // buildInvoicePDF renders a GST-style tax invoice matching the standard
@@ -33,6 +35,18 @@ cfg := config.AppConfig
 pdf := gofpdf.New("P", "mm", "A4", "")
 pdf.AddPage()
 pdf.SetMargins(12, 12, 12)
+
+// QR code encodes invoice number, order ID, and total - lets a
+// warehouse or delivery staff quickly verify the invoice against the
+// order without typing anything. Placed top-right so it doesn't
+// interfere with the seller/address text on the left.
+	qrContent := fmt.Sprintf("Invoice: %s\nOrder: #%d\nAmount: Rs.%.2f", invoice.InvoiceNumber, invoice.OrderID, invoice.TotalAmount)
+	if qrPNG, err := qrcode.Encode(qrContent, qrcode.Medium, 256); err == nil {
+		qrReader := bytes.NewReader(qrPNG)
+		opts := gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
+		pdf.RegisterImageOptionsReader("invoice_qr", opts, qrReader)
+		pdf.ImageOptions("invoice_qr", 170, 12, 26, 26, false, opts, 0, "")
+	}
 
 // ---- Seller header ----
 pdf.SetFont("Arial", "B", 12)
