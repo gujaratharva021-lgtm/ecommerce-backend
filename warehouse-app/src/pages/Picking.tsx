@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { completePicking, getPickingTask, markPickItem, scanPickItem, startPicking } from '../api/warehouse'
 import type { PickingTask, PickingTaskItem } from '../types/warehouse'
 import StatusBadge from '../components/StatusBadge'
+import CameraScanner from '../components/CameraScanner'
 import { getErrorMessage } from '../utils/errors'
 
 function ItemRow({
@@ -21,15 +22,16 @@ function ItemRow({
   const [barcodeInput, setBarcodeInput] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [scanState, setScanState] = useState<'idle' | 'match' | 'mismatch'>('idle')
+  const [showCamera, setShowCamera] = useState(false)
 
   const isDone = item.status !== 'pending'
 
-  const handleScan = async () => {
-    if (!barcodeInput.trim()) return
+  const submitScan = async (code: string) => {
+    if (!code.trim()) return
     setIsScanning(true)
     setScanState('idle')
     try {
-      const result = await scanPickItem(item.id, barcodeInput.trim())
+      const result = await scanPickItem(item.id, code.trim())
       if (result.match) {
         setScanState('match')
         onMark('picked')
@@ -42,6 +44,13 @@ function ItemRow({
       setIsScanning(false)
       setBarcodeInput('')
     }
+  }
+
+  const handleScan = () => submitScan(barcodeInput)
+
+  const handleCameraDetected = (code: string) => {
+    setShowCamera(false)
+    submitScan(code)
   }
 
   return (
@@ -78,6 +87,21 @@ function ItemRow({
             className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
           />
           <button
+            disabled={isBusy || isScanning}
+            onClick={() => setShowCamera(true)}
+            title="Scan with camera"
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+              <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+              <path d="M7 12h10" />
+            </svg>
+            Camera
+          </button>
+          <button
             disabled={isBusy || isScanning || !barcodeInput.trim()}
             onClick={handleScan}
             className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-xs font-medium disabled:opacity-40"
@@ -85,6 +109,10 @@ function ItemRow({
             {isScanning ? 'Scanning...' : 'Scan'}
           </button>
         </div>
+      )}
+
+      {showCamera && (
+        <CameraScanner onDetected={handleCameraDetected} onClose={() => setShowCamera(false)} />
       )}
 
       {scanState === 'mismatch' && !isDone && (
