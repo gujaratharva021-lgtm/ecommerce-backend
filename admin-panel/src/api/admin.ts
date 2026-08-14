@@ -1,4 +1,4 @@
-import apiClient from './client'
+﻿import apiClient from './client'
 import type { Product, ProductCreateRequest, CreateCouponRequest, CreateOfferRequest, CreateBannerRequest, CreateDeliveryZoneRequest, DeliveryPartner, Warehouse, WarehouseStaff } from '../types/admin'
 
 export const IMAGE_ORIGIN = (apiClient.defaults.baseURL ?? '').replace(/\/api\/v1\/?$/, '')
@@ -26,6 +26,9 @@ export const deleteProduct = (id: number) =>
 
 export const updateInventory = (id: number, stock: number, warehouseId: number) =>
   apiClient.put(`/admin/products/${id}/inventory`, { stock, warehouse_id: warehouseId }).then((r) => r.data)
+
+export const generateProductBarcode = (id: number) =>
+  apiClient.post(`/admin/products/${id}/barcode`).then((r) => r.data as { id: number; barcode: string })
 
 // ---- Categories ----
 export const listCategories = () =>

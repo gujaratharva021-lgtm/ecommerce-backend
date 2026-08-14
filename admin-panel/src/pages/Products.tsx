@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import {
@@ -9,6 +10,7 @@ import {
   updateInventory,
   listCategories,
   uploadImage,
+  generateProductBarcode,
   IMAGE_ORIGIN,
 } from '../api/admin'
 import type { Product, Category } from '../types/admin'
@@ -35,6 +37,7 @@ export default function Products() {
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [generatingBarcodeId, setGeneratingBarcodeId] = useState<number | null>(null)
 
   async function load() {
     setIsLoading(true)
@@ -181,6 +184,52 @@ export default function Products() {
     }
   }
 
+  async function handleGenerateBarcode(product: Product) {
+    setGeneratingBarcodeId(product.id)
+    try {
+      const { barcode } = await generateProductBarcode(product.id)
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, barcode } : p)))
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Failed to generate barcode.')
+    } finally {
+      setGeneratingBarcodeId(null)
+    }
+  }
+
+  // Opens a small popup with a printable label: the product name, price,
+  // the barcode as both a scannable QR code and its plain text value, then
+  // triggers the browser print dialog. QR (not a 1D barcode image) because
+  // it's what the warehouse app's camera scanner reliably decodes, and it's
+  // trivial to render client-side with no extra rendering dependencies.
+  async function handlePrintLabel(product: Product) {
+    if (!product.barcode) return
+    const qrDataUrl = await QRCode.toDataURL(product.barcode, { width: 220, margin: 1 })
+
+    const win = window.open('', '_blank', 'width=320,height=420')
+    if (!win) return
+    win.document.write(`
+      <html>
+        <head>
+          <title>Label - ${product.name}</title>
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 16px; }
+            img { width: 180px; height: 180px; }
+            h2 { font-size: 14px; margin: 8px 0 2px; }
+            p { font-size: 12px; color: #444; margin: 0 0 8px; letter-spacing: 1px; }
+          </style>
+        </head>
+        <body>
+          <img src="${qrDataUrl}" alt="barcode" />
+          <h2>${product.name}</h2>
+          <p>${product.barcode}</p>
+        </body>
+      </html>
+    `)
+    win.document.close()
+    win.focus()
+    win.onload = () => win.print()
+  }
+
   return (
     <Layout>
       <div className="p-8">
@@ -217,6 +266,7 @@ export default function Products() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Price</th>
                   <th className="px-4 py-3 font-medium">Stock</th>
+                  <th className="px-4 py-3 font-medium">Barcode</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -240,7 +290,7 @@ export default function Products() {
                       )}
                     </td>
                     <td className="px-4 py-3">{p.name}</td>
-                    <td className="px-4 py-3">?{p.price}</td>
+                    <td className="px-4 py-3">₹{p.price}</td>
                     <td className="px-4 py-3">
                       <input
                         type="number"
@@ -255,6 +305,27 @@ export default function Products() {
                           )
                         }
                       />
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.barcode ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-slate-300">{p.barcode}</span>
+                          <button
+                            onClick={() => handlePrintLabel(p)}
+                            className="text-indigo-400 hover:text-indigo-300 text-xs"
+                          >
+                            Print
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateBarcode(p)}
+                          disabled={generatingBarcodeId === p.id}
+                          className="text-indigo-400 hover:text-indigo-300 text-xs disabled:opacity-40"
+                        >
+                          {generatingBarcodeId === p.id ? 'Generating...' : 'Generate'}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right space-x-3">
                       <button
@@ -303,7 +374,7 @@ export default function Products() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Price (?)</label>
+                <label className="text-xs text-slate-400 block mb-1">Price (₹)</label>
                 <input
                   type="number"
                   value={form.price}
@@ -386,5 +457,3 @@ export default function Products() {
     </Layout>
   )
 }
-
-

@@ -311,6 +311,7 @@ adminOffers := admin.Group("/offers")
 				adminProducts.PUT("/:id", middleware.RequirePermission(middleware.PermEditPrice), handlers.UpdateProduct)
 				adminProducts.DELETE("/:id", handlers.DeleteProduct)
 				adminProducts.PUT("/:id/inventory", handlers.UpdateInventory)
+				adminProducts.POST("/:id/barcode", handlers.GenerateProductBarcode)
 			}
 
 				admin.GET("/inventory", handlers.GetInventoryOverview)

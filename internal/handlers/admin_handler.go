@@ -205,6 +205,37 @@ func UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, product)
 }
 
+// GenerateProductBarcode godoc
+// POST /api/v1/admin/products/:id/barcode (admin only)
+// Assigns a deterministic, guaranteed-unique barcode to a product that
+// doesn't have one yet (format PRD######, built from the product's own
+// primary key so there's no collision-retry needed). Idempotent - calling
+// it again on a product that already has a barcode just returns the
+// existing value unchanged, so it's safe to click more than once.
+func GenerateProductBarcode(c *gin.Context) {
+id := c.Param("id")
+
+var product models.Product
+if err := database.DB.First(&product, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+return
+}
+
+if product.Barcode == "" {
+product.Barcode = fmt.Sprintf("PRD%06d", product.ID)
+if err := database.DB.Model(&product).Update("barcode", product.Barcode).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate barcode"})
+return
+}
+
+adminID := c.MustGet("user_id").(uint)
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "generate_barcode", "product", id, "barcode: "+product.Barcode)
+}
+
+c.JSON(http.StatusOK, gin.H{"id": product.ID, "barcode": product.Barcode})
+}
+
 // DeleteProduct godoc
 // DELETE /api/v1/admin/products/:id (admin only)
 func DeleteProduct(c *gin.Context) {
