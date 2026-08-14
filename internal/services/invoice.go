@@ -44,16 +44,35 @@ if err := tx.Where("order_id = ?", orderID).First(&invoice).Error; err == nil {
 return nil
 }
 
-var count int64
-tx.Model(&models.Invoice{}).Count(&count)
-invoiceNumber := fmt.Sprintf("INV-%d-%06d", time.Now().Year(), count+1)
+// Atomic invoice number: a dedicated Postgres sequence, not COUNT(*)+1.
+// Two concurrent invoice generations for two *different* orders could
+// both read the same COUNT() before either commits and then collide on
+// the unique invoice_number constraint - nextval() is atomic across
+// concurrent transactions and can never hand out the same value twice.
+var seqVal int64
+if err := tx.Raw("SELECT nextval('invoice_number_seq')").Scan(&seqVal).Error; err != nil {
+return fmt.Errorf("failed to allocate invoice number: %w", err)
+}
+invoiceNumber := fmt.Sprintf("INV-%d-%06d", time.Now().Year(), seqVal)
+
+var orderCoupon models.OrderCoupon
+discountAmount := 0.0
+if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == nil {
+discountAmount = orderCoupon.DiscountAmount
+}
 
 invoice = models.Invoice{
 InvoiceNumber:  invoiceNumber,
 OrderID:        order.ID,
 CustomerName:   order.Address.FullName,
 CustomerPhone:  order.Address.Phone,
+AddressLine1:   order.Address.Line1,
+AddressLine2:   order.Address.Line2,
+AddressCity:    order.Address.City,
+AddressState:   order.Address.State,
+AddressPincode: order.Address.Pincode,
 ItemsAmount:    order.ItemsAmount,
+DiscountAmount: discountAmount,
 DeliveryCharge: order.DeliveryCharge,
 WalletUsed:     order.WalletAmountUsed,
 TotalAmount:    order.TotalAmount,

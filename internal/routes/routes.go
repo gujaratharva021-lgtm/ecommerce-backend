@@ -105,6 +105,7 @@ func SetupRoutes(router *gin.Engine) {
 				warehouseOrders.PUT("/:id/handover", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.HandoverOrder)
 				warehouseOrders.GET("/:id/handover", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetHandover)
 warehouseOrders.GET("/:id/invoice", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetOrderInvoice)
+warehouseOrders.GET("/:id/invoice/pdf", middleware.RequireWarehouseRole(middleware.RoleAnyStaff...), handlers.GetWarehouseOrderInvoicePDF)
 			}
 
 			warehousePicking := warehouse.Group("/picking")
@@ -229,6 +230,8 @@ warehouseOrders.GET("/:id/invoice", middleware.RequireWarehouseRole(middleware.R
 			orders.GET("", handlers.GetOrders)
 			orders.GET("/:id", handlers.GetOrderByID)
 			orders.GET("/:id/tracking", handlers.GetOrderTracking)
+			orders.GET("/:id/invoice", handlers.GetMyOrderInvoice)
+			orders.GET("/:id/invoice/pdf", handlers.GetMyOrderInvoicePDF)
 			orders.PUT("/:id/cancel", handlers.CancelOrder)
 			orders.POST("/:id/return", handlers.RequestReturn)
 			orders.POST("/:id/payment", handlers.CreatePaymentOrder)   // creates Razorpay order (payment_method: online only)
@@ -332,6 +335,13 @@ adminOffers := admin.Group("/offers")
 			{
 				adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
 				adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
+			}
+
+			adminInvoices := admin.Group("/invoices")
+			{
+				adminInvoices.GET("", handlers.SearchInvoices)
+				adminInvoices.GET("/:id", handlers.GetAdminInvoiceByID)
+				adminInvoices.GET("/:id/pdf", handlers.GetAdminInvoicePDF)
 			}
 
 			adminReturns := admin.Group("/returns")

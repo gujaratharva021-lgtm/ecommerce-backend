@@ -18,7 +18,13 @@ OrderID        uint          `gorm:"uniqueIndex;not null" json:"order_id"`
 Order          Order         `gorm:"foreignKey:OrderID" json:"-"`
 CustomerName   string        `json:"customer_name"`
 CustomerPhone  string        `json:"customer_phone"`
+AddressLine1   string        `json:"address_line1"`
+AddressLine2   string        `json:"address_line2,omitempty"`
+AddressCity    string        `json:"address_city"`
+AddressState   string        `json:"address_state"`
+AddressPincode string        `json:"address_pincode"`
 ItemsAmount    float64       `json:"items_amount"`
+DiscountAmount float64       `json:"discount_amount"`
 DeliveryCharge float64       `json:"delivery_charge"`
 WalletUsed     float64       `json:"wallet_amount_used"`
 TotalAmount    float64       `json:"total_amount"`
