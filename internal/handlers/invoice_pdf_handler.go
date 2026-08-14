@@ -52,7 +52,7 @@ pdf.SetMargins(12, 12, 12)
 pdf.SetFont("Arial", "B", 12)
 pdf.CellFormat(150, 6, "Seller Name: "+cfg.SellerCompanyName, "", 1, "L", false, 0, "")
 pdf.SetFont("Arial", "", 9)
-pdf.CellFormat(150, 5, cfg.SellerAddress, "", 1, "L", false, 0, "")
+pdf.MultiCell(150, 5, cfg.SellerAddress, "", "L", false)
 pdf.SetFont("Arial", "B", 9)
 if cfg.SellerGSTIN != "" {
 pdf.CellFormat(0, 5, "GSTIN: "+cfg.SellerGSTIN, "", 1, "L", false, 0, "")
