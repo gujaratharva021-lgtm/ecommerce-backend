@@ -25,7 +25,16 @@ export default function CameraScanner({ onDetected, onClose }: CameraScannerProp
     scanner
       .start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 150 } },
+        {
+          fps: 10,
+          // Scale the scan box to ~80% of whatever the camera preview ends
+          // up being, capped so it isn't absurd on a huge display - much
+          // easier to line up a barcode in than a small fixed box.
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8)
+            return { width: Math.min(size, 400), height: Math.min(size, 400) }
+          },
+        },
         (decodedText) => {
           if (hasFiredRef.current) return
           hasFiredRef.current = true
@@ -60,23 +69,27 @@ export default function CameraScanner({ onDetected, onClose }: CameraScannerProp
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 w-full max-w-sm">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium">Scan Barcode</p>
+          <p className="text-base font-medium">Scan Barcode</p>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-sm">
             Close
           </button>
         </div>
 
         {error ? (
-          <div className="text-xs text-rose-400 border border-rose-900 bg-rose-950/40 rounded-lg px-3 py-3">
+          <div className="text-sm text-rose-400 border border-rose-900 bg-rose-950/40 rounded-lg px-4 py-4">
             {error}
           </div>
         ) : (
           <>
-            {isStarting && <p className="text-xs text-slate-400 mb-2">Starting camera...</p>}
-            <div id="camera-scanner-viewport" ref={containerRef} className="rounded-lg overflow-hidden bg-black" />
-            <p className="text-xs text-slate-500 mt-3 text-center">
+            {isStarting && <p className="text-sm text-slate-400 mb-2">Starting camera...</p>}
+            <div
+              id="camera-scanner-viewport"
+              ref={containerRef}
+              className="rounded-lg overflow-hidden bg-black min-h-[60vh] max-h-[75vh]"
+            />
+            <p className="text-sm text-slate-500 mt-3 text-center">
               Point the camera at the product's barcode. It scans automatically.
             </p>
           </>
