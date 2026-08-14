@@ -29,7 +29,7 @@ import type {
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>
-  apiClient.get('/warehouse/stock-transfers').then((r) => r.data as { stock_transfers: StockTransfer[] })
+  apiClient.get('/warehouse/stock-transfers', { params: { limit: 100 } }).then((r) => r.data as { stock_transfers: StockTransfer[] })
 export const requestStockTransfer = (data: {
   product_id: number
   to_warehouse_id: number
@@ -227,7 +227,7 @@ export const deleteBatch = (id: number) =>
 // ---- Staff overview ----
 
 export const getStaffOverview = () =>
-  apiClient.get('/warehouse/staff').then((r) => r.data as { staff: import('../types/warehouse').StaffOverviewRow[] })
+  apiClient.get('/warehouse/staff', { params: { limit: 100 } }).then((r) => r.data as { staff: import('../types/warehouse').StaffOverviewRow[] })
 
 
 // ---- Warehouse Inventory ----
