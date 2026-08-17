@@ -1,6 +1,7 @@
 ﻿package services
 
 import (
+"errors"
 "fmt"
 "log"
 "math"
@@ -8,6 +9,8 @@ import (
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // staleLocationWindow is how recent a partner's last location update must
@@ -32,6 +35,13 @@ c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 return earthRadiusKm * c
 }
 
+// errAutoAssignSkipped is an internal sentinel used to unwind the
+// transaction (with a clean rollback - there's nothing to undo since no
+// write happened yet) when there's simply nothing to do: already assigned,
+// no address coordinates, or no partner available. It is never logged as a
+// failure.
+var errAutoAssignSkipped = errors.New("auto-assign: nothing to do")
+
 // AutoAssignDeliveryPartner picks the nearest active, currently-unburdened
 // delivery partner and assigns them to the given order. It's a no-op (logs
 // and returns) if the order already has a partner, if the order's address
@@ -41,43 +51,73 @@ return earthRadiusKm * c
 // Partners are also deprioritized if they already have an active
 // (confirmed/shipped) delivery in progress, so load is spread out rather
 // than piling every new order onto whoever happens to be closest.
+//
+// Concurrency: the read (order + partner list + current load) and the
+// write (assigning the picked partner) all happen inside a single DB
+// transaction, and the candidate partner rows are locked with SELECT ...
+// FOR UPDATE for the duration of that transaction. If two orders become
+// ready for dispatch at the same moment, the second call blocks on that
+// lock until the first transaction commits, so it always recomputes load
+// against up-to-date data and can never pick a partner based on a stale
+// snapshot the first call has already acted on. The final write is also a
+// conditional UPDATE ... WHERE delivery_partner_id IS NULL, so a
+// concurrent manual assignment (admin endpoint) landing in between can
+// never be silently overwritten. Partner rows are locked in a fixed (id
+// ascending) order so two concurrent assignment transactions can only
+// queue behind each other, never deadlock.
 func AutoAssignDeliveryPartner(orderID uint) {
+var assignedPartnerID uint
+var assignedPartnerName string
+
+err := database.DB.Transaction(func(tx *gorm.DB) error {
 var order models.Order
-if err := database.DB.Preload("Address").First(&order, orderID).Error; err != nil {
-log.Printf("[auto-assign] order %d not found: %v", orderID, err)
-return
+if err := tx.Preload("Address").First(&order, orderID).Error; err != nil {
+return fmt.Errorf("order %d not found: %w", orderID, err)
 }
 
 if order.DeliveryPartnerID != nil {
-return // already assigned, nothing to do
+return errAutoAssignSkipped // already assigned, nothing to do
 }
 if order.Address.Lat == nil || order.Address.Lng == nil {
 log.Printf("[auto-assign] order %d's address has no coordinates, skipping auto-assign", orderID)
-return
+return errAutoAssignSkipped
 }
 
+// Lock every active delivery partner row (in a deterministic id
+// order) for the rest of this transaction. This is the crux of the
+// concurrency fix: a second, concurrent AutoAssignDeliveryPartner
+// transaction trying to lock the same rows blocks right here until
+// this transaction commits or rolls back, so partner selection and
+// load counting can never race against another in-flight assignment.
 var partners []models.DeliveryPartner
-if err := database.DB.Where("is_active = ?", true).Find(&partners).Error; err != nil {
-log.Printf("[auto-assign] failed to load delivery partners: %v", err)
-return
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("is_active = ?", true).
+Order("id").
+Find(&partners).Error; err != nil {
+return fmt.Errorf("failed to load delivery partners: %w", err)
 }
 if len(partners) == 0 {
 log.Printf("[auto-assign] no active delivery partners available for order %d", orderID)
-return
+return errAutoAssignSkipped
 }
 
 // Load count of currently active (confirmed/shipped) deliveries per
-// partner, so we can prefer less-loaded partners.
+// partner, so we can prefer less-loaded partners. Safe to read
+// without an extra lock: the partners we might assign to are
+// already locked above, and this count is only ever bumped by
+// another assignment landing on one of those same locked rows.
 type loadRow struct {
 DeliveryPartnerID uint
 Cnt               int64
 }
 var loads []loadRow
-database.DB.Model(&models.Order{}).
+if err := tx.Model(&models.Order{}).
 Select("delivery_partner_id, count(*) as cnt").
 Where("delivery_partner_id IS NOT NULL AND status IN ?", []string{models.OrderStatusConfirmed, models.OrderStatusShipped}).
 Group("delivery_partner_id").
-Scan(&loads)
+Scan(&loads).Error; err != nil {
+return fmt.Errorf("failed to load partner workloads: %w", err)
+}
 loadByPartner := make(map[uint]int64, len(loads))
 for _, l := range loads {
 loadByPartner[l.DeliveryPartnerID] = l.Cnt
@@ -121,20 +161,41 @@ bestHasFreshLocation = hasFreshLocation
 
 if bestPartner == nil {
 log.Printf("[auto-assign] could not select a partner for order %d", orderID)
+return errAutoAssignSkipped
+}
+
+// Conditional, atomic write: only assign if the order is still
+// unassigned. Guards against a concurrent manual assignment (admin
+// endpoint) landing between our read of `order` above and this
+// write - if that happened, RowsAffected is 0 and we treat it as a
+// no-op rather than clobbering the manual assignment.
+result := tx.Model(&models.Order{}).
+Where("id = ? AND delivery_partner_id IS NULL", order.ID).
+Update("delivery_partner_id", bestPartner.ID)
+if result.Error != nil {
+return fmt.Errorf("failed to assign partner %d to order %d: %w", bestPartner.ID, order.ID, result.Error)
+}
+if result.RowsAffected == 0 {
+return errAutoAssignSkipped
+}
+
+assignedPartnerID = bestPartner.ID
+assignedPartnerName = bestPartner.Name
+return nil
+})
+
+if err != nil {
+if !errors.Is(err, errAutoAssignSkipped) {
+log.Printf("[auto-assign] failed to assign order %d: %v", orderID, err)
+}
 return
 }
 
-partnerID := bestPartner.ID
-if err := database.DB.Model(&models.Order{}).Where("id = ?", order.ID).Update("delivery_partner_id", partnerID).Error; err != nil {
-log.Printf("[auto-assign] failed to assign partner %d to order %d: %v", partnerID, order.ID, err)
-return
-}
-
-log.Printf("[auto-assign] order %d assigned to delivery partner %d (%s)", order.ID, partnerID, bestPartner.Name)
+log.Printf("[auto-assign] order %d assigned to delivery partner %d (%s)", orderID, assignedPartnerID, assignedPartnerName)
 
 go SendPushToPartner(
-partnerID,
+assignedPartnerID,
 "New delivery assigned",
-fmt.Sprintf("Order #%d has been assigned to you", order.ID),
+fmt.Sprintf("Order #%d has been assigned to you", orderID),
 )
 }

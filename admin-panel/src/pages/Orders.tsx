@@ -60,10 +60,13 @@ export default function Orders() {
 
   async function handleAssignDelivery(orderId: number, partnerId: string) {
     if (!partnerId) return
+    const deliveryPartnerId = parseInt(partnerId, 10)
     setAssigningId(orderId)
     try {
-      await assignDeliveryPartner(orderId, parseInt(partnerId, 10))
-      alert('Delivery partner assigned successfully.')
+      await assignDeliveryPartner(orderId, deliveryPartnerId)
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, delivery_partner_id: deliveryPartnerId } : o)),
+      )
     } catch (err: any) {
       alert(err.response?.data?.error ?? 'Failed to assign delivery partner.')
     } finally {
@@ -165,23 +168,30 @@ export default function Orders() {
                     </td>
                     <td className="px-4 py-3">
                       {(o.status === 'confirmed' || o.status === 'shipped') ? (
-                        <select
-                          defaultValue=""
-                          disabled={assigningId === o.id}
-                          onChange={(e) => handleAssignDelivery(o.id, e.target.value)}
-                          className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs disabled:opacity-50"
-                        >
-                          <option value="">
-                            {assigningId === o.id ? 'Assigning...' : 'Assign partner...'}
-                          </option>
-                          {partners.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.phone})
+                        <div className="space-y-1">
+                          {o.delivery_partner_id ? (
+                            <div className="text-xs text-emerald-300">
+                              Assigned: {partners.find((p) => p.id === o.delivery_partner_id)?.name ?? `Partner #${o.delivery_partner_id}`}
+                            </div>
+                          ) : null}
+                          <select
+                            value={o.delivery_partner_id ?? ''}
+                            disabled={assigningId === o.id}
+                            onChange={(e) => handleAssignDelivery(o.id, e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            <option value="">
+                              {assigningId === o.id ? 'Assigning...' : o.delivery_partner_id ? 'Reassign partner...' : 'Assign partner...'}
                             </option>
-                          ))}
-                        </select>
+                            {partners.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.phone})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-500">Confirm order first</span>
+                        <span className="text-xs text-slate-500">-</span>
                       )}
                     </td>
                   </tr>
