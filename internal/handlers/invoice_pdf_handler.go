@@ -88,9 +88,14 @@ pdf.CellFormat(0, 5, "Date : "+invoice.GeneratedAt.Format("02-01-2006"), "", 1, 
 if invoice.PaymentReference != "" {
 pdf.CellFormat(0, 5, "Payment Reference: "+invoice.PaymentReference, "", 1, "L", false, 0, "")
 }
-taxType := "CGST + SGST (Intra-State)"
+totalGST := invoice.CGSTAmount + invoice.SGSTAmount + invoice.IGSTAmount
+taxType := "No GST Applicable"
+if totalGST > 0 {
 if invoice.IsInterState {
 taxType = "IGST (Inter-State)"
+} else {
+taxType = "CGST + SGST (Intra-State)"
+}
 }
 pdf.CellFormat(0, 5, "Tax Type: "+taxType, "", 1, "L", false, 0, "")
 pdf.Ln(2)
