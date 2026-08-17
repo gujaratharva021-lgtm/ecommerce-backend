@@ -16,6 +16,7 @@ userID := c.MustGet("user_id").(uint)
 var addresses []models.Address
 if err := database.DB.
 Where("user_id = ?", userID).
+Where("is_deleted = ?", false).
 Order("is_default DESC, created_at DESC").
 Find(&addresses).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load addresses"})
@@ -139,14 +140,7 @@ c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this addr
 return
 }
 
-var orderCount int64
-database.DB.Model(&models.Order{}).Where("address_id = ?", address.ID).Count(&orderCount)
-if orderCount > 0 {
-c.JSON(http.StatusBadRequest, gin.H{"error": "This address is linked to a previous order and cannot be deleted"})
-return
-}
-
-if err := database.DB.Delete(&address).Error; err != nil {
+if err := database.DB.Model(&address).Update("is_deleted", true).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete address"})
 return
 }
@@ -155,6 +149,7 @@ if address.IsDefault {
 var nextAddress models.Address
 if err := database.DB.
 Where("user_id = ?", userID).
+Where("is_deleted = ?", false).
 Order("created_at DESC").
 First(&nextAddress).Error; err == nil {
 database.DB.Model(&nextAddress).Update("is_default", true)
