@@ -39,6 +39,7 @@ WarehouseID       *uint            `gorm:"index;index:idx_orders_warehouse_statu
 Warehouse         *Warehouse       `gorm:"foreignKey:WarehouseID" json:"warehouse,omitempty"`
 ItemsAmount       float64          `gorm:"not null" json:"items_amount"`
 DeliveryCharge    float64          `gorm:"not null;default:0" json:"delivery_charge"`
+PlatformFee       float64          `gorm:"not null;default:0" json:"platform_fee"`
 WalletAmountUsed  float64          `gorm:"not null;default:0" json:"wallet_amount_used"`
 TotalAmount       float64          `gorm:"not null" json:"total_amount"`
 Status            string           `gorm:"default:pending;index:idx_orders_warehouse_status,priority:2" json:"status"`         // pending/confirmed/shipped/delivered/cancelled

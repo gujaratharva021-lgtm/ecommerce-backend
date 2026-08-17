@@ -294,6 +294,11 @@ pdf.SetFont("Arial", "", 9)
 pdf.CellFormat(150, 5, "Delivery Charge", "", 0, "L", false, 0, "")
 pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.DeliveryCharge), "", 1, "R", false, 0, "")
 }
+if invoice.PlatformFee > 0 {
+pdf.SetFont("Arial", "", 9)
+pdf.CellFormat(150, 5, "Platform Fee", "", 0, "L", false, 0, "")
+pdf.CellFormat(0, 5, fmt.Sprintf("%.2f", invoice.PlatformFee), "", 1, "R", false, 0, "")
+}
 if invoice.WalletUsed > 0 {
 pdf.SetFont("Arial", "", 9)
 pdf.CellFormat(150, 5, "Wallet Used", "", 0, "L", false, 0, "")

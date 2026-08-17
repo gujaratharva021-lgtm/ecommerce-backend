@@ -86,6 +86,8 @@ addColumnStatements := []string{
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
 `ALTER TABLE products ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE orders ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`,
 }
 for _, stmt := range addColumnStatements {
 if err := tx.Exec(stmt).Error; err != nil {
@@ -168,6 +170,17 @@ deliveryGST = order.DeliveryCharge - deliveryTaxable
 totalTaxable += deliveryTaxable
 totalGST += deliveryGST
 
+// Platform fee gets the same composite-supply tax treatment as delivery
+// charge - taxed at the order's highest item GST rate.
+platformFeeTaxable := order.PlatformFee
+platformFeeGST := 0.0
+if maxGSTPercent > 0 && order.PlatformFee > 0 {
+platformFeeTaxable = order.PlatformFee / (1 + maxGSTPercent/100)
+platformFeeGST = order.PlatformFee - platformFeeTaxable
+}
+totalTaxable += platformFeeTaxable
+totalGST += platformFeeGST
+
 cgstAmount := 0.0
 sgstAmount := 0.0
 igstAmount := 0.0
@@ -191,6 +204,7 @@ AddressPincode:    order.Address.Pincode,
 ItemsAmount:       order.ItemsAmount,
 DiscountAmount:    discountAmount,
 DeliveryCharge:    order.DeliveryCharge,
+PlatformFee:       order.PlatformFee,
 WalletUsed:        order.WalletAmountUsed,
 IsInterState:      isInterState,
 TaxableAmount:     totalTaxable,

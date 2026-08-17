@@ -26,6 +26,7 @@ AddressPincode string        `json:"address_pincode"`
 ItemsAmount    float64       `json:"items_amount"`
 DiscountAmount float64       `json:"discount_amount"`
 DeliveryCharge float64       `json:"delivery_charge"`
+PlatformFee    float64       `json:"platform_fee"`
 WalletUsed     float64       `gorm:"column:wallet_amount_used" json:"wallet_amount_used"`
 IsInterState   bool          `json:"is_inter_state"`
 TaxableAmount  float64       `json:"taxable_amount"`
