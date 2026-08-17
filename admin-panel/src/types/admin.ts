@@ -1,4 +1,4 @@
-export interface Product {
+﻿export interface Product {
   id: number
   name: string
   description?: string
@@ -6,6 +6,8 @@ export interface Product {
   category_id: number
   image_url?: string
   barcode?: string
+  gst_percent?: number
+  hsn_code?: string
   created_at?: string
   inventories?: { id: number; warehouse_id: number; stock: number; in_stock: boolean }[]
 }
@@ -17,6 +19,8 @@ export interface ProductCreateRequest {
   category_id: number
   image_url?: string
   stock?: number
+  gst_percent?: number
+  hsn_code?: string
 }
 
 export interface Category {
@@ -230,9 +234,9 @@ export interface SettingsMap {
 }
 
 export const SETTINGS_LABELS: Record<string, string> = {
-  free_delivery_threshold: 'Free Delivery Threshold (â‚¹)',
-  flat_delivery_charge: 'Flat Delivery Charge (â‚¹)',
-  min_order_amount: 'Minimum Order Amount (â‚¹)',
+  free_delivery_threshold: 'Free Delivery Threshold (Ã¢â€šÂ¹)',
+  flat_delivery_charge: 'Flat Delivery Charge (Ã¢â€šÂ¹)',
+  min_order_amount: 'Minimum Order Amount (Ã¢â€šÂ¹)',
   cancellation_window_minutes: 'Cancellation Window (minutes)',
   company_name: 'Company Name',
   support_phone: 'Support Phone',

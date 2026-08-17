@@ -32,3 +32,9 @@ secrets/
 warehouse-app/src_backup_*/
 
 invoice-*.pdf
+
+*.bak
+phase*_results.txt
+phase_admin_baseline*.txt
+routes_dump.txt
+phase_*.txt

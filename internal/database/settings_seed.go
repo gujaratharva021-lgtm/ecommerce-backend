@@ -8,6 +8,7 @@ import "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 var defaultSettings = map[string]string{
 "free_delivery_threshold":     "500",
 "flat_delivery_charge":        "50",
+"platform_fee":                "5",
 "min_order_amount":            "0",
 "cancellation_window_minutes": "10",
 "company_name":                "",

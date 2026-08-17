@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "errors"
@@ -151,6 +151,11 @@ if itemsAmount >= freeDeliveryThreshold {
 deliveryCharge = 0
 }
 
+// Platform fee: flat fee on every order (not waived above the free-delivery
+// threshold). Admin-configurable via PUT /admin/settings ("platform_fee"),
+// defaults to Rs.5.
+platformFee := utils.GetSettingFloat("platform_fee", 5.0)
+
 // Coupon: validated against itemsAmount (before delivery charge),
 // using the transaction so the read is consistent with everything
 // else happening in this checkout.
@@ -165,7 +170,7 @@ appliedCoupon = coupon
 discount = d
 }
 
-totalBeforeWallet := itemsAmount + deliveryCharge - discount
+totalBeforeWallet := itemsAmount + deliveryCharge + platformFee - discount
 walletUsed := 0.0
 if req.UseWallet {
 userWallet, werr := utils.GetOrCreateWallet(tx, userID)
@@ -196,6 +201,7 @@ AddressID:        address.ID,
 WarehouseID:      &warehouseID,
 ItemsAmount:      itemsAmount,
 DeliveryCharge:   deliveryCharge,
+PlatformFee:      platformFee,
 WalletAmountUsed: walletUsed,
 TotalAmount:      finalTotal,
 Status:           orderStatus,

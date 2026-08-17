@@ -1,4 +1,4 @@
-package database
+﻿package database
 
 import (
 	"log"
@@ -125,4 +125,11 @@ func EnsureProductionSchemaPatches() {
 if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
 log.Fatalf("Failed to add gst_percent column: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add platform_fee column to orders: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add platform_fee column to invoices: %v", err)
+}
+seedDefaultSettings()
 }
