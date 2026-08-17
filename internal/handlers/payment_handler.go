@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"log"
@@ -16,7 +16,7 @@ import (
 // POST /api/v1/orders/:id/payment (protected)
 // Creates a Razorpay order for an existing app order (payment_method must
 // be "online") and returns what the frontend needs to open Razorpay
-// Checkout. Safe to call again to retry after a failed/abandoned attempt Ã¢â‚¬â€
+// Checkout. Safe to call again to retry after a failed/abandoned attempt â€”
 // it overwrites the same Payment row rather than creating duplicates.
 func CreatePaymentOrder(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
@@ -78,7 +78,7 @@ func CreatePaymentOrder(c *gin.Context) {
 // Verifies the Razorpay signature returned by Checkout on the frontend.
 // On success, marks the Payment + Order as paid and auto-advances a
 // still-pending order to "confirmed". On signature mismatch, the payment
-// is marked failed and the order is left untouched Ã¢â‚¬â€ the frontend can
+// is marked failed and the order is left untouched â€” the frontend can
 // retry via CreatePaymentOrder.
 func VerifyPayment(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
@@ -130,10 +130,12 @@ func VerifyPayment(c *gin.Context) {
 		order.Status = models.OrderStatusConfirmed
 	}
 	if err := database.DB.Save(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order Ã¢â‚¬â€ contact support"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order â€” contact support"})
 		return
 	}
-        go services.AutoAssignDeliveryPartner(order.ID)
+        // Delivery partner assignment is admin-only now (see
+        // AssignDeliveryPartner) - it no longer happens automatically the
+        // moment payment is confirmed.
         if order.WarehouseID != nil {
                 services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyNewOrder,
                         "New order #"+orderID,

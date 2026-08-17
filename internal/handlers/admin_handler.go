@@ -422,9 +422,9 @@ func UpdateOrderStatus(c *gin.Context) {
 	}
 
 	order.Status = req.Status
-        if req.Status == models.OrderStatusConfirmed {
-                go services.AutoAssignDeliveryPartner(order.ID)
-        }
+    // Delivery partner assignment is admin-only now (see
+    // AssignDeliveryPartner) - confirming an order no longer auto-assigns
+    // a partner behind the admin's back.
 
 	message := "Your order #" + orderID + " status is now: " + req.Status
 	utils.SendNotification(order.Address.Phone, message, "order_status_"+req.Status, &order.ID)
