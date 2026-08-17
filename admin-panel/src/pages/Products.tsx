@@ -22,6 +22,8 @@ const emptyForm = {
   category_id: '',
   stock: '',
   image_url: '',
+  gst_percent: '0',
+  hsn_code: '',
 }
 
 export default function Products() {
@@ -82,6 +84,8 @@ export default function Products() {
       category_id: String(p.category_id),
       stock: '',
       image_url: p.image_url ?? '',
+      gst_percent: String(p.gst_percent ?? 0),
+      hsn_code: p.hsn_code ?? '',
     })
     setFormError(null)
     setEditingProduct(p)
@@ -127,6 +131,8 @@ export default function Products() {
           price: parseFloat(form.price),
           category_id: parseInt(form.category_id, 10),
           image_url: form.image_url.trim(),
+          gst_percent: form.gst_percent ? parseFloat(form.gst_percent) : 0,
+          hsn_code: form.hsn_code.trim(),
         })
       } else {
         await createProduct({
@@ -135,6 +141,8 @@ export default function Products() {
           price: parseFloat(form.price),
           category_id: parseInt(form.category_id, 10),
           image_url: form.image_url.trim(),
+          gst_percent: form.gst_percent ? parseFloat(form.gst_percent) : 0,
+          hsn_code: form.hsn_code.trim(),
           stock: form.stock ? parseInt(form.stock, 10) : 0,
         })
       }
@@ -408,6 +416,30 @@ export default function Products() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">GST %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={100}
+                  value={form.gst_percent}
+                  onChange={(e) => setForm({ ...form, gst_percent: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">HSN Code</label>
+                <input
+                  type="text"
+                  value={form.hsn_code}
+                  onChange={(e) => setForm({ ...form, hsn_code: e.target.value })}
+                  placeholder="e.g. 8544"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs text-slate-400 block mb-1">Image</label>

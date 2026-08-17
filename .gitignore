@@ -37,3 +37,4 @@ invoice-*.pdf
 phase*_results.txt
 phase_admin_baseline*.txt
 routes_dump.txt
+phase_*.txt
