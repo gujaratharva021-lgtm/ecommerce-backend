@@ -1,4 +1,4 @@
-package services
+﻿package services
 
 import (
 "fmt"
@@ -83,6 +83,8 @@ addColumnStatements := []string{
 `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS igst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
+`ALTER TABLE products ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
 `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
 }
 for _, stmt := range addColumnStatements {
@@ -146,6 +148,26 @@ totalGST += gstLineAmount
 itemGST[i] = gstLine{percent: gstPercent, amount: gstLineAmount}
 }
 
+// Delivery charge follows the same tax treatment as the goods it's
+// delivering (composite supply, Section 15(2)(c) CGST Act) rather than
+// being left untaxed - taxed at the highest GST rate among the order's
+// items, since a single delivery charge can't be split per-item. Orders
+// with no GST-rated items (maxGSTPercent stays 0) leave delivery untaxed too.
+maxGSTPercent := 0.0
+for _, g := range itemGST {
+if g.percent > maxGSTPercent {
+maxGSTPercent = g.percent
+}
+}
+deliveryTaxable := order.DeliveryCharge
+deliveryGST := 0.0
+if maxGSTPercent > 0 && order.DeliveryCharge > 0 {
+deliveryTaxable = order.DeliveryCharge / (1 + maxGSTPercent/100)
+deliveryGST = order.DeliveryCharge - deliveryTaxable
+}
+totalTaxable += deliveryTaxable
+totalGST += deliveryGST
+
 cgstAmount := 0.0
 sgstAmount := 0.0
 igstAmount := 0.0
@@ -190,6 +212,7 @@ InvoiceID:   invoice.ID,
 ProductID:   item.ProductID,
 ProductName: item.Product.Name,
 SKU:         item.Product.Barcode,
+HSNCode:     item.Product.HSNCode,
 Quantity:    item.Quantity,
 Price:       item.Price,
 GSTPercent:  itemGST[i].percent,

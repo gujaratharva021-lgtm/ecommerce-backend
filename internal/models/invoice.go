@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import "time"
 
@@ -55,6 +55,10 @@ ProductName string `json:"product_name"`
 // assigned. Blank if the product never had a barcode generated - not
 // invented, since there's no separate SKU concept in this catalog.
 SKU      string  `json:"sku,omitempty"`
+	// HSNCode is a snapshot of the product's HSN code at order time, for
+	// GST-compliant invoicing. Separate from SKU/Barcode - HSN is a tax
+	// classification code, not an inventory identifier.
+	HSNCode  string  `json:"hsn_code,omitempty"`
 Quantity int     `json:"quantity"`
 Price    float64 `json:"price"`
 GSTPercent float64 `json:"gst_percent"`

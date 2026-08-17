@@ -193,7 +193,7 @@ cgstDisplay = fmt.Sprintf("%.2f", half)
 sgstDisplay = fmt.Sprintf("%.2f", half)
 }
 
-hsn := item.SKU
+hsn := item.HSNCode
 if hsn == "" {
 hsn = "-"
 }
