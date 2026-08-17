@@ -1,4 +1,4 @@
-﻿package services
+package services
 
 import (
 "fmt"
@@ -10,15 +10,14 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 )
 
-// staleLocationWindow is how recent a partner's last location update must
-// be for them to be considered "trackable" for nearest-match purposes.
-// Partners with an older (or missing) location are still eligible, but are
-// ranked after trackable ones, since we can't judge their real distance.
 const staleLocationWindow = 30 * time.Minute
 
-// haversineKm returns the great-circle distance in kilometers between two
-// lat/lng points. This is the standard formula used for short-to-medium
-// range distance estimates where earth curvature matters slightly.
+var terminalOrderStatuses = []string{
+models.OrderStatusDelivered,
+models.OrderStatusCancelled,
+models.OrderStatusReturned,
+}
+
 func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
 const earthRadiusKm = 6371.0
 dLat := (lat2 - lat1) * math.Pi / 180.0
@@ -32,29 +31,64 @@ c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 return earthRadiusKm * c
 }
 
-// AutoAssignDeliveryPartner picks the nearest active, currently-unburdened
-// delivery partner and assigns them to the given order. It's a no-op (logs
-// and returns) if the order already has a partner, if the order's address
-// has no coordinates, or if no active partner is available.
+type partnerCandidate struct {
+ID  uint
+Lat float64
+Lng float64
+}
+
+func selectNearestPartner(pickupLat, pickupLng float64, candidates []partnerCandidate) *uint {
+if len(candidates) == 0 {
+return nil
+}
+
+bestIdx := 0
+bestDist := haversineKm(pickupLat, pickupLng, candidates[0].Lat, candidates[0].Lng)
+for i := 1; i < len(candidates); i++ {
+d := haversineKm(pickupLat, pickupLng, candidates[i].Lat, candidates[i].Lng)
+if d < bestDist {
+bestDist = d
+bestIdx = i
+}
+}
+
+id := candidates[bestIdx].ID
+return &id
+}
+
+// AutoAssignDeliveryPartner picks the nearest eligible delivery partner and
+// assigns them to the given order. It's a no-op (logs and returns) if the
+// order already has a partner, if the order has no pickup warehouse, or if
+// no eligible partner is available.
 //
-// "Nearest" is computed against the partner's last known live location.
-// Partners are also deprioritized if they already have an active
-// (confirmed/shipped) delivery in progress, so load is spread out rather
-// than piling every new order onto whoever happens to be closest.
+// Eligibility:
+//   - the partner must be active (is_active = true)
+//   - the partner must NOT already be handling another order that hasn't
+//     reached a terminal status (delivered/cancelled/returned) - they're
+//     excluded outright, not just deprioritized, so load is spread across
+//     free partners instead of piling onto someone already out delivering
+//   - the partner must have a valid, recent GPS location (within
+//     staleLocationWindow); a partner with a missing or stale location is
+//     skipped for this pass rather than guessed at
+//
+// "Nearest" is measured from the order's pickup warehouse to the partner's
+// latest valid location - not from the customer's delivery address, since
+// the partner starts their trip at the warehouse.
 func AutoAssignDeliveryPartner(orderID uint) {
 var order models.Order
-if err := database.DB.Preload("Address").First(&order, orderID).Error; err != nil {
+if err := database.DB.Preload("Warehouse").First(&order, orderID).Error; err != nil {
 log.Printf("[auto-assign] order %d not found: %v", orderID, err)
 return
 }
 
 if order.DeliveryPartnerID != nil {
-return // already assigned, nothing to do
-}
-if order.Address.Lat == nil || order.Address.Lng == nil {
-log.Printf("[auto-assign] order %d's address has no coordinates, skipping auto-assign", orderID)
 return
 }
+if order.Warehouse == nil {
+log.Printf("[auto-assign] order %d has no pickup warehouse, skipping auto-assign", orderID)
+return
+}
+pickupLat, pickupLng := order.Warehouse.Lat, order.Warehouse.Lng
 
 var partners []models.DeliveryPartner
 if err := database.DB.Where("is_active = ?", true).Find(&partners).Error; err != nil {
@@ -66,74 +100,55 @@ log.Printf("[auto-assign] no active delivery partners available for order %d", o
 return
 }
 
-// Load count of currently active (confirmed/shipped) deliveries per
-// partner, so we can prefer less-loaded partners.
-type loadRow struct {
-DeliveryPartnerID uint
-Cnt               int64
+var busyPartnerIDs []uint
+if err := database.DB.Model(&models.Order{}).
+Where("delivery_partner_id IS NOT NULL AND status NOT IN ?", terminalOrderStatuses).
+Distinct("delivery_partner_id").
+Pluck("delivery_partner_id", &busyPartnerIDs).Error; err != nil {
+log.Printf("[auto-assign] failed to load busy delivery partners: %v", err)
+return
 }
-var loads []loadRow
-database.DB.Model(&models.Order{}).
-Select("delivery_partner_id, count(*) as cnt").
-Where("delivery_partner_id IS NOT NULL AND status IN ?", []string{models.OrderStatusConfirmed, models.OrderStatusShipped}).
-Group("delivery_partner_id").
-Scan(&loads)
-loadByPartner := make(map[uint]int64, len(loads))
-for _, l := range loads {
-loadByPartner[l.DeliveryPartnerID] = l.Cnt
+busy := make(map[uint]bool, len(busyPartnerIDs))
+for _, id := range busyPartnerIDs {
+busy[id] = true
 }
 
-custLat, custLng := *order.Address.Lat, *order.Address.Lng
 staleCutoff := time.Now().Add(-staleLocationWindow)
-
-var bestPartner *models.DeliveryPartner
-var bestScore float64
-var bestHasFreshLocation bool
-
-for i := range partners {
-p := &partners[i]
-hasFreshLocation := p.CurrentLat != nil && p.CurrentLng != nil &&
+partnerByID := make(map[uint]models.DeliveryPartner, len(partners))
+candidates := make([]partnerCandidate, 0, len(partners))
+for _, p := range partners {
+if busy[p.ID] {
+continue
+}
+hasValidLocation := p.CurrentLat != nil && p.CurrentLng != nil &&
 p.LastLocationUpdate != nil && p.LastLocationUpdate.After(staleCutoff)
-
-var distanceKm float64
-if hasFreshLocation {
-distanceKm = haversineKm(custLat, custLng, *p.CurrentLat, *p.CurrentLng)
-} else {
-// Unknown distance: treat as far away so trackable partners
-// are preferred, but still selectable if no one else exists.
-distanceKm = math.MaxFloat64 / 2
+if !hasValidLocation {
+continue
+}
+partnerByID[p.ID] = p
+candidates = append(candidates, partnerCandidate{
+ID:  p.ID,
+Lat: *p.CurrentLat,
+Lng: *p.CurrentLng,
+})
 }
 
-// Each active delivery adds a fixed "penalty" in km-equivalent
-// terms so a partner already juggling orders isn't picked over a
-// slightly-farther free partner.
-const loadPenaltyKm = 3.0
-score := distanceKm + float64(loadByPartner[p.ID])*loadPenaltyKm
-
-if bestPartner == nil ||
-(hasFreshLocation && !bestHasFreshLocation) ||
-(hasFreshLocation == bestHasFreshLocation && score < bestScore) {
-bestPartner = p
-bestScore = score
-bestHasFreshLocation = hasFreshLocation
+bestID := selectNearestPartner(pickupLat, pickupLng, candidates)
+if bestID == nil {
+log.Printf("[auto-assign] no eligible nearby delivery partner (free + valid location) for order %d", orderID)
+return
 }
-}
+bestPartner := partnerByID[*bestID]
 
-if bestPartner == nil {
-log.Printf("[auto-assign] could not select a partner for order %d", orderID)
+if err := database.DB.Model(&models.Order{}).Where("id = ?", order.ID).Update("delivery_partner_id", bestPartner.ID).Error; err != nil {
+log.Printf("[auto-assign] failed to assign partner %d to order %d: %v", bestPartner.ID, order.ID, err)
 return
 }
 
-partnerID := bestPartner.ID
-if err := database.DB.Model(&models.Order{}).Where("id = ?", order.ID).Update("delivery_partner_id", partnerID).Error; err != nil {
-log.Printf("[auto-assign] failed to assign partner %d to order %d: %v", partnerID, order.ID, err)
-return
-}
-
-log.Printf("[auto-assign] order %d assigned to delivery partner %d (%s)", order.ID, partnerID, bestPartner.Name)
+log.Printf("[auto-assign] order %d assigned to delivery partner %d (%s)", order.ID, bestPartner.ID, bestPartner.Name)
 
 go SendPushToPartner(
-partnerID,
+bestPartner.ID,
 "New delivery assigned",
 fmt.Sprintf("Order #%d has been assigned to you", order.ID),
 )
