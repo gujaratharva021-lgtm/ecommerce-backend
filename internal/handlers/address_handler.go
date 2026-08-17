@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "net/http"
@@ -136,6 +136,13 @@ return
 }
 if address.UserID != userID {
 c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this address"})
+return
+}
+
+var orderCount int64
+database.DB.Model(&models.Order{}).Where("address_id = ?", address.ID).Count(&orderCount)
+if orderCount > 0 {
+c.JSON(http.StatusBadRequest, gin.H{"error": "This address is linked to a previous order and cannot be deleted"})
 return
 }
 
