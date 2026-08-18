@@ -230,7 +230,6 @@ delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerO
 
 				admin.POST("/wallet/credit/:user_id", handlers.AdminCreditWallet)
 
-admin.PUT("/products/:id/inventory", handlers.UpdateInventory)
 admin.POST("/products/:id/barcode", handlers.GenerateProductBarcode)
 admin.DELETE("/coupons/:id", handlers.DeleteCoupon)
 admin.PUT("/stock-transfers/:id/cancel", handlers.CancelStockTransfer)
