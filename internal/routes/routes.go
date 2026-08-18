@@ -91,7 +91,7 @@ delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerO
 				warehouseStockTransfers.PUT("/:id/reject", handlers.RejectStockTransferByWarehouseStaff)
 			}
 warehouseAuthed := warehouse.Group("")
-warehouseAuthed.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly())
+warehouseAuthed.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
 {
 warehouseAuthed.GET("/dashboard", handlers.GetWarehouseDashboard)
 warehouseAuthed.GET("/orders", handlers.GetWarehouseOrders)
