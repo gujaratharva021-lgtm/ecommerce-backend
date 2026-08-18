@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"errors"
@@ -45,7 +45,7 @@ db.Count(&total)
 var orders []models.Order
 offset := (page - 1) * limit
 if err := db.Preload("Items.Product").Preload("Address").Preload("DeliveryPartner").
-Order("created_at ASC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
 return
 }
