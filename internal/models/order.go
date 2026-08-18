@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import "time"
 
@@ -7,6 +7,12 @@ import "time"
 const (
 OrderStatusPending   = "pending"
 OrderStatusConfirmed = "confirmed"
+	OrderStatusPicking          = "picking"
+	OrderStatusPicked           = "picked"
+	OrderStatusPacking          = "packing"
+	OrderStatusPacked           = "packed"
+	OrderStatusReadyForDispatch = "ready_for_dispatch"
+	OrderStatusHandedOver       = "handed_over"
 OrderStatusShipped   = "shipped"
 OrderStatusDelivered = "delivered"
 OrderStatusReturned  = "returned"
@@ -23,21 +29,48 @@ OrderPaymentStatusPaid    = "paid"
 OrderPaymentStatusFailed  = "failed"
 )
 
+// Delivery assignment lifecycle (Phase 3). This tracks the state of the
+// *courier's* response to being handed an order, independent of the
+// order's own fulfillment Status above. It only ever applies while
+// DeliveryPartnerID is set:
+//
+//	ASSIGNED  - a partner has just been assigned (admin action or
+//	            auto-assign) and hasn't responded yet. Only the ASSIGNED
+//	            state is open to Accept/Reject.
+//	ACCEPTED  - the assigned partner accepted the delivery.
+//	REJECTED  - the assigned partner declined. The order is NOT
+//	            reassigned automatically in this phase (see Phase 3 task
+//	            spec) - it's left for an admin/dispatcher to re-assign by
+//	            calling assign-delivery again, which starts a fresh
+//	            ASSIGNED cycle.
+const (
+	DeliveryAssignmentStatusAssigned = "assigned"
+	DeliveryAssignmentStatusAccepted = "accepted"
+	DeliveryAssignmentStatusRejected = "rejected"
+)
+
 type Order struct {
 ID                uint             `gorm:"primaryKey" json:"id"`
 UserID            uint             `gorm:"not null;index" json:"user_id"`
 User              User             `gorm:"foreignKey:UserID" json:"-"`
 AddressID         uint             `gorm:"not null" json:"address_id"`
 Address           Address          `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+WarehouseID       *uint            `gorm:"index;index:idx_orders_warehouse_status,priority:1" json:"warehouse_id,omitempty"`
+Warehouse         *Warehouse       `gorm:"foreignKey:WarehouseID" json:"warehouse,omitempty"`
 ItemsAmount       float64          `gorm:"not null" json:"items_amount"`
 DeliveryCharge    float64          `gorm:"not null;default:0" json:"delivery_charge"`
+PlatformFee       float64          `gorm:"not null;default:0" json:"platform_fee"`
 WalletAmountUsed  float64          `gorm:"not null;default:0" json:"wallet_amount_used"`
 TotalAmount       float64          `gorm:"not null" json:"total_amount"`
-Status            string           `gorm:"default:pending" json:"status"`         // pending/confirmed/shipped/delivered/cancelled
+Status            string           `gorm:"default:pending;index:idx_orders_warehouse_status,priority:2" json:"status"`         // pending/confirmed/shipped/delivered/cancelled
 PaymentMethod     string           `gorm:"default:cod" json:"payment_method"`     // cod/online
 PaymentStatus     string           `gorm:"default:pending" json:"payment_status"` // pending/paid/failed
 DeliveryPartnerID *uint            `gorm:"index" json:"delivery_partner_id,omitempty"`
 DeliveryPartner   *DeliveryPartner `gorm:"foreignKey:DeliveryPartnerID" json:"delivery_partner,omitempty"`
+// DeliveryAssignmentStatus is one of the DeliveryAssignmentStatus*
+// constants above, or empty/nil when no partner has ever been assigned.
+DeliveryAssignmentStatus *string     `gorm:"index;size:20" json:"delivery_assignment_status,omitempty"`
+DeliveryRejectionReason  *string     `json:"delivery_rejection_reason,omitempty"`
 Items             []OrderItem      `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 CreatedAt         time.Time        `json:"created_at"`
 UpdatedAt         time.Time        `json:"updated_at"`
@@ -54,8 +87,8 @@ CreatedAt time.Time `json:"created_at"`
 }
 
 // CheckoutRequest is the body for POST /orders/checkout.
-// AddressID is optional â€” if omitted, the user's default address is used.
-// PaymentMethod is optional â€” defaults to "cod" if omitted; "online" starts
+// AddressID is optional - if omitted, the user's default address is used.
+// PaymentMethod is optional - defaults to "cod" if omitted; "online" starts
 // the Razorpay flow (see POST /orders/:id/payment).
 type CheckoutRequest struct {
 AddressID     uint   `json:"address_id"`
@@ -67,6 +100,12 @@ UseWallet     bool   `json:"use_wallet"`
 // OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).
 type OrderStatusUpdateRequest struct {
 Status string `json:"status" binding:"required,oneof=confirmed shipped delivered cancelled"`
+}
+
+// RejectAssignmentRequest is the body for PUT /delivery/orders/:id/reject
+// (delivery partner only). Reason is optional.
+type RejectAssignmentRequest struct {
+	Reason string `json:"reason"`
 }
 
 // OrderListResponse wraps paginated order results.

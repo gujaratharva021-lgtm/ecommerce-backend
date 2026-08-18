@@ -47,3 +47,14 @@ Lng float64 `json:"lng" binding:"required"`
 type UpdateOnlineStatusRequest struct {
 IsOnline *bool `json:"is_online" binding:"required"`
 }
+
+// UpdateDeliveryProfileRequest is the body for PUT /delivery/profile
+type UpdateDeliveryProfileRequest struct {
+Name          string `json:"name" binding:"required"`
+VehicleNumber string `json:"vehicle_number"`
+}
+
+// UpdateAvailabilityRequest is the body for PUT /delivery/availability
+type UpdateAvailabilityRequest struct {
+Status string `json:"status" binding:"required,oneof=online offline"`
+}
