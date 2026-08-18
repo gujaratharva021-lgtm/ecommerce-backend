@@ -131,5 +131,8 @@ log.Fatalf("Failed to add platform_fee column to orders: %v", err)
 if err := DB.Exec(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
 log.Fatalf("Failed to add platform_fee column to invoices: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+log.Fatalf("Failed to add is_online column to delivery_partners: %v", err)
+}
 seedDefaultSettings()
 }
