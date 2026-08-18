@@ -23,13 +23,22 @@ func GenerateJWT(userID uint, phone, role string) (string, error) {
 	if err != nil {
 		expiryHours = 72
 	}
+	return GenerateJWTWithExpiry(userID, phone, role, time.Now().Add(time.Duration(expiryHours)*time.Hour))
+}
+
+// GenerateJWTWithExpiry creates a signed JWT with an explicit expiry
+// instant. GenerateJWT is the normal entry point for login flows; this
+// exists so tests (e.g. role/middleware tests) can deterministically
+// construct an already-expired token without sleeping.
+func GenerateJWTWithExpiry(userID uint, phone, role string, expiresAt time.Time) (string, error) {
+	cfg := config.AppConfig
 
 	claims := Claims{
 		UserID: userID,
 		Phone:  phone,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expiryHours) * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

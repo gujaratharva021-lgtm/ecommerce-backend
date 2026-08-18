@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
@@ -53,17 +55,41 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// DeliveryPartnerOnly restricts access to users with role "delivery_partner". Must run after AuthMiddleware.
+// DeliveryPartnerOnly restricts access to users with role "delivery_partner".
+// Must run after AuthMiddleware. In addition to checking the JWT role claim,
+// this re-checks the partner's is_active flag against the DB on every
+// request, so a partner deactivated by admin loses API access immediately -
+// not only after their existing token happens to expire.
 func DeliveryPartnerOnly() gin.HandlerFunc {
-return func(c *gin.Context) {
-role, exists := c.Get("role")
-if !exists || role != "delivery_partner" {
-c.JSON(http.StatusForbidden, gin.H{"error": "Delivery partner access required"})
-c.Abort()
-return
-}
-c.Next()
-}
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists || role != "delivery_partner" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Delivery partner access required"})
+			c.Abort()
+			return
+		}
+
+		partnerID, ok := c.Get("user_id")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.Abort()
+			return
+		}
+
+		var partner models.DeliveryPartner
+		if err := database.DB.Select("id", "is_active").First(&partner, partnerID).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Delivery partner account not found"})
+			c.Abort()
+			return
+		}
+		if !partner.IsActive {
+			c.JSON(http.StatusForbidden, gin.H{"error": "This delivery partner account is inactive"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 // WarehouseStaffOnly restricts access to users with role "warehouse_staff". Must run after AuthMiddleware.
