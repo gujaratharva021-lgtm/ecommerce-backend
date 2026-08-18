@@ -355,6 +355,12 @@ adminInvoices := admin.Group("/invoices")
 adminInvoices.GET("", handlers.SearchInvoices)
 adminInvoices.GET("/:id", handlers.GetAdminInvoiceByID)
 adminInvoices.GET("/:id/pdf", handlers.GetAdminInvoicePDF)
+			}
+
+			 adminReports := admin.Group("/reports")
+			{
+				adminReports.GET("/daily-sales", handlers.GetDailySalesReport)
+				adminReports.GET("/daily-sales/export", handlers.ExportDailySalesReport)
 }
 			}
 		}
