@@ -26,7 +26,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.markShipped(_order['id']);
+      final data = await ApiService.markShipped(_order['order_id']);
       setState(() {
         _order = data['order'];
         _loading = false;
@@ -45,7 +45,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.confirmDelivery(_order['id']);
+      final data = await ApiService.confirmDelivery(_order['order_id']);
       setState(() {
         _order = data['order'];
         _loading = false;
@@ -60,12 +60,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final address = _order['address'] ?? {};
-    final items = (_order['items'] ?? []) as List<dynamic>;
     final status = _order['status'] ?? '';
+    final deliveryAddress = _order['delivery_address'] ?? '';
+    final customerName = _order['customer_name'] ?? '';
+    final customerPhone = _order['customer_phone'] ?? '';
+    final itemCount = _order['item_count'] ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Order #${_order['id']}')),
+      appBar: AppBar(title: Text('Order #${_order['order_id']}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -76,14 +78,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    address['full_name'] ?? '',
+                    customerName,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 4),
-                  Text(address['phone'] ?? ''),
+                  Text(customerPhone),
                   const SizedBox(height: 8),
-                  Text('${address['line1'] ?? ''}, ${address['line2'] ?? ''}'),
-                  Text('${address['city'] ?? ''}, ${address['state'] ?? ''} - ${address['pincode'] ?? ''}'),
+                  Text(deliveryAddress),
                 ],
               ),
             ),
@@ -97,26 +98,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   const Text('Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
-                  ...items.map((item) {
-                    final product = item['product'] ?? {};
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('${product['name'] ?? ''} x${item['quantity']}'),
-                          Text('₹${item['price']}'),
-                        ],
-                      ),
-                    );
-                  }),
+                  Text('$itemCount item(s)'),
                   const Divider(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(
-                        '₹${_order['total_amount']}',
+                        '\u20B9${_order['total_amount']}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -152,7 +141,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             )
           else if (status == 'delivered')
             const Center(
-              child: Text('✅ Delivered', style: TextStyle(color: Colors.green, fontSize: 18)),
+              child: Text('Delivered', style: TextStyle(color: Colors.green, fontSize: 18)),
             ),
         ],
       ),
