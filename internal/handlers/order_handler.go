@@ -134,7 +134,7 @@ func Checkout(c *gin.Context) {
 			})
 		}
 
-		deliveryCharge := flatDeliveryCharge
+		deliveryCharge := services.CalculateDeliveryCharge(address.Lat, address.Lng)
 		if itemsAmount >= freeDeliveryThreshold {
 			deliveryCharge = 0
 		}
@@ -224,6 +224,9 @@ func Checkout(c *gin.Context) {
 	message := "Your order #" + strconv.Itoa(int(order.ID)) + " has been placed successfully!"
 	utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
 	services.SendPushToUser(order.UserID, "Order Placed", message)
+        if order.Status == models.OrderStatusConfirmed {
+                go services.AutoAssignDeliveryPartner(order.ID)
+        }
 
 	c.JSON(http.StatusCreated, order)
 }

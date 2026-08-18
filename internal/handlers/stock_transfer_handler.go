@@ -150,6 +150,109 @@ return
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
+// ApproveStockTransferByWarehouseStaff godoc
+// PUT /api/v1/warehouse/stock-transfers/:id/approve (warehouse staff only)
+// Only staff at the DESTINATION warehouse may approve an incoming transfer.
+// Same effect as the admin ApproveStockTransfer: deducts stock from the
+// source warehouse immediately and marks the transfer in_transit.
+func ApproveStockTransferByWarehouseStaff(c *gin.Context) {
+staffID := c.MustGet("user_id").(uint)
+id := c.Param("id")
+
+var staff models.WarehouseStaff
+if err := database.DB.First(&staff, staffID).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse staff not found"})
+return
+}
+
+var transfer models.StockTransfer
+if err := database.DB.First(&transfer, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Stock transfer not found"})
+return
+}
+
+if transfer.ToWarehouseID != staff.WarehouseID {
+c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination warehouse can approve this transfer"})
+return
+}
+
+if transfer.Status != models.StockTransferPending {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending transfers can be approved"})
+return
+}
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+var inventory models.Inventory
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.FromWarehouseID).
+First(&inventory).Error; err != nil {
+return errors.New("source warehouse has no inventory record for this product")
+}
+
+if inventory.Stock < transfer.Quantity {
+return errors.New("insufficient stock at source warehouse to approve this transfer")
+}
+
+inventory.Stock -= transfer.Quantity
+if inventory.Stock <= 0 {
+inventory.InStock = false
+}
+if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+transfer.Status = models.StockTransferInTransit
+transfer.ApprovedBy = &staffID
+return tx.Save(&transfer).Error
+})
+
+if txErr != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
+}
+
+// RejectStockTransferByWarehouseStaff godoc
+// PUT /api/v1/warehouse/stock-transfers/:id/reject (warehouse staff only)
+// Only staff at the DESTINATION warehouse may reject an incoming transfer.
+func RejectStockTransferByWarehouseStaff(c *gin.Context) {
+staffID := c.MustGet("user_id").(uint)
+id := c.Param("id")
+
+var staff models.WarehouseStaff
+if err := database.DB.First(&staff, staffID).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse staff not found"})
+return
+}
+
+var transfer models.StockTransfer
+if err := database.DB.First(&transfer, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Stock transfer not found"})
+return
+}
+
+if transfer.ToWarehouseID != staff.WarehouseID {
+c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination warehouse can reject this transfer"})
+return
+}
+
+if transfer.Status != models.StockTransferPending {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending transfers can be rejected"})
+return
+}
+
+transfer.Status = models.StockTransferRejected
+transfer.ApprovedBy = &staffID
+if err := database.DB.Save(&transfer).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject stock transfer"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
+}
+
 // ---------------------------------------------------------------------------
 // Stock Transfers - Admin side
 // ---------------------------------------------------------------------------

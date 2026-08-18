@@ -1,11 +1,14 @@
 ﻿package handlers
 
 import (
+"fmt"
 "net/http"
+"time"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // ---------------------------------------------------------------------------
@@ -115,6 +118,11 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 return
 }
 
+if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusShipped {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner can only be assigned to confirmed or shipped orders"})
+return
+}
+
 var req models.AssignDeliveryPartnerRequest
 if err := c.ShouldBindJSON(&req); err != nil {
 c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -138,18 +146,121 @@ return
 }
 
 database.DB.Preload("DeliveryPartner").First(&order, order.ID)
+
+go services.SendPushToPartner(
+req.DeliveryPartnerID,
+"New delivery assigned",
+fmt.Sprintf("Order #%d has been assigned to you", order.ID),
+)
+
 c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
 }
 
 // ---------------------------------------------------------------------------
-// Delivery Partner self-service (delivery partner only)
+// Delivery Partner order actions (delivery partner only)
 // ---------------------------------------------------------------------------
+
+// GetMyDeliveries godoc
+// GET /api/v1/delivery/orders (delivery partner only)
+func GetMyDeliveries(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+
+query := database.DB.
+Preload("Address").
+Preload("Items.Product").
+Where("delivery_partner_id = ?", partnerID)
+
+if status := c.Query("status"); status != "" {
+query = query.Where("status = ?", status)
+}
+
+var orders []models.Order
+if err := query.Order("created_at DESC").Find(&orders).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load assigned orders"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"orders": orders})
+}
+
+// UpdateDeliveryOrderStatus godoc
+// PUT /api/v1/delivery/orders/:id/status (delivery partner only)
+func UpdateDeliveryOrderStatus(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+orderID := c.Param("id")
+
+var req struct {
+Status string `json:"status" binding:"required,oneof=shipped"`
+}
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+var order models.Order
+if err := database.DB.Preload("Address").Preload("Items.Product").Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).First(&order).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+return
+}
+
+if order.Status != models.OrderStatusConfirmed {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be confirmed before it can be marked shipped"})
+return
+}
+
+order.Status = req.Status
+if err := database.DB.Save(&order).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+return
+}
+
+go services.SendPushToUser(
+order.UserID,
+"Order out for delivery",
+fmt.Sprintf("Your order #%d is on its way", order.ID),
+)
+
+c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
+}
+
+// ConfirmDelivery godoc
+// PUT /api/v1/delivery/orders/:id/deliver (delivery partner only)
+func ConfirmDelivery(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+orderID := c.Param("id")
+
+var order models.Order
+if err := database.DB.Preload("Address").Preload("Items.Product").Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).First(&order).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+return
+}
+
+if order.Status != models.OrderStatusShipped {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be shipped before it can be marked delivered"})
+return
+}
+
+order.Status = models.OrderStatusDelivered
+if order.PaymentMethod == models.PaymentMethodCOD {
+order.PaymentStatus = models.OrderPaymentStatusPaid
+}
+
+if err := database.DB.Save(&order).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm delivery"})
+return
+}
+
+go services.SendPushToUser(
+order.UserID,
+"Order delivered",
+fmt.Sprintf("Your order #%d has been delivered. Enjoy!", order.ID),
+)
+
+c.JSON(http.StatusOK, gin.H{"message": "Delivery confirmed", "order": order})
+}
 
 // GetMyStatus godoc
 // GET /api/v1/delivery/status (delivery partner only)
-// Returns the logged-in partner's current online/offline status. Used on
-// app start/refresh/relogin so the toggle reflects the real persisted
-// state instead of resetting to a default.
 func GetMyStatus(c *gin.Context) {
 partnerID := c.MustGet("user_id").(uint)
 
@@ -164,7 +275,6 @@ c.JSON(http.StatusOK, gin.H{"is_online": partner.IsOnline})
 
 // UpdateMyStatus godoc
 // PUT /api/v1/delivery/status (delivery partner only)
-// Lets the logged-in partner toggle themselves online/offline.
 func UpdateMyStatus(c *gin.Context) {
 partnerID := c.MustGet("user_id").(uint)
 
@@ -174,17 +284,67 @@ c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 return
 }
 
-result := database.DB.Model(&models.DeliveryPartner{}).
-Where("id = ?", partnerID).
-Update("is_online", *req.IsOnline)
-if result.Error != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
-return
-}
-if result.RowsAffected == 0 {
+var partner models.DeliveryPartner
+if err := database.DB.First(&partner, partnerID).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
 return
 }
 
-c.JSON(http.StatusOK, gin.H{"is_online": *req.IsOnline})
+partner.IsOnline = *req.IsOnline
+if err := database.DB.Model(&partner).Update("is_online", partner.IsOnline).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"is_online": partner.IsOnline})
+}
+
+// GetMyEarnings godoc
+// GET /api/v1/delivery/earnings (delivery partner only)
+const perDeliveryEarning = 30.0
+
+func GetMyEarnings(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+
+var deliveredOrders []models.Order
+if err := database.DB.
+Where("delivery_partner_id = ? AND status = ?", partnerID, models.OrderStatusDelivered).
+Order("updated_at DESC").
+Find(&deliveredOrders).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load earnings"})
+return
+}
+
+totalEarnings := float64(len(deliveredOrders)) * perDeliveryEarning
+
+todayStart := time.Now().Truncate(24 * time.Hour)
+todayCount := 0
+todayEarnings := 0.0
+type EarningEntry struct {
+OrderID     uint      `json:"order_id"`
+Amount      float64   `json:"amount"`
+DeliveredAt time.Time `json:"delivered_at"`
+}
+entries := make([]EarningEntry, 0, len(deliveredOrders))
+
+for _, o := range deliveredOrders {
+if o.UpdatedAt.After(todayStart) {
+todayCount++
+todayEarnings += perDeliveryEarning
+}
+entries = append(entries, EarningEntry{
+OrderID:     o.ID,
+Amount:      perDeliveryEarning,
+DeliveredAt: o.UpdatedAt,
+})
+}
+
+c.JSON(http.StatusOK, gin.H{
+"per_delivery_rate": perDeliveryEarning,
+"today_earnings":    todayEarnings,
+"today_deliveries":  todayCount,
+"total_earnings":    totalEarnings,
+"total_deliveries":  len(deliveredOrders),
+"entries":           entries,
+})
 }
