@@ -29,6 +29,26 @@ OrderPaymentStatusPaid    = "paid"
 OrderPaymentStatusFailed  = "failed"
 )
 
+// Delivery assignment lifecycle (Phase 3). This tracks the state of the
+// *courier's* response to being handed an order, independent of the
+// order's own fulfillment Status above. It only ever applies while
+// DeliveryPartnerID is set:
+//
+//	ASSIGNED  - a partner has just been assigned (admin action or
+//	            auto-assign) and hasn't responded yet. Only the ASSIGNED
+//	            state is open to Accept/Reject.
+//	ACCEPTED  - the assigned partner accepted the delivery.
+//	REJECTED  - the assigned partner declined. The order is NOT
+//	            reassigned automatically in this phase (see Phase 3 task
+//	            spec) - it's left for an admin/dispatcher to re-assign by
+//	            calling assign-delivery again, which starts a fresh
+//	            ASSIGNED cycle.
+const (
+	DeliveryAssignmentStatusAssigned = "assigned"
+	DeliveryAssignmentStatusAccepted = "accepted"
+	DeliveryAssignmentStatusRejected = "rejected"
+)
+
 type Order struct {
 ID                uint             `gorm:"primaryKey" json:"id"`
 UserID            uint             `gorm:"not null;index" json:"user_id"`
@@ -47,6 +67,10 @@ PaymentMethod     string           `gorm:"default:cod" json:"payment_method"`   
 PaymentStatus     string           `gorm:"default:pending" json:"payment_status"` // pending/paid/failed
 DeliveryPartnerID *uint            `gorm:"index" json:"delivery_partner_id,omitempty"`
 DeliveryPartner   *DeliveryPartner `gorm:"foreignKey:DeliveryPartnerID" json:"delivery_partner,omitempty"`
+// DeliveryAssignmentStatus is one of the DeliveryAssignmentStatus*
+// constants above, or empty/nil when no partner has ever been assigned.
+DeliveryAssignmentStatus *string     `gorm:"index;size:20" json:"delivery_assignment_status,omitempty"`
+DeliveryRejectionReason  *string     `json:"delivery_rejection_reason,omitempty"`
 Items             []OrderItem      `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 CreatedAt         time.Time        `json:"created_at"`
 UpdatedAt         time.Time        `json:"updated_at"`
@@ -76,6 +100,12 @@ UseWallet     bool   `json:"use_wallet"`
 // OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).
 type OrderStatusUpdateRequest struct {
 Status string `json:"status" binding:"required,oneof=confirmed shipped delivered cancelled"`
+}
+
+// RejectAssignmentRequest is the body for PUT /delivery/orders/:id/reject
+// (delivery partner only). Reason is optional.
+type RejectAssignmentRequest struct {
+	Reason string `json:"reason"`
 }
 
 // OrderListResponse wraps paginated order results.

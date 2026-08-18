@@ -107,8 +107,10 @@ t.Fatalf("failed to seed order: %v", err)
 return order
 }
 
-// seedActivePartner creates an active delivery partner with a fresh
-// location fix at the given coordinates.
+// seedActivePartner creates an active, ONLINE delivery partner with a
+// fresh location fix at the given coordinates. IsOnline must be true here
+// (Phase 3): auto-assign only ever picks from online partners, same as
+// the admin assign-delivery endpoint.
 func seedActivePartner(t *testing.T, phone string, lat, lng float64) models.DeliveryPartner {
 t.Helper()
 now := time.Now()
@@ -116,6 +118,7 @@ partner := models.DeliveryPartner{
 Name:                "Partner " + phone,
 Phone:               phone,
 IsActive:            true,
+IsOnline:            true,
 CurrentLat:          &lat,
 CurrentLng:          &lng,
 LastLocationUpdate:  &now,

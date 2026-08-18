@@ -1,6 +1,7 @@
 ﻿package handlers
 
 import (
+"errors"
 "fmt"
 "net/http"
 "time"
@@ -9,6 +10,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // ---------------------------------------------------------------------------
@@ -107,74 +110,180 @@ c.JSON(http.StatusOK, gin.H{"message": "Delivery partner deleted"})
 // Order assignment (admin only)
 // ---------------------------------------------------------------------------
 
-// AssignDeliveryPartner godoc
-// PUT /api/v1/admin/orders/:id/assign-delivery (admin only)
-func AssignDeliveryPartner(c *gin.Context) {
-orderID := c.Param("id")
-
-var order models.Order
-if err := database.DB.First(&order, orderID).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
-return
-}
-
-if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusShipped {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner can only be assigned to confirmed or shipped orders"})
-return
-}
-
-var req models.AssignDeliveryPartnerRequest
-if err := c.ShouldBindJSON(&req); err != nil {
-c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-return
-}
-
-var partner models.DeliveryPartner
-if err := database.DB.First(&partner, req.DeliveryPartnerID).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
-return
-}
-if !partner.IsActive {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner is not active"})
-return
-}
-
-order.DeliveryPartnerID = &req.DeliveryPartnerID
-if err := database.DB.Save(&order).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign delivery partner"})
-return
-}
-
-database.DB.Preload("DeliveryPartner").First(&order, order.ID)
-
-// Notify the partner's device(s) that a new order has been assigned.
-go services.SendPushToPartner(
-req.DeliveryPartnerID,
-"New delivery assigned",
-fmt.Sprintf("Order #%d has been assigned to you", order.ID),
+// errAssignConflict/errAssignValidation are internal sentinels used to
+// short-circuit the transaction below with a specific, already-decided
+// HTTP response, distinct from an unexpected DB error.
+var (
+	errAssignOrderNotFound   = errors.New("order not found")
+	errAssignBadOrderStatus  = errors.New("order not eligible for assignment")
+	errAssignPartnerNotFound = errors.New("delivery partner not found")
+	errAssignPartnerInactive = errors.New("delivery partner is not active")
+	errAssignPartnerOffline  = errors.New("delivery partner is offline")
+	errAssignAlreadyActive   = errors.New("order already has an active delivery assignment")
 )
 
-c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
+// AssignDeliveryPartner godoc
+// PUT /api/v1/admin/orders/:id/assign-delivery (admin only)
+//
+// Assigns (or re-assigns, after a rejection) a delivery partner to an
+// order. Only ONLINE, active partners are eligible - offline partners
+// must never receive new assignments. The whole check-then-write runs
+// inside one transaction with the order row locked for its duration, so
+// two concurrent assign requests for the same order can never both
+// succeed (task #10: no double assignment).
+func AssignDeliveryPartner(c *gin.Context) {
+	orderID := c.Param("id")
+
+	var req models.AssignDeliveryPartnerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var order models.Order
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Lock the order row for the duration of this transaction so a
+		// concurrent assignment (admin or auto-assign) for the same
+		// order has to wait, rather than racing on the read-then-write
+		// below.
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, orderID).Error; err != nil {
+			return errAssignOrderNotFound
+		}
+
+		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusShipped {
+			return errAssignBadOrderStatus
+		}
+
+		// Only re-assignable if there is no partner yet, or the
+		// previous partner rejected the delivery. An ASSIGNED or
+		// ACCEPTED order is already actively owned by a partner and
+		// must not be silently reassigned here.
+		if order.DeliveryPartnerID != nil &&
+			(order.DeliveryAssignmentStatus == nil || *order.DeliveryAssignmentStatus != models.DeliveryAssignmentStatusRejected) {
+			return errAssignAlreadyActive
+		}
+
+		var partner models.DeliveryPartner
+		if err := tx.First(&partner, req.DeliveryPartnerID).Error; err != nil {
+			return errAssignPartnerNotFound
+		}
+		if !partner.IsActive {
+			return errAssignPartnerInactive
+		}
+		if !partner.IsOnline {
+			return errAssignPartnerOffline
+		}
+
+		newStatus := models.DeliveryAssignmentStatusAssigned
+		order.DeliveryPartnerID = &req.DeliveryPartnerID
+		order.DeliveryAssignmentStatus = &newStatus
+		order.DeliveryRejectionReason = nil
+
+		if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).Updates(map[string]interface{}{
+			"delivery_partner_id":        req.DeliveryPartnerID,
+			"delivery_assignment_status": newStatus,
+			"delivery_rejection_reason":  nil,
+		}).Error; err != nil {
+			return fmt.Errorf("failed to assign delivery partner: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		switch {
+		case errors.Is(err, errAssignOrderNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		case errors.Is(err, errAssignBadOrderStatus):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner can only be assigned to confirmed or shipped orders"})
+		case errors.Is(err, errAssignAlreadyActive):
+			c.JSON(http.StatusConflict, gin.H{"error": "Order already has an active delivery assignment"})
+		case errors.Is(err, errAssignPartnerNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
+		case errors.Is(err, errAssignPartnerInactive):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner is not active"})
+		case errors.Is(err, errAssignPartnerOffline):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery partner is offline and cannot receive new assignments"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign delivery partner"})
+		}
+		return
+	}
+
+	database.DB.Preload("DeliveryPartner").First(&order, order.ID)
+
+	// Notify the partner's device(s) that a new order has been assigned.
+	go services.SendPushToPartner(
+		req.DeliveryPartnerID,
+		"New delivery assigned",
+		fmt.Sprintf("Order #%d has been assigned to you", order.ID),
+	)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
 }
 
 // ---------------------------------------------------------------------------
 // Delivery Partner order actions (delivery partner only)
 // ---------------------------------------------------------------------------
 
+// AssignedOrderSummary is the shape returned by GET /delivery/orders. It
+// deliberately surfaces only what a courier needs to fulfil the delivery -
+// it does not include the customer's account/user record, other saved
+// addresses, product cost/margin fields, etc.
+type AssignedOrderSummary struct {
+	OrderID          uint       `json:"order_id"`
+	Status           string     `json:"status"`
+	AssignmentStatus *string    `json:"assignment_status,omitempty"`
+	RejectionReason  *string    `json:"rejection_reason,omitempty"`
+	DeliveryAddress  string     `json:"delivery_address"`
+	CustomerName     string     `json:"customer_name"`
+	CustomerPhone    string     `json:"customer_phone"`
+	TotalAmount      float64    `json:"total_amount"`
+	PaymentMethod    string     `json:"payment_method"`
+	ItemCount        int        `json:"item_count"`
+	CreatedAt        time.Time  `json:"created_at"`
+}
+
+func toAssignedOrderSummary(o models.Order) AssignedOrderSummary {
+	addr := fmt.Sprintf("%s, %s, %s - %s", o.Address.Line1, o.Address.City, o.Address.State, o.Address.Pincode)
+	if o.Address.Line2 != "" {
+		addr = fmt.Sprintf("%s, %s, %s, %s - %s", o.Address.Line1, o.Address.Line2, o.Address.City, o.Address.State, o.Address.Pincode)
+	}
+	return AssignedOrderSummary{
+		OrderID:          o.ID,
+		Status:           o.Status,
+		AssignmentStatus: o.DeliveryAssignmentStatus,
+		RejectionReason:  o.DeliveryRejectionReason,
+		DeliveryAddress:  addr,
+		CustomerName:     o.Address.FullName,
+		CustomerPhone:    o.Address.Phone,
+		TotalAmount:      o.TotalAmount,
+		PaymentMethod:    o.PaymentMethod,
+		ItemCount:        len(o.Items),
+		CreatedAt:        o.CreatedAt,
+	}
+}
+
 // GetMyDeliveries godoc
 // GET /api/v1/delivery/orders (delivery partner only)
-// Returns orders assigned to the logged-in delivery partner.
-// Optional ?status= filter (e.g. confirmed, shipped, delivered).
+// Returns orders assigned to the logged-in delivery partner, identified
+// solely from the verified JWT ("user_id") - never from a client-supplied
+// delivery_boy_id, so one partner can never list another's orders (IDOR).
+// Optional ?status= filters by order status (e.g. confirmed, shipped,
+// delivered); optional ?assignment_status= filters by
+// assigned/accepted/rejected.
 func GetMyDeliveries(c *gin.Context) {
 partnerID := c.MustGet("user_id").(uint)
 
 query := database.DB.
 Preload("Address").
-Preload("Items.Product").
+Preload("Items").
 Where("delivery_partner_id = ?", partnerID)
 
 if status := c.Query("status"); status != "" {
 query = query.Where("status = ?", status)
+}
+if assignmentStatus := c.Query("assignment_status"); assignmentStatus != "" {
+query = query.Where("delivery_assignment_status = ?", assignmentStatus)
 }
 
 var orders []models.Order
@@ -183,7 +292,108 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load assigned o
 return
 }
 
-c.JSON(http.StatusOK, gin.H{"orders": orders})
+summaries := make([]AssignedOrderSummary, 0, len(orders))
+for _, o := range orders {
+summaries = append(summaries, toAssignedOrderSummary(o))
+}
+
+c.JSON(http.StatusOK, gin.H{"orders": summaries})
+}
+
+// ---------------------------------------------------------------------------
+// Assignment accept / reject (delivery partner only)
+// ---------------------------------------------------------------------------
+
+var (
+	errAssignmentOrderNotOwned = errors.New("order not found or not assigned to you")
+	errAssignmentNotPending    = errors.New("assignment is not pending")
+)
+
+// AcceptAssignment godoc
+// PUT /api/v1/delivery/orders/:id/accept (delivery partner only)
+// Moves a pending assignment ASSIGNED -> ACCEPTED. Only the partner the
+// order is currently assigned to can accept it - the lookup is scoped by
+// "id = ? AND delivery_partner_id = ?" using the authenticated partner's
+// own ID, so changing the :id in the URL can never let one partner accept
+// (or discover) another partner's order (IDOR/BOLA protection). The
+// conditional UPDATE additionally guards against a double-accept race:
+// if two requests for the same order land at once, only the one that
+// still finds delivery_assignment_status = 'assigned' succeeds.
+func AcceptAssignment(c *gin.Context) {
+	respondToAssignment(c, models.DeliveryAssignmentStatusAccepted, "")
+}
+
+// RejectAssignment godoc
+// PUT /api/v1/delivery/orders/:id/reject (delivery partner only)
+// Moves a pending assignment ASSIGNED -> REJECTED. Same ownership/IDOR and
+// concurrency guarantees as AcceptAssignment. The order is never deleted
+// and is not automatically reassigned here - that's handled separately by
+// an admin/dispatcher calling assign-delivery again (Phase 3 spec
+// explicitly defers auto-reassignment to a later phase).
+func RejectAssignment(c *gin.Context) {
+	var req models.RejectAssignmentRequest
+	// Body is optional - an empty/absent body just means no reason given.
+	_ = c.ShouldBindJSON(&req)
+	respondToAssignment(c, models.DeliveryAssignmentStatusRejected, req.Reason)
+}
+
+func respondToAssignment(c *gin.Context, newStatus string, reason string) {
+	partnerID := c.MustGet("user_id").(uint)
+	orderID := c.Param("id")
+
+	var order models.Order
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).
+			First(&order).Error; err != nil {
+			return errAssignmentOrderNotOwned
+		}
+
+		if order.DeliveryAssignmentStatus == nil || *order.DeliveryAssignmentStatus != models.DeliveryAssignmentStatusAssigned {
+			return errAssignmentNotPending
+		}
+
+		updates := map[string]interface{}{"delivery_assignment_status": newStatus}
+		if newStatus == models.DeliveryAssignmentStatusRejected {
+			if reason != "" {
+				updates["delivery_rejection_reason"] = reason
+			}
+		}
+
+		result := tx.Model(&models.Order{}).
+			Where("id = ? AND delivery_partner_id = ? AND delivery_assignment_status = ?",
+				order.ID, partnerID, models.DeliveryAssignmentStatusAssigned).
+			Updates(updates)
+		if result.Error != nil {
+			return fmt.Errorf("failed to update assignment: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			// Someone else (impossible for another partner, but a
+			// concurrent request from the same partner) beat us to it.
+			return errAssignmentNotPending
+		}
+		return nil
+	})
+
+	if err != nil {
+		switch {
+		case errors.Is(err, errAssignmentOrderNotOwned):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+		case errors.Is(err, errAssignmentNotPending):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "This assignment has already been responded to or is not in a pending state"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update assignment"})
+		}
+		return
+	}
+
+	database.DB.Preload("Address").Preload("Items").First(&order, order.ID)
+
+	msg := "Delivery accepted"
+	if newStatus == models.DeliveryAssignmentStatusRejected {
+		msg = "Delivery rejected"
+	}
+	c.JSON(http.StatusOK, gin.H{"message": msg, "order": toAssignedOrderSummary(order)})
 }
 
 // UpdateDeliveryOrderStatus godoc

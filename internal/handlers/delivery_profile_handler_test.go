@@ -46,7 +46,17 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	if err := db.AutoMigrate(&models.DeliveryPartner{}); err != nil {
+	// Also migrates the models needed by delivery_assignment_handler_test.go
+	// (Phase 3, same package - only one TestMain is allowed per package).
+	if err := db.AutoMigrate(
+		&models.DeliveryPartner{},
+		&models.User{},
+		&models.Category{},
+		&models.Product{},
+		&models.Address{},
+		&models.Order{},
+		&models.OrderItem{},
+	); err != nil {
 		fmt.Printf("[delivery_profile_handler_test] skipping package: migration failed: %v\n", err)
 		os.Exit(0)
 	}

@@ -89,9 +89,13 @@ return errAutoAssignSkipped
 // transaction trying to lock the same rows blocks right here until
 // this transaction commits or rolls back, so partner selection and
 // load counting can never race against another in-flight assignment.
+// Phase 3: only ONLINE (is_online) partners are eligible for NEW
+// assignments, on top of the existing IsActive (admin-enabled) check.
+// A partner going offline never touches orders already assigned to
+// them - this filter only affects who gets picked for a *new* one.
 var partners []models.DeliveryPartner
 if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-Where("is_active = ?", true).
+Where("is_active = ? AND is_online = ?", true, true).
 Order("id").
 Find(&partners).Error; err != nil {
 return fmt.Errorf("failed to load delivery partners: %w", err)
@@ -169,9 +173,14 @@ return errAutoAssignSkipped
 // endpoint) landing between our read of `order` above and this
 // write - if that happened, RowsAffected is 0 and we treat it as a
 // no-op rather than clobbering the manual assignment.
+assignedStatus := models.DeliveryAssignmentStatusAssigned
 result := tx.Model(&models.Order{}).
 Where("id = ? AND delivery_partner_id IS NULL", order.ID).
-Update("delivery_partner_id", bestPartner.ID)
+Updates(map[string]interface{}{
+"delivery_partner_id":        bestPartner.ID,
+"delivery_assignment_status": assignedStatus,
+"delivery_rejection_reason":  nil,
+})
 if result.Error != nil {
 return fmt.Errorf("failed to assign partner %d to order %d: %w", bestPartner.ID, order.ID, result.Error)
 }

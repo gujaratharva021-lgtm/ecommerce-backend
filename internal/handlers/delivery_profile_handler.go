@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"net/http"
@@ -159,3 +159,4 @@ func UpdateDeliveryAvailability(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": availabilityLabel(isOnline), "is_online": isOnline})
 }
+
