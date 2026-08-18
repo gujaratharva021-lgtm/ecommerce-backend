@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -139,4 +139,52 @@ return
 
 database.DB.Preload("DeliveryPartner").First(&order, order.ID)
 c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
+}
+
+// ---------------------------------------------------------------------------
+// Delivery Partner self-service (delivery partner only)
+// ---------------------------------------------------------------------------
+
+// GetMyStatus godoc
+// GET /api/v1/delivery/status (delivery partner only)
+// Returns the logged-in partner's current online/offline status. Used on
+// app start/refresh/relogin so the toggle reflects the real persisted
+// state instead of resetting to a default.
+func GetMyStatus(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+
+var partner models.DeliveryPartner
+if err := database.DB.First(&partner, partnerID).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"is_online": partner.IsOnline})
+}
+
+// UpdateMyStatus godoc
+// PUT /api/v1/delivery/status (delivery partner only)
+// Lets the logged-in partner toggle themselves online/offline.
+func UpdateMyStatus(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+
+var req models.UpdateOnlineStatusRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+result := database.DB.Model(&models.DeliveryPartner{}).
+Where("id = ?", partnerID).
+Update("is_online", *req.IsOnline)
+if result.Error != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+return
+}
+if result.RowsAffected == 0 {
+c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"is_online": *req.IsOnline})
 }

@@ -1,0 +1,364 @@
+diff --git a/delivery_app/lib/screens/orders_screen.dart b/delivery_app/lib/screens/orders_screen.dart
+index 13fffe2..8994080 100644
+--- a/delivery_app/lib/screens/orders_screen.dart
++++ b/delivery_app/lib/screens/orders_screen.dart
+@@ -19,6 +19,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
+   String? _error;
+   String _filter = 'all';
+ 
++  bool? _isOnline; // null while the initial status fetch is in flight
++  bool _statusLoading = true;
++  bool _statusUpdating = false;
++  String? _statusError;
++
+   static const Color primaryPurple = Color(0xFF5B2A9E);
+   static const Color pageBg = Color(0xFFF7F1FB);
+   static const Color bannerBg = Color(0xFFEDE6F7);
+@@ -28,6 +33,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
+   void initState() {
+     super.initState();
+     _loadAll();
++    _loadOnlineStatus();
+   }
+ 
+   Future<void> _loadAll() async {
+@@ -56,6 +62,56 @@ class _OrdersScreenState extends State<OrdersScreen> {
+     }
+   }
+ 
++  // Fetches the partner's real online/offline status from the backend, so
++  // it reflects what was last persisted after an app refresh or relogin
++  // instead of resetting to a hardcoded default.
++  Future<void> _loadOnlineStatus() async {
++    setState(() {
++      _statusLoading = true;
++      _statusError = null;
++    });
++    try {
++      final isOnline = await ApiService.getOnlineStatus();
++      if (!mounted) return;
++      setState(() {
++        _isOnline = isOnline;
++        _statusLoading = false;
++      });
++    } catch (e) {
++      if (!mounted) return;
++      setState(() {
++        _statusError = 'Failed to load status';
++        _statusLoading = false;
++      });
++    }
++  }
++
++  Future<void> _toggleOnlineStatus() async {
++    if (_isOnline == null || _statusUpdating) return;
++    final next = !_isOnline!;
++    setState(() {
++      _statusUpdating = true;
++      _statusError = null;
++    });
++    try {
++      final confirmed = await ApiService.updateOnlineStatus(next);
++      if (!mounted) return;
++      setState(() {
++        _isOnline = confirmed;
++        _statusUpdating = false;
++      });
++    } catch (e) {
++      if (!mounted) return;
++      setState(() {
++        _statusUpdating = false;
++        _statusError = 'Failed to update status';
++      });
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Could not update status. Please try again.')),
++      );
++    }
++  }
++
+   Future<void> _confirmLogout() async {
+     final confirmed = await showDialog<bool>(
+       context: context,
+@@ -208,20 +264,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
+                                 style: TextStyle(fontSize: 13, color: Colors.black54),
+                               ),
+                               const SizedBox(height: 14),
+-                              Container(
+-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+-                                decoration: BoxDecoration(
+-                                  color: Colors.white,
+-                                  borderRadius: BorderRadius.circular(20),
+-                                ),
+-                                child: const Row(
+-                                  mainAxisSize: MainAxisSize.min,
+-                                  children: [
+-                                    Icon(Icons.circle, color: Color(0xFF22C55E), size: 10),
+-                                    SizedBox(width: 6),
+-                                    Text('Online', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+-                                  ],
+-                                ),
++                              _OnlineStatusToggle(
++                                isOnline: _isOnline,
++                                loading: _statusLoading,
++                                updating: _statusUpdating,
++                                error: _statusError,
++                                onTap: _toggleOnlineStatus,
++                                onRetry: _loadOnlineStatus,
+                               ),
+                             ],
+                           ),
+@@ -393,6 +442,108 @@ class _OrdersScreenState extends State<OrdersScreen> {
+   }
+ }
+ 
++// Online/offline toggle shown on the dashboard banner. Reflects the status
++// persisted on the backend (fetched on load) rather than a hardcoded value,
++// shows a spinner while loading/updating, and surfaces a retry on error.
++class _OnlineStatusToggle extends StatelessWidget {
++  final bool? isOnline;
++  final bool loading;
++  final bool updating;
++  final String? error;
++  final VoidCallback onTap;
++  final VoidCallback onRetry;
++
++  const _OnlineStatusToggle({
++    required this.isOnline,
++    required this.loading,
++    required this.updating,
++    required this.error,
++    required this.onTap,
++    required this.onRetry,
++  });
++
++  static const Color onlineGreen = Color(0xFF22C55E);
++
++  @override
++  Widget build(BuildContext context) {
++    if (loading) {
++      return Container(
++        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
++        child: const Row(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            SizedBox(
++              width: 12,
++              height: 12,
++              child: CircularProgressIndicator(strokeWidth: 2),
++            ),
++            SizedBox(width: 8),
++            Text('Checking status…', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
++          ],
++        ),
++      );
++    }
++
++    if (error != null && isOnline == null) {
++      return InkWell(
++        onTap: onRetry,
++        borderRadius: BorderRadius.circular(20),
++        child: Container(
++          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
++          child: const Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Icon(Icons.error_outline, color: Colors.redAccent, size: 14),
++              SizedBox(width: 6),
++              Text('Status unavailable · Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
++            ],
++          ),
++        ),
++      );
++    }
++
++    final online = isOnline == true;
++    return InkWell(
++      onTap: updating ? null : onTap,
++      borderRadius: BorderRadius.circular(20),
++      child: Container(
++        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
++        decoration: BoxDecoration(
++          color: Colors.white,
++          borderRadius: BorderRadius.circular(20),
++        ),
++        child: Row(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            if (updating)
++              const SizedBox(
++                width: 10,
++                height: 10,
++                child: CircularProgressIndicator(strokeWidth: 2),
++              )
++            else
++              Icon(Icons.circle, color: online ? onlineGreen : Colors.grey, size: 10),
++            const SizedBox(width: 6),
++            Text(
++              online ? 'Online' : 'Offline',
++              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
++            ),
++            const SizedBox(width: 6),
++            Switch(
++              value: online,
++              onChanged: updating ? null : (_) => onTap(),
++              activeColor: onlineGreen,
++              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
++
+ class _FilterChip extends StatelessWidget {
+   final String label;
+   final bool selected;
+diff --git a/delivery_app/lib/services/api_service.dart b/delivery_app/lib/services/api_service.dart
+index a3f6c7a..b0916ea 100644
+--- a/delivery_app/lib/services/api_service.dart
++++ b/delivery_app/lib/services/api_service.dart
+@@ -81,6 +81,24 @@ class ApiService {
+     return data;
+   }
+ 
++  static Future<bool> getOnlineStatus() async {
++    final res = await http.get(Uri.parse('$baseUrl/delivery/status'), headers: await _headers());
++    final data = jsonDecode(res.body);
++    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load status');
++    return data['is_online'] == true;
++  }
++
++  static Future<bool> updateOnlineStatus(bool isOnline) async {
++    final res = await http.put(
++      Uri.parse('$baseUrl/delivery/status'),
++      headers: await _headers(),
++      body: jsonEncode({'is_online': isOnline}),
++    );
++    final data = jsonDecode(res.body);
++    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to update status');
++    return data['is_online'] == true;
++  }
++
+   static Future<void> updateLocation(double lat, double lng) async {
+     await http.put(
+       Uri.parse('$baseUrl/delivery/location'),
+diff --git a/internal/database/database.go b/internal/database/database.go
+index 807b2a7..d846fd7 100644
+--- a/internal/database/database.go
++++ b/internal/database/database.go
+@@ -131,5 +131,8 @@ log.Fatalf("Failed to add platform_fee column to orders: %v", err)
+ if err := DB.Exec(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+ log.Fatalf("Failed to add platform_fee column to invoices: %v", err)
+ }
++if err := DB.Exec(`ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
++log.Fatalf("Failed to add is_online column to delivery_partners: %v", err)
++}
+ seedDefaultSettings()
+ }
+diff --git a/internal/handlers/delivery_partner_handler.go b/internal/handlers/delivery_partner_handler.go
+index 152ebab..d99ac6d 100644
+--- a/internal/handlers/delivery_partner_handler.go
++++ b/internal/handlers/delivery_partner_handler.go
+@@ -269,6 +269,51 @@ fmt.Sprintf("Your order #%d has been delivered. Enjoy!", order.ID),
+ c.JSON(http.StatusOK, gin.H{"message": "Delivery confirmed", "order": order})
+ }
+ 
++// GetMyStatus godoc
++// GET /api/v1/delivery/status (delivery partner only)
++// Returns the logged-in partner's current online/offline status. Used on
++// app start/refresh/relogin so the toggle reflects the real persisted
++// state instead of resetting to a default.
++func GetMyStatus(c *gin.Context) {
++partnerID := c.MustGet("user_id").(uint)
++
++var partner models.DeliveryPartner
++if err := database.DB.First(&partner, partnerID).Error; err != nil {
++c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
++return
++}
++
++c.JSON(http.StatusOK, gin.H{"is_online": partner.IsOnline})
++}
++
++// UpdateMyStatus godoc
++// PUT /api/v1/delivery/status (delivery partner only)
++// Lets the logged-in partner toggle themselves online/offline. This does
++// not touch location data - see UpdateLocation for that.
++func UpdateMyStatus(c *gin.Context) {
++partnerID := c.MustGet("user_id").(uint)
++
++var req models.UpdateOnlineStatusRequest
++if err := c.ShouldBindJSON(&req); err != nil {
++c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
++return
++}
++
++var partner models.DeliveryPartner
++if err := database.DB.First(&partner, partnerID).Error; err != nil {
++c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
++return
++}
++
++partner.IsOnline = *req.IsOnline
++if err := database.DB.Model(&partner).Update("is_online", partner.IsOnline).Error; err != nil {
++c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
++return
++}
++
++c.JSON(http.StatusOK, gin.H{"is_online": partner.IsOnline})
++}
++
+ // GetMyEarnings godoc
+ // GET /api/v1/delivery/earnings (delivery partner only)
+ // Returns delivery earnings summary: today's earnings, total earnings,
+diff --git a/internal/models/delivery_partner.go b/internal/models/delivery_partner.go
+index 5c66021..6963d21 100644
+--- a/internal/models/delivery_partner.go
++++ b/internal/models/delivery_partner.go
+@@ -15,6 +15,7 @@ Name               string     `gorm:"not null" json:"name"`
+ Phone              string     `gorm:"not null;uniqueIndex" json:"phone"`
+ VehicleNumber      string     `json:"vehicle_number"`
+ IsActive           bool       `gorm:"default:true" json:"is_active"`
++IsOnline           bool       `gorm:"default:false" json:"is_online"`
+ CurrentLat         *float64   `json:"current_lat,omitempty"`
+ CurrentLng         *float64   `json:"current_lng,omitempty"`
+ LastLocationUpdate *time.Time `json:"last_location_update,omitempty"`
+@@ -42,3 +43,8 @@ Lat float64 `json:"lat" binding:"required"`
+ Lng float64 `json:"lng" binding:"required"`
+ }
+ 
++// UpdateOnlineStatusRequest is the body for PUT /delivery/status (delivery partner only)
++type UpdateOnlineStatusRequest struct {
++IsOnline *bool `json:"is_online" binding:"required"`
++}
++
+diff --git a/internal/routes/routes.go b/internal/routes/routes.go
+index 5a2969c..a835048 100644
+--- a/internal/routes/routes.go
++++ b/internal/routes/routes.go
+@@ -76,6 +76,8 @@ func SetupRoutes(router *gin.Engine) {
+ 			delivery.POST("/send-otp", middleware.RateLimit(5, time.Minute), handlers.SendPartnerOTP)
+ 			delivery.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyPartnerOTP)
+ 			delivery.PUT("/location", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateLocation)
++			delivery.GET("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyStatus)
++			delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateMyStatus)
+ 			delivery.GET("/orders", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyDeliveries)
+ 			delivery.PUT("/orders/:id/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateDeliveryOrderStatus)
+ 			delivery.PUT("/orders/:id/deliver", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.ConfirmDelivery)
+diff --git a/migrations/000032_add_delivery_partner_online_status.down.sql b/migrations/000032_add_delivery_partner_online_status.down.sql
+new file mode 100644
+index 0000000..7f90abf
+--- /dev/null
++++ b/migrations/000032_add_delivery_partner_online_status.down.sql
+@@ -0,0 +1 @@
++ALTER TABLE delivery_partners DROP COLUMN IF EXISTS is_online;
+diff --git a/migrations/000032_add_delivery_partner_online_status.up.sql b/migrations/000032_add_delivery_partner_online_status.up.sql
+new file mode 100644
+index 0000000..f49a260
+--- /dev/null
++++ b/migrations/000032_add_delivery_partner_online_status.up.sql
+@@ -0,0 +1 @@
++ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;

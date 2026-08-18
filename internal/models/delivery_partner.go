@@ -1,9 +1,9 @@
-package models
+﻿package models
 
 import (
-	"time"
+"time"
 
-	"gorm.io/gorm"
+"gorm.io/gorm"
 )
 
 // DeliveryPartner is a delivery person the admin can create/manage.
@@ -15,12 +15,13 @@ Name               string     `gorm:"not null" json:"name"`
 Phone              string     `gorm:"not null;uniqueIndex" json:"phone"`
 VehicleNumber      string     `json:"vehicle_number"`
 IsActive           bool       `gorm:"default:true" json:"is_active"`
+IsOnline           bool       `gorm:"default:false" json:"is_online"`
 CurrentLat         *float64   `json:"current_lat,omitempty"`
 CurrentLng         *float64   `json:"current_lng,omitempty"`
 LastLocationUpdate *time.Time `json:"last_location_update,omitempty"`
 CreatedAt          time.Time  `json:"created_at"`
 UpdatedAt          time.Time  `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // DeliveryPartnerRequest is the body for POST/PUT /admin/delivery-partners
@@ -42,3 +43,7 @@ Lat float64 `json:"lat" binding:"required"`
 Lng float64 `json:"lng" binding:"required"`
 }
 
+// UpdateOnlineStatusRequest is the body for PUT /delivery/status (delivery partner only)
+type UpdateOnlineStatusRequest struct {
+IsOnline *bool `json:"is_online" binding:"required"`
+}
