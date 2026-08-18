@@ -192,6 +192,7 @@ delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerO
 			{
 				adminAnalytics.GET("/summary", handlers.GetAnalyticsSummary)
 				adminAnalytics.GET("/products", handlers.GetProductPerformance)
+					adminAnalytics.GET("/dashboard", handlers.GetDashboardOverview)
 			}
 
 			adminDeliveryPartners := admin.Group("/delivery-partners")
