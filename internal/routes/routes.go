@@ -74,6 +74,7 @@ delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerO
 			delivery.PUT("/availability", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateDeliveryAvailability)
 			delivery.PUT("/orders/:id/accept", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.AcceptAssignment)
 			delivery.PUT("/orders/:id/reject", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.RejectAssignment)
+			delivery.GET("/earnings", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyEarnings)
 		}
 
 		warehouse := api.Group("/warehouse")
