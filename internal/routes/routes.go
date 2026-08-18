@@ -229,6 +229,82 @@ delivery.PUT("/status", middleware.AuthMiddleware(), middleware.DeliveryPartnerO
 				}
 
 				admin.POST("/wallet/credit/:user_id", handlers.AdminCreditWallet)
+
+admin.PUT("/products/:id/inventory", handlers.UpdateInventory)
+admin.POST("/products/:id/barcode", handlers.GenerateProductBarcode)
+admin.DELETE("/coupons/:id", handlers.DeleteCoupon)
+admin.PUT("/stock-transfers/:id/cancel", handlers.CancelStockTransfer)
+
+adminCustomers := admin.Group("/customers")
+{
+adminCustomers.GET("", handlers.GetCustomers)
+adminCustomers.GET("/:id", handlers.GetCustomerByID)
+adminCustomers.PUT("/:id/block", handlers.BlockCustomer)
+adminCustomers.PUT("/:id/unblock", handlers.UnblockCustomer)
+}
+
+admin.GET("/inventory", handlers.GetInventoryOverview)
+
+adminStaff := admin.Group("/staff")
+{
+adminStaff.GET("", handlers.GetAdminStaff)
+adminStaff.PUT("/:id/role", handlers.UpdateStaffRole)
+}
+
+adminSettings := admin.Group("/settings")
+{
+adminSettings.GET("", handlers.GetSettings)
+adminSettings.PUT("", handlers.UpdateSettings)
+}
+
+admin.GET("/audit-logs", handlers.GetAuditLogs)
+admin.POST("/notifications/broadcast", handlers.BroadcastNotification)
+
+adminOffers := admin.Group("/offers")
+{
+adminOffers.GET("", handlers.GetOffers)
+adminOffers.POST("", handlers.CreateOffer)
+adminOffers.PUT("/:id/status", handlers.UpdateOfferStatus)
+adminOffers.DELETE("/:id", handlers.DeleteOffer)
+}
+
+adminBanners := admin.Group("/banners")
+{
+adminBanners.GET("", handlers.GetBanners)
+adminBanners.POST("", handlers.CreateBanner)
+adminBanners.PUT("/:id", handlers.UpdateBanner)
+adminBanners.DELETE("/:id", handlers.DeleteBanner)
+}
+
+adminDeliveryZones := admin.Group("/delivery-zones")
+{
+adminDeliveryZones.GET("", handlers.GetDeliveryZones)
+adminDeliveryZones.POST("", handlers.CreateDeliveryZone)
+adminDeliveryZones.PUT("/:id", handlers.UpdateDeliveryZone)
+adminDeliveryZones.DELETE("/:id", handlers.DeleteDeliveryZone)
+}
+
+adminSupportTickets := admin.Group("/support/tickets")
+{
+adminSupportTickets.GET("", handlers.GetAllTickets)
+adminSupportTickets.GET("/:id/messages", handlers.GetTicketMessagesAdmin)
+adminSupportTickets.POST("/:id/messages", handlers.AdminReplyToTicket)
+adminSupportTickets.PUT("/:id/status", handlers.UpdateTicketStatus)
+}
+
+adminPayments := admin.Group("/payments")
+{
+adminPayments.GET("", handlers.GetAdminPayments)
+adminPayments.GET("/reconciliation", handlers.GetAdminPaymentReconciliation)
+adminPayments.GET("/:orderId", handlers.GetAdminPaymentDetail)
+}
+
+adminInvoices := admin.Group("/invoices")
+{
+adminInvoices.GET("", handlers.SearchInvoices)
+adminInvoices.GET("/:id", handlers.GetAdminInvoiceByID)
+adminInvoices.GET("/:id/pdf", handlers.GetAdminInvoicePDF)
+}
 			}
 		}
 	}
