@@ -89,7 +89,7 @@ export default function Handover() {
             <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase">
               <tr>
                 <th className="text-left px-4 py-2.5">Order</th>
-                <th className="text-left px-4 py-2.5">Customer</th>
+                <th className="text-left px-4 py-2.5">Address</th>
                 <th className="text-left px-4 py-2.5">Delivery Partner</th>
                 <th className="text-left px-4 py-2.5">Payment</th>
                 <th className="text-right px-4 py-2.5">Action</th>
@@ -99,7 +99,7 @@ export default function Handover() {
               {orders.map((order) => (
                 <tr key={order.id} className="hover:bg-slate-800/30">
                   <td className="px-4 py-3">#{order.id}</td>
-                  <td className="px-4 py-3 text-slate-300">{order.customer_name ?? '-'}</td>
+                  <td className="px-4 py-3 text-slate-300">{order.address ? `${order.address.city ?? ''}, ${order.address.pincode ?? ''}` : '-'}</td>
                   <td className="px-4 py-3">
                     {order.delivery_partner ? (
                       <span className="text-slate-300">{order.delivery_partner.name}</span>
