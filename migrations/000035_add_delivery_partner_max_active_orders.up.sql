@@ -1,1 +1,1 @@
-﻿ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS max_active_orders INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS max_active_orders INTEGER NOT NULL DEFAULT 5;
