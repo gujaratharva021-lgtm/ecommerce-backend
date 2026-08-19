@@ -76,6 +76,7 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     setError(null)
+    setIsLoading(true)
     try {
       const data = await getDashboard()
       setStats(data)
