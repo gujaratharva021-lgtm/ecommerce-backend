@@ -326,8 +326,8 @@ export default function Orders() {
 
       {invoiceTarget !== null && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 w-full max-w-lg">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-800 shrink-0">
               <h2 className="text-base font-semibold">Invoice — Order #{invoiceTarget}</h2>
               <button
                 onClick={() => setInvoiceTarget(null)}
@@ -337,6 +337,7 @@ export default function Orders() {
               </button>
             </div>
 
+            <div className="p-6 pt-4 overflow-y-auto">
             {invoiceLoading ? (
               <p className="text-sm text-slate-400">Loading invoice...</p>
             ) : invoiceError ? (
@@ -399,9 +400,13 @@ export default function Orders() {
                 </p>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       )}
     </div>
   )
 }
+
+
+
