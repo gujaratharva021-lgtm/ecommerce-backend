@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -7,7 +7,6 @@ const navItems = [
   { to: '/customers', label: 'Customers', icon: '\u25C7' },
   { to: '/inventory', label: 'Inventory Overview', icon: '\u25A6' },
   { to: '/staff-roles', label: 'Staff & Roles', icon: '\u25C8' },
-  { to: '/settings', label: 'Settings', icon: '\u2699' },
   { to: '/products', label: 'Products', icon: '\u25A3' },
   { to: '/categories', label: 'Categories', icon: '\u25A4' },
   { to: '/orders', label: 'Orders', icon: '\u25A5' },
@@ -17,16 +16,9 @@ const navItems = [
   { to: '/warehouse-staff', label: 'Warehouse Staff', icon: '\u25AB' },
   { to: '/stock-transfers', label: 'Stock Transfers', icon: '\u21C4' },
   { to: '/returns', label: 'Returns', icon: '\u21BA' },
-  { to: '/analytics', label: 'Analytics', icon: '\u25C9' },
-  { to: '/wallet-credit', label: 'Wallet Credit', icon: '\u25CF' },
-  { to: '/audit-logs', label: 'Audit Logs', icon: '\u2263' },
   { to: '/notifications', label: 'Notifications', icon: '\u25CB' },
   { to: '/offers', label: 'Offers', icon: '\u25C6' },
-  { to: '/banners', label: 'Banners', icon: '\u25A9' },
   { to: '/delivery-zones', label: 'Delivery Zones', icon: '\u2302' },
-  { to: '/support', label: 'Support', icon: '\u2691' },
-  { to: '/payments', label: 'Payments', icon: '\u20b9' },
-  { to: '/invoices', label: 'Invoices', icon: '📄' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
