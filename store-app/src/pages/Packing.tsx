@@ -95,7 +95,7 @@ export default function Packing() {
       )}
 
       {exceptions.length > 0 && (
-        <div className="border border-amber-900 bg-amber-950/30 text-amber-300 text-sm rounded-lg px-4 py-3 mb-4">
+        <div className="border border-red-900 bg-red-950/30 text-red-300 text-sm rounded-lg px-4 py-3 mb-4">
           {exceptions.length} item(s) had picking exceptions &mdash; double-check before packing.
         </div>
       )}
@@ -112,7 +112,7 @@ export default function Packing() {
               <p className="text-xs text-slate-400 mt-1">
                 Needed: {item.quantity_needed} &middot; Picked: {item.quantity_picked}
               </p>
-              {item.reason && <p className="text-xs text-amber-400 mt-1">Reason: {item.reason}</p>}
+              {item.reason && <p className="text-xs text-red-400 mt-1">Reason: {item.reason}</p>}
             </div>
             <StatusBadge status={item.status} />
           </div>
@@ -123,7 +123,7 @@ export default function Packing() {
         <button
           onClick={handleStart}
           disabled={isStarting}
-          className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
         >
           {isStarting ? 'Starting...' : 'Start Packing'}
         </button>

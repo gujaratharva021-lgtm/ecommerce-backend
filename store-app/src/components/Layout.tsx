@@ -19,7 +19,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
       <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-900 flex flex-col">
         <div className="px-5 py-5 border-b border-slate-800">
-          <p className="font-mono text-[10px] tracking-widest text-amber-500 uppercase mb-1">
+          <p className="font-mono text-[10px] tracking-widest text-red-500 uppercase mb-1">
             {warehouseLabel}
           </p>
           <p className="font-display text-xl leading-none">Store Staff App</p>
@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               className={({ isActive }) =>
                 `flex items-center gap-2.5 pl-3 pr-3 py-2 text-sm border-l-2 transition-colors ${
                   isActive
-                    ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-medium'
+                    ? 'border-red-500 bg-red-500/10 text-red-300 font-medium'
                     : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`
               }

@@ -97,7 +97,7 @@ export default function Exceptions() {
               onClick={() => setStatusFilter(f.value)}
               className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                 statusFilter === f.value
-                  ? 'bg-amber-500/20 text-amber-300'
+                  ? 'bg-red-500/20 text-red-300'
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
@@ -172,7 +172,7 @@ export default function Exceptions() {
                         {exc.status === 'open' && (
                           <button
                             onClick={() => openResolveDialog(exc, 'investigating')}
-                            className="text-xs px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                            className="text-xs px-2.5 py-1 rounded-md bg-red-500/15 text-red-300 hover:bg-red-500/25"
                           >
                             Investigate
                           </button>
@@ -236,7 +236,7 @@ export default function Exceptions() {
                 onChange={(e) => setResolution(e.target.value)}
                 placeholder="Resolution notes (required)"
                 rows={3}
-                className="w-full text-sm bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 mb-4 focus:outline-none focus:border-amber-500"
+                className="w-full text-sm bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 mb-4 focus:outline-none focus:border-red-500"
               />
             )}
             <div className="flex gap-2 justify-end">
@@ -250,7 +250,7 @@ export default function Exceptions() {
               <button
                 onClick={submitUpdate}
                 disabled={isSubmitting}
-                className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : 'Confirm'}
               </button>

@@ -76,7 +76,7 @@ export default function Notifications() {
         <h1 className="font-display text-2xl font-semibold">
           Notifications
           {unreadCount > 0 && (
-            <span className="ml-2 text-xs bg-amber-500 text-white rounded-full px-2 py-0.5 align-middle">
+            <span className="ml-2 text-xs bg-red-500 text-white rounded-full px-2 py-0.5 align-middle">
               {unreadCount} unread
             </span>
           )}
@@ -105,7 +105,7 @@ export default function Notifications() {
             onClick={() => setFilter(f)}
             className={`px-3 py-2 text-sm capitalize border-b-2 transition-colors ${
               filter === f
-                ? 'border-amber-400 text-amber-300 font-medium'
+                ? 'border-red-400 text-red-300 font-medium'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -134,7 +134,7 @@ export default function Notifications() {
             <div
               key={n.id}
               className={`border rounded-xl p-4 flex items-start justify-between gap-4 ${
-                n.is_read ? 'border-slate-800 bg-slate-900/50' : 'border-amber-800 bg-amber-950/20'
+                n.is_read ? 'border-slate-800 bg-slate-900/50' : 'border-red-800 bg-red-950/20'
               }`}
             >
               <div>
@@ -142,7 +142,7 @@ export default function Notifications() {
                   <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">
                     {TYPE_LABELS[n.type] ?? n.type}
                   </span>
-                  {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
                 </div>
                 <p className="text-sm font-medium">{n.title}</p>
                 {n.message && <p className="text-xs text-slate-400 mt-0.5">{n.message}</p>}

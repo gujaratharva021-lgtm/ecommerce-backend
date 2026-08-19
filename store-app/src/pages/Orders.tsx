@@ -146,7 +146,7 @@ export default function Orders() {
               onClick={() => setTab(tab.status)}
               className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? 'border-amber-400 text-amber-300 font-medium'
+                  ? 'border-red-400 text-red-300 font-medium'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -196,7 +196,7 @@ export default function Orders() {
                     <td className="px-4 py-3 text-slate-400">
                       {itemCount} lines &middot; {totalQty} qty
                     </td>
-                    <td className="px-4 py-3">₹{order.total_amount.toFixed(2)}</td>
+                    <td className="px-4 py-3">â‚¹{order.total_amount.toFixed(2)}</td>
                     <td className="px-4 py-3 text-slate-400 uppercase text-xs">
                       {order.payment_method} &middot; {order.payment_status}
                     </td>
@@ -217,7 +217,7 @@ export default function Orders() {
                         <button
                           onClick={() => handleAccept(order)}
                           disabled={acceptingId === order.id}
-                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
                         >
                           {acceptingId === order.id ? 'Accepting...' : 'Accept'}
                         </button>
@@ -284,7 +284,7 @@ export default function Orders() {
                 {handoverTarget.delivery_partner.vehicle_number && (
                   <p className="text-slate-400 text-xs">Vehicle: {handoverTarget.delivery_partner.vehicle_number}</p>
                 )}
-                <p className="text-xs text-amber-400 mt-2">Verify this partner is physically present before confirming.</p>
+                <p className="text-xs text-red-400 mt-2">Verify this partner is physically present before confirming.</p>
               </div>
             ) : (
               <p className="text-sm text-rose-400 mb-4">No delivery partner assigned to this order yet. Cannot hand over.</p>
@@ -328,7 +328,7 @@ export default function Orders() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-800 shrink-0">
-              <h2 className="text-base font-semibold">Invoice — Order #{invoiceTarget}</h2>
+              <h2 className="text-base font-semibold">Invoice â€” Order #{invoiceTarget}</h2>
               <button
                 onClick={() => setInvoiceTarget(null)}
                 className="text-slate-400 hover:text-slate-200 text-sm"
@@ -367,7 +367,7 @@ export default function Orders() {
                         <span>
                           {item.product_name} <span className="text-slate-500">x{item.quantity}</span>
                         </span>
-                        <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                        <span>â‚¹{(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -376,21 +376,21 @@ export default function Orders() {
                 <div className="border border-slate-800 rounded-lg p-3 space-y-1">
                   <div className="flex justify-between text-slate-400">
                     <span>Items Amount</span>
-                    <span>₹{invoice.items_amount.toFixed(2)}</span>
+                    <span>â‚¹{invoice.items_amount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Delivery Charge</span>
-                    <span>₹{invoice.delivery_charge.toFixed(2)}</span>
+                    <span>â‚¹{invoice.delivery_charge.toFixed(2)}</span>
                   </div>
                   {invoice.wallet_used > 0 && (
                     <div className="flex justify-between text-slate-400">
                       <span>Wallet Used</span>
-                      <span>-₹{invoice.wallet_used.toFixed(2)}</span>
+                      <span>-â‚¹{invoice.wallet_used.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-semibold pt-1 border-t border-slate-800">
                     <span>Total</span>
-                    <span>₹{invoice.total_amount.toFixed(2)}</span>
+                    <span>â‚¹{invoice.total_amount.toFixed(2)}</span>
                   </div>
                 </div>
 

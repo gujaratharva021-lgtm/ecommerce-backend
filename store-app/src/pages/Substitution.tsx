@@ -133,7 +133,7 @@ function NewRequestModal({ defaultOrderId, defaultItemId, defaultProductId, onCl
                       setSubstituteOptions([])
                     }}
                     className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-800 ${
-                      substituteProductId === String(p.id) ? 'bg-amber-500/10 text-amber-300' : ''
+                      substituteProductId === String(p.id) ? 'bg-red-500/10 text-red-300' : ''
                     }`}
                   >
                     {p.name} (#{p.id})
@@ -176,7 +176,7 @@ function NewRequestModal({ defaultOrderId, defaultItemId, defaultProductId, onCl
           <button
             disabled={isSubmitting || !orderId || !originalProductId || !substituteProductId || !quantity}
             onClick={handleSubmit}
-            className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-medium disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg bg-red-500 hover:bg-red-400 text-white text-xs font-medium disabled:opacity-50"
           >
             {isSubmitting ? 'Submitting...' : 'Submit Request'}
           </button>
@@ -238,7 +238,7 @@ export default function Substitution() {
         <h1 className="font-display text-2xl font-semibold">Substitution Requests</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-medium"
+          className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-400 text-white text-xs font-medium"
         >
           + New Request
         </button>
@@ -256,7 +256,7 @@ export default function Substitution() {
             onClick={() => setStatusFilter(tab.value)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               statusFilter === tab.value
-                ? 'bg-amber-500/20 text-amber-300'
+                ? 'bg-red-500/20 text-red-300'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
           >
@@ -294,7 +294,7 @@ export default function Substitution() {
                     </span>
                     <span className="text-slate-500"> &times;{req.quantity}</span>
                   </p>
-                  {req.reason && <p className="text-xs text-amber-400 mt-1">Reason: {req.reason}</p>}
+                  {req.reason && <p className="text-xs text-red-400 mt-1">Reason: {req.reason}</p>}
                   {req.decision_note && (
                     <p className="text-xs text-slate-500 mt-1">Note: {req.decision_note}</p>
                   )}

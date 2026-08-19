@@ -19,7 +19,7 @@ function StatCard({
 }) {
   const toneClass =
     tone === 'warning'
-      ? 'text-amber-300'
+      ? 'text-red-300'
       : tone === 'danger'
         ? 'text-rose-300'
         : tone === 'success'
@@ -28,7 +28,7 @@ function StatCard({
 
   const ringClass =
     tone === 'warning'
-      ? 'ring-amber-500/20'
+      ? 'ring-red-500/20'
       : tone === 'danger'
         ? 'ring-rose-500/20'
         : tone === 'success'
@@ -128,7 +128,7 @@ export default function Dashboard() {
     <div className="p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <p className="font-mono text-[10px] tracking-widest text-amber-500 uppercase mb-1">Overview</p>
+          <p className="font-mono text-[10px] tracking-widest text-red-500 uppercase mb-1">Overview</p>
           <h1 className="font-display text-2xl font-semibold">Dashboard</h1>
         </div>
         <button
@@ -159,7 +159,7 @@ export default function Dashboard() {
                   className={`w-full text-left text-sm px-4 py-2.5 rounded-lg border flex items-center gap-2 ${
                     a.tone === 'danger'
                       ? 'border-rose-900 bg-rose-950/40 text-rose-300'
-                      : 'border-amber-900 bg-amber-950/30 text-amber-300'
+                      : 'border-red-900 bg-red-950/30 text-red-300'
                   } ${a.onClick ? 'hover:brightness-125 cursor-pointer' : 'cursor-default'}`}
                 >
                   {a.label}

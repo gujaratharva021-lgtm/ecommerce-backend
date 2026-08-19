@@ -60,19 +60,19 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-500/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-red-500/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center mb-4 shadow-lg shadow-amber-500/20">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-400 to-orange-600 flex items-center justify-center mb-4 shadow-lg shadow-red-500/20">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
               <path d="M3 6h18" />
               <path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
           </div>
-          <p className="font-mono text-[10px] tracking-widest text-amber-500 uppercase mb-1">
+          <p className="font-mono text-[10px] tracking-widest text-red-500 uppercase mb-1">
             Store Staff App
           </p>
           <h1 className="font-display text-2xl font-semibold">Welcome back</h1>
@@ -94,7 +94,7 @@ export default function Login() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                     autoFocus
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-11 pr-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-11 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition-colors"
                   />
                 </div>
               </div>
@@ -106,7 +106,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-400 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
               >
                 {isSubmitting ? 'Sending...' : 'Send OTP'}
               </button>
@@ -116,7 +116,7 @@ export default function Login() {
           {step === 'otp' && (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <p className="text-xs text-slate-400">
-                OTP sent to <span className="text-amber-400 font-medium">{phone}</span>
+                OTP sent to <span className="text-red-400 font-medium">{phone}</span>
               </p>
               <div>
                 <label className="text-xs text-slate-400 block mb-1.5">Enter OTP</label>
@@ -124,11 +124,11 @@ export default function Login() {
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
-                  placeholder="••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   autoFocus
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm tracking-[0.5em] text-center focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-colors"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm tracking-[0.5em] text-center focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition-colors"
                 />
               </div>
               {error && (
@@ -139,7 +139,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                className="w-full py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-400 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
               >
                 {isSubmitting ? 'Verifying...' : 'Verify & Login'}
               </button>
@@ -150,7 +150,7 @@ export default function Login() {
                   setOtp('')
                   setError(null)
                 }}
-                className="w-full text-center text-xs text-slate-400 hover:text-amber-400 transition-colors"
+                className="w-full text-center text-xs text-slate-400 hover:text-red-400 transition-colors"
               >
                 Use a different number
               </button>

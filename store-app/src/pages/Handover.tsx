@@ -111,7 +111,7 @@ export default function Handover() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => openHandover(order)}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors"
                     >
                       Handover
                     </button>
@@ -135,7 +135,7 @@ export default function Handover() {
                 {handoverTarget.delivery_partner.vehicle_number && (
                   <p className="text-slate-400 text-xs">Vehicle: {handoverTarget.delivery_partner.vehicle_number}</p>
                 )}
-                <p className="text-xs text-amber-400 mt-2">Verify this partner is physically present before confirming.</p>
+                <p className="text-xs text-red-400 mt-2">Verify this partner is physically present before confirming.</p>
               </div>
             ) : (
               <p className="text-sm text-rose-400 mb-4">No delivery partner assigned to this order yet. Cannot hand over.</p>
@@ -166,7 +166,7 @@ export default function Handover() {
               <button
                 onClick={handleConfirmHandover}
                 disabled={handoverSubmitting || !handoverTarget.delivery_partner}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
               >
                 {handoverSubmitting ? 'Confirming...' : 'Confirm Handover'}
               </button>

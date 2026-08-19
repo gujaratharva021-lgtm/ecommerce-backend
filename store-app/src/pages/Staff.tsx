@@ -63,7 +63,7 @@ export default function Staff() {
     <div className="p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <p className="font-mono text-[10px] tracking-widest text-amber-500 uppercase mb-1">Team</p>
+          <p className="font-mono text-[10px] tracking-widest text-red-500 uppercase mb-1">Team</p>
           <h1 className="font-display text-2xl font-semibold">Staff</h1>
         </div>
         <button
@@ -93,9 +93,9 @@ export default function Staff() {
             <p className="text-xs text-slate-400 mb-2">Active Now</p>
             <p className="font-mono text-2xl font-semibold text-emerald-300">{activeCount}</p>
           </div>
-          <div className="relative border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-900/60 rounded-xl p-4 ring-1 ring-amber-500/20">
+          <div className="relative border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-900/60 rounded-xl p-4 ring-1 ring-red-500/20">
             <p className="text-xs text-slate-400 mb-2">Orders Handled</p>
-            <p className="font-mono text-2xl font-semibold text-amber-300">{totalOrders}</p>
+            <p className="font-mono text-2xl font-semibold text-red-300">{totalOrders}</p>
           </div>
         </div>
       )}
@@ -124,7 +124,7 @@ export default function Staff() {
                 <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-400 to-orange-600 flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
                         {initials(s.name)}
                       </div>
                       <div>
@@ -134,7 +134,7 @@ export default function Staff() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-500/15 text-amber-300">
+                    <span className="text-xs px-2 py-1 rounded-full bg-red-500/15 text-red-300">
                       {ROLE_LABELS[s.role] ?? s.role}
                     </span>
                   </td>
