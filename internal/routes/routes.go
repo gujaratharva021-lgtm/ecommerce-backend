@@ -142,6 +142,11 @@ warehouseAuthed.GET("/audit-logs", handlers.GetWarehouseAuditLogs)
 warehouseAuthed.GET("/notifications", handlers.GetWarehouseNotifications)
 warehouseAuthed.PUT("/notifications/:id/read", handlers.MarkNotificationRead)
 warehouseAuthed.PUT("/notifications/read-all", handlers.MarkAllNotificationsRead)
+warehouseAuthed.POST("/substitutions", handlers.CreateSubstitutionRequest)
+warehouseAuthed.GET("/substitutions", handlers.GetSubstitutionRequests)
+warehouseAuthed.GET("/substitutions/:id", handlers.GetSubstitutionRequest)
+warehouseAuthed.PUT("/substitutions/:id/approve", middleware.RequireWarehouseRole("warehouse_manager"), handlers.ApproveSubstitutionRequest)
+warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole("warehouse_manager"), handlers.RejectSubstitutionRequest)
 }
 		}
 
