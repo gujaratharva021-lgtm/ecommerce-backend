@@ -216,6 +216,7 @@ warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole
                         adminFinance.Use(middleware.FinanceOnly())
                         {
                                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
+                                adminFinance.GET("/profit-loss", handlers.GetProfitLoss)
 adminFinance.GET("/expenses", handlers.ListExpenses)
 adminFinance.POST("/expenses", handlers.CreateExpense)
 adminFinance.PUT("/expenses/:id", handlers.UpdateExpense)

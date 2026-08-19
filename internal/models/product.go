@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import (
 	"time"
@@ -11,6 +11,10 @@ type Product struct {
 	Name        string     `gorm:"not null;index" json:"name"`
 	Description string     `json:"description"`
 	Price       float64    `gorm:"not null;index" json:"price"`
+// CostPrice is what we paid to acquire the product (per unit). Used for
+// COGS / gross profit calculations in the Finance panel. 0 means not yet
+// set - callers should treat 0 as "unknown cost", not "free product".
+CostPrice   float64    `gorm:"not null;default:0" json:"cost_price"`
 	GSTPercent  float64    `gorm:"not null;default:0" json:"gst_percent"`
 	HSNCode     string     `json:"hsn_code,omitempty"`
 	ImageURL    string     `json:"image_url"`
@@ -24,13 +28,14 @@ Barcode     string     `gorm:"index" json:"barcode,omitempty"`
 }
 
 // ProductRequest is the body for POST/PUT /admin/products (admin only).
-// Stock is only used on create, to seed the product's Inventory row ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+// Stock is only used on create, to seed the product's Inventory row ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
 // use PUT /admin/products/:id/inventory to adjust stock afterwards.
 type ProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
 	GSTPercent  float64 `json:"gst_percent" binding:"gte=0,lte=100"`
+CostPrice   float64 `json:"cost_price" binding:"gte=0"`
 	HSNCode     string  `json:"hsn_code"`
 	ImageURL    string  `json:"image_url"`
 	CategoryID  uint    `json:"category_id" binding:"required"`
@@ -57,4 +62,6 @@ type ProductListResponse struct {
 	Total      int64     `json:"total"`
 	TotalPages int       `json:"total_pages"`
 }
+
+
 

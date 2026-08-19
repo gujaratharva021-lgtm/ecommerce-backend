@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"fmt"
@@ -129,7 +129,8 @@ func CreateProduct(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
-		GSTPercent:  req.GSTPercent,
+		CostPrice:   req.CostPrice,
+               GSTPercent:  req.GSTPercent,
 		HSNCode:     req.HSNCode,
 		ImageURL:    req.ImageURL,
 		CategoryID:  req.CategoryID,
@@ -189,7 +190,8 @@ func UpdateProduct(c *gin.Context) {
 	product.Name = req.Name
 	product.Description = req.Description
 	product.Price = req.Price
-	product.GSTPercent = req.GSTPercent
+	product.CostPrice = req.CostPrice
+       product.GSTPercent = req.GSTPercent
 	product.HSNCode = req.HSNCode
 	product.ImageURL = req.ImageURL
 	product.CategoryID = req.CategoryID
@@ -436,3 +438,5 @@ func UpdateOrderStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, order)
 }
+
+

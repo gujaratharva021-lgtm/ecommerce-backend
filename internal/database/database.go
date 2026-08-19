@@ -185,5 +185,8 @@ log.Fatalf("Failed to create payrolls status index: %v", err)
 if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_payrolls_month_year ON payrolls(month, year)`).Error; err != nil {
 log.Fatalf("Failed to create payrolls month_year index: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add cost_price column to products: %v", err)
+}
 seedDefaultSettings()
 }
