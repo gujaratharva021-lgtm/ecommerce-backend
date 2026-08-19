@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -7,20 +7,19 @@ const navItems = [
   { to: '/orders', label: 'Order Queue' },
   { to: '/substitutions', label: 'Substitution' },
   { to: '/exceptions', label: 'Exceptions' },
-  { to: '/performance', label: 'Performance' },
+  { to: '/handover', label: 'Handover' },
   { to: '/staff', label: 'Staff' },
-  { to: '/notifications', label: 'Notifications' },
+  { to: '/performance', label: 'Performance' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { staff, logout } = useAuth()
-  const warehouseLabel = staff?.warehouse?.name ?? `WAREHOUSE #${staff?.warehouse_id ?? '—'}`
-
+  const warehouseLabel = staff?.warehouse?.name ?? `WAREHOUSE #${staff?.warehouse_id ?? '-'}`
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
       <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-900 flex flex-col">
         <div className="px-5 py-5 border-b border-slate-800">
-          <p className="font-mono text-[10px] tracking-widest text-indigo-500 uppercase mb-1">
+          <p className="font-mono text-[10px] tracking-widest text-amber-500 uppercase mb-1">
             {warehouseLabel}
           </p>
           <p className="font-display text-xl leading-none">Store Staff App</p>
@@ -33,7 +32,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               className={({ isActive }) =>
                 `flex items-center gap-2.5 pl-3 pr-3 py-2 text-sm border-l-2 transition-colors ${
                   isActive
-                    ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300 font-medium'
+                    ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-medium'
                     : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`
               }
