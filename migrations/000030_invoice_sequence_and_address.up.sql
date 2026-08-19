@@ -1,4 +1,4 @@
-﻿-- Atomic, gap-tolerant sequence for invoice numbers. Replaces the old
+-- Atomic, gap-tolerant sequence for invoice numbers. Replaces the old
 -- COUNT(*)+1 scheme, which two concurrent invoice generations for
 -- different orders could both read at the same value and then both
 -- try to insert the same invoice_number, hitting the unique constraint
