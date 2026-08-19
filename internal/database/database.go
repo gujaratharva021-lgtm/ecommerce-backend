@@ -1,4 +1,4 @@
-﻿package database
+package database
 
 import (
 	"log"
@@ -92,6 +92,7 @@ func AutoMigrate() {
 		&models.WarehouseBin{},
 		&models.StockMovement{},
 		&models.WarehouseException{},
+		&models.SubstitutionRequest{},
 		&models.WarehouseAuditLog{},
 		&models.Receiving{},
 		&models.Batch{},
