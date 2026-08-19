@@ -85,6 +85,7 @@ export default function Returns() {
               <thead>
                 <tr className="bg-slate-900 text-slate-400 text-left">
                   <th className="px-4 py-3 font-medium">Order ID</th>
+                  <th className="px-4 py-3 font-medium">Product</th>
                   <th className="px-4 py-3 font-medium">Reason</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium"></th>
@@ -94,6 +95,11 @@ export default function Returns() {
                 {returns.map((r) => (
                   <tr key={r.id} className="border-t border-slate-800">
                     <td className="px-4 py-3">#{r.order_id}</td>
+                    <td className="px-4 py-3 text-slate-400">
+                      {r.items && r.items.length > 0
+                        ? r.items.map((it) => it.order_item?.product?.name ?? 'Unknown').join(', ')
+                        : '-'}
+                    </td>
                     <td className="px-4 py-3 text-slate-400">{r.reason ?? '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${statusColor(r.status)}`}>

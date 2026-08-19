@@ -1,4 +1,4 @@
-﻿export interface Product {
+export interface Product {
   id: number
   name: string
   description?: string
@@ -112,11 +112,20 @@ export interface StockTransfer {
   created_at?: string
 }
 
+export interface ReturnRequestItem {
+  id: number
+  order_item_id: number
+  order_item?: OrderItem
+  quantity: number
+  refund_amount: number
+}
+
 export interface ReturnRequest {
   id: number
   order_id: number
   reason?: string
   status: string
+  items?: ReturnRequestItem[]
   created_at?: string
 }
 
