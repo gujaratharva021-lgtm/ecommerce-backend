@@ -212,6 +212,12 @@ warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
 		{
+                        adminFinance := admin.Group("/finance")
+                        adminFinance.Use(middleware.FinanceOnly())
+                        {
+                                adminFinance.GET("/revenue", handlers.GetRevenueSummary)
+                        }
+
 			adminCategories := admin.Group("/categories")
 			{
 				adminCategories.POST("", handlers.CreateCategory)
