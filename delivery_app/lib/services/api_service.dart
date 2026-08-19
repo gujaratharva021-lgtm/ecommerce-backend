@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -78,6 +78,29 @@ class ApiService {
     );
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to confirm delivery');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> acceptAssignment(int orderId) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/orders/$orderId/accept'),
+      headers: await _headers(),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to accept delivery');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> rejectAssignment(int orderId, {String? reason}) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/orders/$orderId/reject'),
+      headers: await _headers(),
+      body: jsonEncode(
+        (reason != null && reason.trim().isNotEmpty) ? {'reason': reason.trim()} : {},
+      ),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to reject delivery');
     return data;
   }
 
