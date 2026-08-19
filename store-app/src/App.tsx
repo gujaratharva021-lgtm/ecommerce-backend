@@ -8,6 +8,7 @@ import Orders from './pages/Orders'
 import Picking from './pages/Picking'
 import Packing from './pages/Packing'
 import Substitution from './pages/Substitution'
+import Inventory from './pages/Inventory'
 import Exceptions from './pages/Exceptions'
 import Handover from './pages/Handover'
 import Performance from './pages/Performance'
@@ -32,6 +33,7 @@ function App() {
           <Route path="/picking/:orderId" element={<Protected><Picking /></Protected>} />
           <Route path="/packing/:orderId" element={<Protected><Packing /></Protected>} />
           <Route path="/substitutions" element={<Protected><Substitution /></Protected>} />
+          <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
           <Route path="/exceptions" element={<Protected><Exceptions /></Protected>} />
           <Route path="/handover" element={<Protected><Handover /></Protected>} />
           <Route path="/performance" element={<Protected><Performance /></Protected>} />
@@ -44,3 +46,5 @@ function App() {
 }
 
 export default App
+
+

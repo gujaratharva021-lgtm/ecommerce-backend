@@ -6,6 +6,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/orders', label: 'Order Queue' },
   { to: '/substitutions', label: 'Substitution' },
+  { to: '/inventory', label: 'Inventory' },
   { to: '/exceptions', label: 'Exceptions' },
   { to: '/handover', label: 'Handover' },
   { to: '/staff', label: 'Staff' },
@@ -56,3 +57,4 @@ export default function Layout({ children }: { children: ReactNode }) {
     </div>
   )
 }
+
