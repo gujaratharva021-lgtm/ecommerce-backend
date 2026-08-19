@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
     "context"
@@ -94,7 +94,9 @@ func main() {
 
     quit := make(chan os.Signal, 1)
     signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    log.Println("Shutting down server...")
+	<-quit
+
+	log.Println("Shutting down server...")
 
     ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
     defer cancel()
@@ -103,3 +105,4 @@ func main() {
     }
     log.Println("Server exited cleanly")
 }
+
