@@ -1,5 +1,5 @@
-﻿import apiClient from './client'
-import type { RevenueSummary } from '../types/finance'
+import apiClient from './client'
+import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput } from '../types/finance'
 
 export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
   const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
@@ -7,3 +7,56 @@ export async function getRevenue(from: string, to: string): Promise<RevenueSumma
   })
   return data
 }
+
+export async function listExpenses(params: {
+  category?: string
+  warehouse_id?: number
+  from?: string
+  to?: string
+  page?: number
+  limit?: number
+}): Promise<ExpenseListResponse> {
+  const { data } = await apiClient.get<ExpenseListResponse>('/admin/finance/expenses', { params })
+  return data
+}
+
+export async function createExpense(body: ExpenseFormInput): Promise<Expense> {
+  const { data } = await apiClient.post<Expense>('/admin/finance/expenses', body)
+  return data
+}
+
+export async function updateExpense(id: number, body: ExpenseFormInput): Promise<Expense> {
+  const { data } = await apiClient.put<Expense>(`/admin/finance/expenses/${id}`, body)
+  return data
+}
+
+export async function deleteExpense(id: number): Promise<void> {
+  await apiClient.delete(`/admin/finance/expenses/${id}`)
+}
+
+export async function listPayroll(params: {
+  staff_id?: number
+  status?: string
+  month?: number
+  year?: number
+  page?: number
+  limit?: number
+}): Promise<PayrollListResponse> {
+  const { data } = await apiClient.get<PayrollListResponse>('/admin/finance/payroll', { params })
+  return data
+}
+
+export async function createPayroll(body: PayrollFormInput): Promise<Payroll> {
+  const { data } = await apiClient.post<Payroll>('/admin/finance/payroll', body)
+  return data
+}
+
+export async function updatePayroll(id: number, body: PayrollFormInput): Promise<Payroll> {
+  const { data } = await apiClient.put<Payroll>(`/admin/finance/payroll/${id}`, body)
+  return data
+}
+
+export async function deletePayroll(id: number): Promise<void> {
+  await apiClient.delete(`/admin/finance/payroll/${id}`)
+}
+
