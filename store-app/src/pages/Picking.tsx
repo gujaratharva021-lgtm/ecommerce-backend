@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { completePicking, getPickingTask, markPickItem, scanPickItem, startPicking } from '../api/warehouse'
 import type { PickingTask, PickingTaskItem } from '../types/warehouse'
@@ -77,7 +77,7 @@ function ItemRow({
       {(item.status === 'unavailable' || item.status === 'short') && (
         <Link
           to={`/substitutions?order_id=${orderId}&item_id=${item.id}&product_id=${item.product_id}`}
-          className="mt-3 inline-block px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-xs font-medium"
+          className="mt-3 inline-block px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-medium"
         >
           Request Substitution
         </Link>
@@ -95,7 +95,7 @@ function ItemRow({
               if (e.key === 'Enter') handleScan()
             }}
             disabled={isBusy || isScanning}
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500"
           />
           <button
             disabled={isBusy || isScanning}
@@ -115,7 +115,7 @@ function ItemRow({
           <button
             disabled={isBusy || isScanning || !barcodeInput.trim()}
             onClick={handleScan}
-            className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-xs font-medium disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-medium disabled:opacity-40"
           >
             {isScanning ? 'Scanning...' : 'Scan'}
           </button>
@@ -318,7 +318,7 @@ export default function Picking() {
         <button
           onClick={handleStart}
           disabled={isStarting}
-          className="mb-6 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          className="mb-6 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
         >
           {isStarting ? 'Starting...' : 'Start Picking'}
         </button>

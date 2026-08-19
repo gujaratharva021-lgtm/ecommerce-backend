@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { acceptOrder, listWarehouseOrders, handoverOrder as handoverOrderApi, getOrderInvoice } from '../api/warehouse'
 import type { Order, OrderStatus, OrderInvoice } from '../types/warehouse'
@@ -146,7 +146,7 @@ export default function Orders() {
               onClick={() => setTab(tab.status)}
               className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
                 isActive
-                  ? 'border-indigo-400 text-indigo-300 font-medium'
+                  ? 'border-amber-400 text-amber-300 font-medium'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -217,7 +217,7 @@ export default function Orders() {
                         <button
                           onClick={() => handleAccept(order)}
                           disabled={acceptingId === order.id}
-                          className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
                         >
                           {acceptingId === order.id ? 'Accepting...' : 'Accept'}
                         </button>
