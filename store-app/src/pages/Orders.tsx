@@ -196,7 +196,7 @@ export default function Orders() {
                     <td className="px-4 py-3 text-slate-400">
                       {itemCount} lines &middot; {totalQty} qty
                     </td>
-                    <td className="px-4 py-3">â‚¹{order.total_amount.toFixed(2)}</td>
+                    <td className="px-4 py-3">₹{order.total_amount.toFixed(2)}</td>
                     <td className="px-4 py-3 text-slate-400 uppercase text-xs">
                       {order.payment_method} &middot; {order.payment_status}
                     </td>
@@ -367,7 +367,7 @@ export default function Orders() {
                         <span>
                           {item.product_name} <span className="text-slate-500">x{item.quantity}</span>
                         </span>
-                        <span>â‚¹{(item.price * item.quantity).toFixed(2)}</span>
+                        <span>₹{(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -376,21 +376,21 @@ export default function Orders() {
                 <div className="border border-slate-800 rounded-lg p-3 space-y-1">
                   <div className="flex justify-between text-slate-400">
                     <span>Items Amount</span>
-                    <span>â‚¹{invoice.items_amount.toFixed(2)}</span>
+                    <span>₹{invoice.items_amount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Delivery Charge</span>
-                    <span>â‚¹{invoice.delivery_charge.toFixed(2)}</span>
+                    <span>₹{invoice.delivery_charge.toFixed(2)}</span>
                   </div>
                   {invoice.wallet_used > 0 && (
                     <div className="flex justify-between text-slate-400">
                       <span>Wallet Used</span>
-                      <span>-â‚¹{invoice.wallet_used.toFixed(2)}</span>
+                      <span>-₹{invoice.wallet_used.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-semibold pt-1 border-t border-slate-800">
                     <span>Total</span>
-                    <span>â‚¹{invoice.total_amount.toFixed(2)}</span>
+                    <span>₹{invoice.total_amount.toFixed(2)}</span>
                   </div>
                 </div>
 
