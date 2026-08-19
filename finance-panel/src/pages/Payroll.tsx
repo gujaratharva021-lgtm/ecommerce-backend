@@ -80,7 +80,7 @@ export default function Payroll() {
 
   useEffect(() => {
     listWarehouseStaff()
-      .then((res) => setStaff(res.staff ?? res ?? []))
+      .then((res) => setStaff(res.warehouse_staff ?? res ?? []))
       .catch(() => {})
   }, [])
 
@@ -392,3 +392,4 @@ export default function Payroll() {
     </div>
   )
 }
+
