@@ -1,8 +1,8 @@
-import apiClient from './client'
-import type { RevenueResponse } from '../types/finance'
+﻿import apiClient from './client'
+import type { RevenueSummary } from '../types/finance'
 
-export async function getRevenue(from: string, to: string): Promise<RevenueResponse> {
-  const { data } = await apiClient.get<RevenueResponse>('/finance/revenue', {
+export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
+  const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
     params: { from, to },
   })
   return data

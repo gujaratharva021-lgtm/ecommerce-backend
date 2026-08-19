@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getRevenue } from '../api/finance'
-import type { RevenueResponse } from '../types/finance'
+import type { RevenueSummary } from '../types/finance'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -23,7 +23,7 @@ function daysAgoISO(days: number) {
 export default function Revenue() {
   const [from, setFrom] = useState(daysAgoISO(30))
   const [to, setTo] = useState(todayISO())
-  const [data, setData] = useState<RevenueResponse | null>(null)
+  const [data, setData] = useState<RevenueSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -91,37 +91,69 @@ export default function Revenue() {
 
       {!isLoading && !error && data && (
         <>
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            <SummaryCard label="Gross Revenue" value={formatCurrency(data.summary.total_gross_revenue)} />
-            <SummaryCard label="Net Revenue" value={formatCurrency(data.summary.total_net_revenue)} />
-            <SummaryCard label="Orders" value={data.summary.total_orders.toLocaleString('en-IN')} />
-            <SummaryCard label="Avg Order Value" value={formatCurrency(data.summary.average_order_value)} />
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <SummaryCard label="Gross Sales" value={formatCurrency(data.gross_sales)} />
+            <SummaryCard label="Net Sales" value={formatCurrency(data.net_sales)} />
+            <SummaryCard label="Discounts" value={formatCurrency(data.discounts)} />
+          </div>
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <SummaryCard label="Delivery Charge" value={formatCurrency(data.delivery_charge)} />
+            <SummaryCard label="Platform Fee" value={formatCurrency(data.platform_fee)} />
+            <SummaryCard label="Orders" value={data.order_count.toLocaleString('en-IN')} />
           </div>
 
-          <div className="border border-slate-800 rounded-xl overflow-hidden">
+          <h2 className="text-sm font-semibold mb-3">Revenue by Warehouse</h2>
+          <div className="border border-slate-800 rounded-xl overflow-hidden mb-8">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-900 text-slate-400 text-left">
-                  <th className="px-4 py-2 font-medium">Date</th>
-                  <th className="px-4 py-2 font-medium text-right">Gross Revenue</th>
-                  <th className="px-4 py-2 font-medium text-right">Net Revenue</th>
+                  <th className="px-4 py-2 font-medium">Warehouse</th>
+                  <th className="px-4 py-2 font-medium text-right">Revenue</th>
                   <th className="px-4 py-2 font-medium text-right">Orders</th>
                 </tr>
               </thead>
               <tbody>
-                {data.daily.length === 0 && (
+                {data.by_warehouse.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
-                      No revenue data for this period.
+                    <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                      No warehouse data for this period.
                     </td>
                   </tr>
                 )}
-                {data.daily.map((row) => (
-                  <tr key={row.date} className="border-t border-slate-800">
-                    <td className="px-4 py-2">{row.date}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(row.gross_revenue)}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(row.net_revenue)}</td>
-                    <td className="px-4 py-2 text-right">{row.orders_count}</td>
+                {data.by_warehouse.map((row) => (
+                  <tr key={row.warehouse_id ?? 'unassigned'} className="border-t border-slate-800">
+                    <td className="px-4 py-2">{row.warehouse_name}</td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(row.revenue)}</td>
+                    <td className="px-4 py-2 text-right">{row.order_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h2 className="text-sm font-semibold mb-3">Top Products by Revenue</h2>
+          <div className="border border-slate-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-900 text-slate-400 text-left">
+                  <th className="px-4 py-2 font-medium">Product</th>
+                  <th className="px-4 py-2 font-medium text-right">Revenue</th>
+                  <th className="px-4 py-2 font-medium text-right">Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.by_product.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                      No product data for this period.
+                    </td>
+                  </tr>
+                )}
+                {data.by_product.map((row) => (
+                  <tr key={row.product_id} className="border-t border-slate-800">
+                    <td className="px-4 py-2">{row.product_name}</td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(row.revenue)}</td>
+                    <td className="px-4 py-2 text-right">{row.quantity}</td>
                   </tr>
                 ))}
               </tbody>
