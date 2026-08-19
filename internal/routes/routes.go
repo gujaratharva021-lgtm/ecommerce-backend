@@ -216,6 +216,14 @@ warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole
                         adminFinance.Use(middleware.FinanceOnly())
                         {
                                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
+adminFinance.GET("/expenses", handlers.ListExpenses)
+adminFinance.POST("/expenses", handlers.CreateExpense)
+adminFinance.PUT("/expenses/:id", handlers.UpdateExpense)
+adminFinance.DELETE("/expenses/:id", handlers.DeleteExpense)
+adminFinance.GET("/payroll", handlers.ListPayroll)
+adminFinance.POST("/payroll", handlers.CreatePayroll)
+adminFinance.PUT("/payroll/:id", handlers.UpdatePayroll)
+adminFinance.DELETE("/payroll/:id", handlers.DeletePayroll)
                         }
 
 			adminCategories := admin.Group("/categories")
