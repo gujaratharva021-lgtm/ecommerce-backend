@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { to: '/revenue', label: 'Revenue' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/payroll', label: 'Payroll' },
+  { to: '/profit-loss', label: 'Profit \u0026 Loss' },
   { to: '/invoices', label: 'Invoices' },
   { to: '/reports', label: 'Reports' },
   { to: '/settings', label: 'Settings' },
@@ -66,3 +67,4 @@ export default function Layout() {
     </div>
   )
 }
+

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput } from '../types/finance'
+import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss } from '../types/finance'
 
 export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
   const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
@@ -60,3 +60,11 @@ export async function deletePayroll(id: number): Promise<void> {
   await apiClient.delete(`/admin/finance/payroll/${id}`)
 }
 
+
+
+export async function getProfitLoss(from: string, to: string): Promise<ProfitLoss> {
+  const { data } = await apiClient.get<ProfitLoss>('/admin/finance/profit-loss', {
+    params: { from, to },
+  })
+  return data
+}

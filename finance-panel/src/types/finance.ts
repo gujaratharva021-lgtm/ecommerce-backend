@@ -104,3 +104,15 @@ export interface PayrollFormInput {
   payment_method?: string
   note?: string
 }
+
+export interface ProfitLoss {
+  from: string
+  to: string
+  revenue: number
+  cogs: number
+  cost_price_coverage: number
+  gross_profit: number
+  operating_expenses: number
+  ebitda: number
+  net_profit: number
+}
