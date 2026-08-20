@@ -2,6 +2,7 @@ package services
 
 import (
 "fmt"
+"time"
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
@@ -93,6 +94,58 @@ CreatedByID:    nil, // system-generated, same convention as invoice audit log
 if err := tx.Create(&entry).Error; err != nil {
 return fmt.Errorf("failed to create ledger entry: %w", err)
 }
+}
+return nil
+})
+}
+
+// PostVendorPaymentLedgerEntry records the double-entry ledger lines for one
+// vendor bill payment: Debit Vendor Payable, Credit Bank. Each call to
+// PayVendorBill can record a partial payment, so this posts once per
+// payment (not once per bill) - the transaction ref includes a timestamp
+// so multiple payments against the same bill each get their own entry.
+func PostVendorPaymentLedgerEntry(billID uint, amount float64) error {
+if amount <= 0 {
+return nil
+}
+
+var vendorPayable, bank models.Account
+if err := database.DB.Where("code = ?", "2001").First(&vendorPayable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2001 (Vendor Payable): %w", err)
+}
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+
+transactionRef := fmt.Sprintf("VBILLPAY-%d-%d", billID, time.Now().UnixNano())
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      vendorPayable.ID,
+Type:           "debit",
+Amount:         amount,
+Description:    fmt.Sprintf("Payment against vendor bill #%d", billID),
+ReferenceType:  "vendor_bill_payment",
+ReferenceID:    &billID,
+EntryDate:      now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create debit ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      bank.ID,
+Type:           "credit",
+Amount:         amount,
+Description:    fmt.Sprintf("Payment against vendor bill #%d", billID),
+ReferenceType:  "vendor_bill_payment",
+ReferenceID:    &billID,
+EntryDate:      now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create credit ledger entry: %w", err)
 }
 return nil
 })

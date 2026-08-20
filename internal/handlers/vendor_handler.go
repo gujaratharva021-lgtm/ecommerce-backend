@@ -1,6 +1,7 @@
 package handlers
 
 import (
+"log"
 "net/http"
 "strconv"
 "time"
@@ -8,6 +9,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
@@ -305,6 +307,11 @@ bill.AmountPaid += req.Amount
 if err := database.DB.Save(&bill).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record payment"})
 return
+}
+
+// Debit Vendor Payable, Credit Bank for this payment.
+if err := services.PostVendorPaymentLedgerEntry(bill.ID, req.Amount); err != nil {
+log.Printf("failed to post vendor payment ledger entry for bill %s: %v", id, err)
 }
 
 adminID := c.MustGet("user_id").(uint)
