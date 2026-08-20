@@ -295,4 +295,7 @@ log.Fatalf("Failed to add voided_by_id column to bank_transactions: %v", err)
 }
 seedDefaultSettings()
 seedChartOfAccounts()
+if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
+log.Fatalf("Failed to drop NOT NULL on ledger_entries.created_by_id: %v", err)
+}
 }

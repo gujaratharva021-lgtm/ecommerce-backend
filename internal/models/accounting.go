@@ -52,7 +52,9 @@ Description    string    `json:"description,omitempty"`
 ReferenceType  string    `json:"reference_type,omitempty"` // e.g. "vendor_bill", "manual"
 ReferenceID    *uint     `json:"reference_id,omitempty"`
 EntryDate      time.Time `gorm:"not null;index" json:"entry_date"`
-CreatedByID    uint      `gorm:"not null" json:"created_by_id"`
+// CreatedByID is nil for system-generated entries (e.g. automatic sales
+// ledger postings) rather than a real admin/staff action.
+CreatedByID    *uint     `json:"created_by_id,omitempty"`
 CreatedAt      time.Time `json:"created_at"`
 }
 

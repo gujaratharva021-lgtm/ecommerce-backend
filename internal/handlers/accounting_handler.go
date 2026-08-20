@@ -220,7 +220,7 @@ Amount:         line.Amount,
 Description:    line.Description,
 ReferenceType:  "manual",
 EntryDate:      entryDate,
-CreatedByID:    adminID,
+CreatedByID:    &adminID,
 }
 if err := tx.Create(&entry).Error; err != nil {
 return err
