@@ -411,6 +411,7 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                     adminPayments.GET("", handlers.GetAdminPayments)
                     adminPayments.GET("/reconciliation", handlers.GetAdminPaymentReconciliation)
                     adminPayments.GET("/:orderId", handlers.GetAdminPaymentDetail)
+adminPayments.PUT("/:order_id/status", handlers.UpdateAdminPaymentStatus)
                 }
 
                 adminInvoices := admin.Group("/invoices")
