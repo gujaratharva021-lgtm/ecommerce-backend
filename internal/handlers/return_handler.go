@@ -1,11 +1,13 @@
 package handlers
 
 import (
+"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 	"gorm.io/gorm"
 )
@@ -180,7 +182,7 @@ func GetMyReturns(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 // GetReturns godoc
-// GET /api/v1/admin/returns (admin only) â€” optional ?status=
+// GET /api/v1/admin/returns (admin only) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â optional ?status=
 func GetReturns(c *gin.Context) {
 	var returns []models.ReturnRequest
 	query := database.DB.Preload("Order").Preload("Items.OrderItem.Product").Order("created_at DESC")
@@ -200,8 +202,8 @@ func GetReturns(c *gin.Context) {
 // ApproveReturn godoc
 // PUT /api/v1/admin/returns/:id/approve (admin only)
 // Restores stock for each returned line item, refunds the pre-computed
-// amount to the customer's wallet, and â€” only if every item on the order
-// has now been fully returned across all approved requests â€” marks the
+// amount to the customer's wallet, and ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â only if every item on the order
+// has now been fully returned across all approved requests ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â marks the
 // order "returned".
 func ApproveReturn(c *gin.Context) {
 	adminID := c.MustGet("user_id").(uint)
@@ -228,6 +230,7 @@ func ApproveReturn(c *gin.Context) {
 		orderItemsByID[it.ID] = it
 	}
 
+var creditNote *models.CreditNote
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		// Restore stock for each returned line item.
 		for _, ri := range returnReq.Items {
@@ -253,6 +256,16 @@ func ApproveReturn(c *gin.Context) {
 		if err := utils.CreditWallet(tx, returnReq.UserID, returnReq.RefundAmount, models.WalletReasonRefund, "return_request", &refID, "Refund for return request #"+id); err != nil {
 			return err
 		}
+
+// Auto-issue a Credit Note against the order's invoice for this return
+// (SRS 12.17). Runs in the same transaction as the stock restore and
+// wallet credit above, so a credit note is never created for a return
+// that doesn't actually complete.
+var cnErr error
+creditNote, cnErr = services.GenerateCreditNoteForReturn(tx, returnReq)
+if cnErr != nil {
+return cnErr
+}
 
 		// Check whether every item on the order is now fully covered by
 		// approved return requests (including this one, which we're about
@@ -298,6 +311,12 @@ func ApproveReturn(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve return: " + txErr.Error()})
 		return
 	}
+
+if creditNote != nil {
+if err := services.PostCreditNoteLedgerEntry(creditNote.ID); err != nil {
+log.Printf("failed to post credit note ledger entry for credit note %d: %v", creditNote.ID, err)
+}
+}
 
 	c.JSON(http.StatusOK, gin.H{"return_request": returnReq})
 }

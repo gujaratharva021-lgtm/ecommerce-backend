@@ -235,6 +235,7 @@ adminVendorBills.POST("/:id/void", handlers.VoidVendorBill)
 adminVendorBills.POST("/:id/hold", handlers.HoldVendorBill)
 adminVendorBills.POST("/:id/dispute", handlers.DisputeVendorBill)
 adminVendorBills.POST("/:id/release-hold", handlers.ReleaseHoldVendorBill)
+adminVendorBills.POST("/:id/debit-note", handlers.CreateDebitNote)
                 }
                 adminAccounts := adminFinance.Group("/accounts")
                 {
@@ -247,6 +248,16 @@ adminVendorBills.POST("/:id/release-hold", handlers.ReleaseHoldVendorBill)
                     adminLedger.GET("", handlers.ListLedgerEntries)
                     adminLedger.POST("", handlers.CreateManualJournalEntry)
                     adminLedger.GET("/trial-balance", handlers.GetTrialBalance)
+adminCreditNotes := adminFinance.Group("/credit-notes")
+{
+adminCreditNotes.GET("", handlers.ListCreditNotes)
+adminCreditNotes.GET("/:id", handlers.GetCreditNote)
+}
+adminDebitNotes := adminFinance.Group("/debit-notes")
+{
+adminDebitNotes.GET("", handlers.ListDebitNotes)
+adminDebitNotes.GET("/:id", handlers.GetDebitNote)
+}
                 }
                 adminBankTransactions := adminFinance.Group("/bank-transactions")
                 {
