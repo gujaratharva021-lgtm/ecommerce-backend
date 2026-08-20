@@ -25,6 +25,7 @@ OnlineOrders     int64   `json:"online_orders"`
 TotalDeliveryFee float64 `json:"total_delivery_charge"`
 TotalWalletUsed  float64 `json:"total_wallet_used"`
 AvgOrderValue    float64 `json:"avg_order_value"`
+TotalVendorGST   float64 `json:"total_vendor_gst"`
 }
 
 func parseReportDate(c *gin.Context) (start, end time.Time, label string, err error) {
@@ -82,6 +83,11 @@ nonCancelled := s.TotalOrders - s.CancelledOrders
 if nonCancelled > 0 {
 s.AvgOrderValue = s.TotalRevenue / float64(nonCancelled)
 }
+
+database.DB.Model(&models.VendorBill{}).
+Where("bill_date >= ? AND bill_date < ?", start, end).
+Select("COALESCE(SUM(gst_amount), 0)").Scan(&s.TotalVendorGST)
+
 return s
 }
 
@@ -121,16 +127,16 @@ xf.SetSheetName("Sheet1", summarySheet)
 summaryHeader := []interface{}{
 "Date", "Total Orders", "Delivered Orders", "Cancelled Orders", "Pending Orders",
 "Total Revenue", "COD Revenue", "Online Revenue", "COD Orders", "Online Orders",
-"Total Delivery Charges", "Total Wallet Used", "Average Order Value",
+"Total Delivery Charges", "Total Wallet Used", "Average Order Value", "Total Vendor GST",
 }
 summaryDataRow := []interface{}{
 label, summary.TotalOrders, summary.DeliveredOrders, summary.CancelledOrders, summary.PendingOrders,
 summary.TotalRevenue, summary.CODRevenue, summary.OnlineRevenue, summary.CODOrders, summary.OnlineOrders,
-summary.TotalDeliveryFee, summary.TotalWalletUsed, summary.AvgOrderValue,
+summary.TotalDeliveryFee, summary.TotalWalletUsed, summary.AvgOrderValue, summary.TotalVendorGST,
 }
 xf.SetSheetRow(summarySheet, "A1", &summaryHeader)
 xf.SetSheetRow(summarySheet, "A2", &summaryDataRow)
-for col := 'A'; col <= 'M'; col++ {
+for col := 'A'; col <= 'N'; col++ {
 xf.SetColWidth(summarySheet, string(col), string(col), 18)
 }
 
@@ -159,6 +165,39 @@ xf.SetSheetRow(ordersSheet, cell, &r)
 }
 for _, col := range []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"} {
 xf.SetColWidth(ordersSheet, col, col, 16)
+}
+
+var vendorBills []models.VendorBill
+database.DB.
+Where("bill_date >= ? AND bill_date < ?", start, end).
+Preload("Vendor").
+Order("bill_date ASC").
+Find(&vendorBills)
+
+vendorGstSheet := "Vendor GST"
+xf.NewSheet(vendorGstSheet)
+vendorGstHeader := []interface{}{"Vendor Name", "Bill Number", "Bill Date", "Amount", "GST Amount", "Amount Paid"}
+xf.SetSheetRow(vendorGstSheet, "A1", &vendorGstHeader)
+
+for i, b := range vendorBills {
+vendorName := ""
+if b.Vendor.ID != 0 {
+vendorName = b.Vendor.Name
+}
+row := []interface{}{
+vendorName,
+b.BillNumber,
+b.BillDate.Format("2006-01-02"),
+b.Amount,
+b.GSTAmount,
+b.AmountPaid,
+}
+r := row
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(vendorGstSheet, cell, &r)
+}
+for _, col := range []string{"A", "B", "C", "D", "E", "F"} {
+xf.SetColWidth(vendorGstSheet, col, col, 18)
 }
 xf.SetActiveSheet(0)
 

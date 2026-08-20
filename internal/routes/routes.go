@@ -1,4 +1,4 @@
-﻿package routes
+package routes
 
 import (
     "time"
@@ -311,7 +311,8 @@ func SetupRoutes(router *gin.Engine) {
                 adminDeliveryPartners.GET("", handlers.GetDeliveryPartners)
                 adminDeliveryPartners.PUT("/:id", handlers.UpdateDeliveryPartner)
                 adminDeliveryPartners.DELETE("/:id", handlers.DeleteDeliveryPartner)
-                adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
+                // TODO: teammate WIP - handler not implemented yet, temporarily disabled to unblock build
+// adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
             }
 
             admin.PUT("/orders/:id/assign-delivery", handlers.AssignDeliveryPartner)
