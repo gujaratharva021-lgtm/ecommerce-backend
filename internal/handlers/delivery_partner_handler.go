@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+"log"
 	"strconv"
 	"time"
 
@@ -495,6 +496,12 @@ func ConfirmDelivery(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to confirm delivery"})
 		return
 	}
+
+// Revenue is recognized now (COD delivery just confirmed) - post the
+// double-entry sales ledger entry at this exact moment, not earlier.
+if err := services.PostSalesLedgerEntry(order.ID); err != nil {
+log.Printf("failed to post sales ledger entry for order %s: %v", orderID, err)
+}
 
 	// Notify the customer that their order has been delivered.
 	go services.SendPushToUser(

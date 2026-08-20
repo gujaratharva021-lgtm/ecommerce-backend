@@ -16,7 +16,7 @@ import (
 // POST /api/v1/orders/:id/payment (protected)
 // Creates a Razorpay order for an existing app order (payment_method must
 // be "online") and returns what the frontend needs to open Razorpay
-// Checkout. Safe to call again to retry after a failed/abandoned attempt â€”
+// Checkout. Safe to call again to retry after a failed/abandoned attempt ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
 // it overwrites the same Payment row rather than creating duplicates.
 func CreatePaymentOrder(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
@@ -78,7 +78,7 @@ func CreatePaymentOrder(c *gin.Context) {
 // Verifies the Razorpay signature returned by Checkout on the frontend.
 // On success, marks the Payment + Order as paid and auto-advances a
 // still-pending order to "confirmed". On signature mismatch, the payment
-// is marked failed and the order is left untouched â€” the frontend can
+// is marked failed and the order is left untouched ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the frontend can
 // retry via CreatePaymentOrder.
 func VerifyPayment(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
@@ -130,7 +130,7 @@ func VerifyPayment(c *gin.Context) {
 		order.Status = models.OrderStatusConfirmed
 	}
 	if err := database.DB.Save(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order â€” contact support"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â contact support"})
 		return
 	}
         // Delivery partner assignment is admin-only now (see
@@ -147,6 +147,12 @@ func VerifyPayment(c *gin.Context) {
         if _, err := services.GenerateInvoiceIfNotExists(order.ID); err != nil {
                 log.Printf("failed to generate invoice for order %s: %v", orderID, err)
         }
+
+// Revenue is recognized now (online payment just verified) - post the
+// double-entry sales ledger entry at this exact moment, not earlier.
+if err := services.PostSalesLedgerEntry(order.ID); err != nil {
+log.Printf("failed to post sales ledger entry for order %s: %v", orderID, err)
+}
 
 	var addr models.Address
 	database.DB.First(&addr, order.AddressID)
