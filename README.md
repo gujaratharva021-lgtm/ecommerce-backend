@@ -1,196 +1,138 @@
-[![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/golang-migrate/migrate/ci.yaml?branch=master)](https://github.com/golang-migrate/migrate/actions/workflows/ci.yaml?query=branch%3Amaster)
-[![GoDoc](https://pkg.go.dev/badge/github.com/golang-migrate/migrate)](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)
-[![Coverage Status](https://img.shields.io/coveralls/github/golang-migrate/migrate/master.svg)](https://coveralls.io/github/golang-migrate/migrate?branch=master)
-[![packagecloud.io](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/golang-migrate/migrate?filter=debs)
-[![Docker Pulls](https://img.shields.io/docker/pulls/migrate/migrate.svg)](https://hub.docker.com/r/migrate/migrate/)
-![Supported Go Versions](https://img.shields.io/badge/Go-1.22%2C%201.23-lightgrey.svg)
-[![GitHub Release](https://img.shields.io/github/release/golang-migrate/migrate.svg)](https://github.com/golang-migrate/migrate/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/golang-migrate/migrate/v4)](https://goreportcard.com/report/github.com/golang-migrate/migrate/v4)
+# Ecommerce Backend (GoLang + PostgreSQL)
 
-# migrate
+Developer 1 — Backend module. Day 1 deliverable: project setup, DB schema, and authentication APIs.
 
-__Database migrations written in Go. Use as [CLI](#cli-usage) or import as [library](#use-in-your-go-project).__
+## Tech Stack
 
-* Migrate reads migrations from [sources](#migration-sources)
-   and applies them in correct order to a [database](#databases).
-* Drivers are "dumb", migrate glues everything together and makes sure the logic is bulletproof.
-   (Keeps the drivers lightweight, too.)
-* Database drivers don't assume things or try to correct user input. When in doubt, fail.
+- Go 1.22+
+- Gin (web framework)
+- GORM (ORM) + PostgreSQL
+- JWT (golang-jwt/jwt/v5) for authentication
+- OTP-based login (phone number only — no email/password)
+- Docker Compose for local PostgreSQL
 
-Forked from [mattes/migrate](https://github.com/mattes/migrate)
+## Folder Structure
 
-## Databases
+ecommerce-backend/
+├── cmd/api/main.go # Entry point
+├── internal/
+│ ├── config/ # Env config loader
+│ ├── database/ # DB connection + migrations
+│ ├── models/ # GORM models (User, Product, Cart, Order, etc.)
+│ ├── handlers/ # Request handlers (controllers)
+│ ├── middleware/ # JWT auth middleware
+│ ├── routes/ # Route definitions
+│ └── utils/ # JWT helpers
+├── migrations/ # (raw SQL, optional — GORM auto-migrates by default)
+├── docker-compose.yml # Local Postgres + pgAdmin
+├── .env.example
+└── go.mod
 
-Database drivers run migrations. [Add a new database?](database/driver.go)
 
-* [PostgreSQL](database/postgres)
-* [PGX v4](database/pgx)
-* [PGX v5](database/pgx/v5)
-* [Redshift](database/redshift)
-* [Ql](database/ql)
-* [Cassandra / ScyllaDB](database/cassandra)
-* [SQLite](database/sqlite)
-* [SQLite3](database/sqlite3) ([todo #165](https://github.com/mattes/migrate/issues/165))
-* [SQLCipher](database/sqlcipher)
-* [MySQL / MariaDB](database/mysql)
-* [Neo4j](database/neo4j)
-* [MongoDB](database/mongodb)
-* [CrateDB](database/crate) ([todo #170](https://github.com/mattes/migrate/issues/170))
-* [Shell](database/shell) ([todo #171](https://github.com/mattes/migrate/issues/171))
-* [Google Cloud Spanner](database/spanner)
-* [CockroachDB](database/cockroachdb)
-* [YugabyteDB](database/yugabytedb)
-* [ClickHouse](database/clickhouse)
-* [Firebird](database/firebird)
-* [MS SQL Server](database/sqlserver)
-* [rqlite](database/rqlite)
+## Setup Instructions
 
-### Database URLs
+### 1. Clone and enter the project
 
-Database connection strings are specified via URLs. The URL format is driver dependent but generally has the form: `dbdriver://username:password@host:port/dbname?param1=true&param2=false`
+git clone https://github.com/gujaratharva021-lgtm/ecommerce-backend.git
+cd ecommerce-backend
 
-Any [reserved URL characters](https://en.wikipedia.org/wiki/Percent-encoding#Percent-encoding_reserved_characters) need to be escaped. Note, the `%` character also [needs to be escaped](https://en.wikipedia.org/wiki/Percent-encoding#Percent-encoding_the_percent_character)
 
-Explicitly, the following characters need to be escaped:
-`!`, `#`, `$`, `%`, `&`, `'`, `(`, `)`, `*`, `+`, `,`, `/`, `:`, `;`, `=`, `?`, `@`, `[`, `]`
+### 2. Start PostgreSQL with Docker
 
-It's easiest to always run the URL parts of your DB connection URL (e.g. username, password, etc) through an URL encoder. See the example Python snippets below:
+docker compose up -d
 
-```bash
-$ python3 -c 'import urllib.parse; print(urllib.parse.quote(input("String to encode: "), ""))'
-String to encode: FAKEpassword!#$%&'()*+,/:;=?@[]
-FAKEpassword%21%23%24%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D
-$ python2 -c 'import urllib; print urllib.quote(raw_input("String to encode: "), "")'
-String to encode: FAKEpassword!#$%&'()*+,/:;=?@[]
-FAKEpassword%21%23%24%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D
-$
-```
 
-## Migration Sources
+This starts:
 
-Source drivers read migrations from local or remote sources. [Add a new source?](source/driver.go)
+- PostgreSQL on `localhost:5432` (user: `postgres`, password: `postgres`, db: `ecommerce_db`)
+- pgAdmin on `localhost:5050` (email: `admin@admin.com`, password: `admin`)
 
-* [Filesystem](source/file) - read from filesystem
-* [io/fs](source/iofs) - read from a Go [io/fs](https://pkg.go.dev/io/fs#FS)
-* [Go-Bindata](source/go_bindata) - read from embedded binary data ([jteeuwen/go-bindata](https://github.com/jteeuwen/go-bindata))
-* [pkger](source/pkger) - read from embedded binary data ([markbates/pkger](https://github.com/markbates/pkger))
-* [GitHub](source/github) - read from remote GitHub repositories
-* [GitHub Enterprise](source/github_ee) - read from remote GitHub Enterprise repositories
-* [Bitbucket](source/bitbucket) - read from remote Bitbucket repositories
-* [Gitlab](source/gitlab) - read from remote Gitlab repositories
-* [AWS S3](source/aws_s3) - read from Amazon Web Services S3
-* [Google Cloud Storage](source/google_cloud_storage) - read from Google Cloud Platform Storage
+### 3. Configure environment variables
 
-## CLI usage
+cp .env.example .env
 
-* Simple wrapper around this library.
-* Handles ctrl+c (SIGINT) gracefully.
-* No config search paths, no config files, no magic ENV var injections.
 
-__[CLI Documentation](cmd/migrate)__
+Edit `.env` if you changed any Docker credentials. Change `JWT_SECRET` to a random string.
 
-### Basic usage
+### 4. Install Go dependencies
 
-```bash
-$ migrate -source file://path/to/migrations -database postgres://localhost:5432/database up 2
-```
+go mod tidy
 
-### Docker usage
 
-```bash
-$ docker run -v {{ migration dir }}:/migrations --network host migrate/migrate
-    -path=/migrations/ -database postgres://localhost:5432/database up 2
-```
+### 5. Run the server
 
-## Use in your Go project
+go run cmd/api/main.go
 
-* API is stable and frozen for this release (v3 & v4).
-* Uses [Go modules](https://golang.org/cmd/go/#hdr-Modules__module_versions__and_more) to manage dependencies.
-* To help prevent database corruptions, it supports graceful stops via `GracefulStop chan bool`.
-* Bring your own logger.
-* Uses `io.Reader` streams internally for low memory overhead.
-* Thread-safe and no goroutine leaks.
 
-__[Go Documentation](https://pkg.go.dev/github.com/golang-migrate/migrate/v4)__
+Server starts on `http://localhost:8080`. On first run, GORM auto-migration creates all tables.
 
-```go
-import (
-    "github.com/golang-migrate/migrate/v4"
-    _ "github.com/golang-migrate/migrate/v4/database/postgres"
-    _ "github.com/golang-migrate/migrate/v4/source/github"
-)
+### 6. Verify it's running
 
-func main() {
-    m, err := migrate.New(
-        "github://mattes:personal-access-token@mattes/migrate_test",
-        "postgres://localhost:5432/database?sslmode=enable")
-    m.Steps(2)
-}
-```
+curl http://localhost:8080/health
 
-Want to use an existing database client?
-
-```go
-import (
-    "database/sql"
-    _ "github.com/lib/pq"
-    "github.com/golang-migrate/migrate/v4"
-    "github.com/golang-migrate/migrate/v4/database/postgres"
-    _ "github.com/golang-migrate/migrate/v4/source/file"
-)
-
-func main() {
-    db, err := sql.Open("postgres", "postgres://localhost:5432/database?sslmode=enable")
-    driver, err := postgres.WithInstance(db, &postgres.Config{})
-    m, err := migrate.NewWithDatabaseInstance(
-        "file:///migrations",
-        "postgres", driver)
-    m.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
-}
-```
-
-## Getting started
-
-Go to [getting started](GETTING_STARTED.md)
-
-## Tutorials
-
-* [CockroachDB](database/cockroachdb/TUTORIAL.md)
-* [PostgreSQL](database/postgres/TUTORIAL.md)
-
-(more tutorials to come)
-
-## Migration files
-
-Each migration has an up and down migration. [Why?](FAQ.md#why-two-separate-files-up-and-down-for-a-migration)
-
-```bash
-1481574547_create_users_table.up.sql
-1481574547_create_users_table.down.sql
-```
-
-[Best practices: How to write migrations.](MIGRATIONS.md)
-
-## Coming from another db migration tool?
-
-Check out [migradaptor](https://github.com/musinit/migradaptor/).
-*Note: migradaptor is not affiliated or supported by this project*
-
-## Versions
-
-Version | Supported? | Import | Notes
---------|------------|--------|------
-**master** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | New features and bug fixes arrive here first |
-**v4** | :white_check_mark: | `import "github.com/golang-migrate/migrate/v4"` | Used for stable releases |
-**v3** | :x: | `import "github.com/golang-migrate/migrate"` (with package manager) or `import "gopkg.in/golang-migrate/migrate.v3"` (not recommended) | **DO NOT USE** - No longer supported |
-
-## Development and Contributing
-
-Yes, please! [`Makefile`](Makefile) is your friend,
-read the [development guide](CONTRIBUTING.md).
-
-Also have a look at the [FAQ](FAQ.md).
 
 ---
 
-Looking for alternatives? [https://awesome-go.com/#database](https://awesome-go.com/#database).
+## Database Tables (Day 1–3)
+
+- `users` — id, name, phone (unique), role, timestamps
+- `otps` — id, phone, code, expires_at, verified, created_at
+- `categories` — id, name, image_url, timestamps
+- `products` — id, name, description, price, image_url, category_id, timestamps
+- `inventories` — id, product_id, stock, in_stock, timestamps
+- `carts` — id, user_id, timestamps
+- `cart_items` — id, cart_id, product_id, quantity, timestamps
+- `addresses` — id, user_id, label, full_name, phone, line1, line2, city, state, pincode, is_default, timestamps
+- `orders` — id, user_id, address_id, items_amount, delivery_charge, total_amount, status, timestamps
+- `order_items` — id, order_id, product_id, quantity, price, created_at
+
+Tables are auto-created via GORM `AutoMigrate` on server start — no manual SQL needed.
+
+## Day 1–5 summary
+
+- Day 1: Project setup, DB schema, Auth APIs (phone + OTP)
+- Day 2: Product/Category APIs, Cart module, image upload
+- Day 3: Address module, Order management + checkout, profile update
+- Day 4: Admin APIs — categories, products, inventory, order status management
+- Day 5: Razorpay payment integration — online + COD checkout, signature verification
+
+Full endpoint-level docs for these are in `API_DOCUMENTATION.md`.
+
+## Day 6 — Finance & Accounting Module
+
+### Overview
+Full accounting/finance module added: vendor bills (accounts payable), a double-entry ledger with manual journal entries and trial balance, bank reconciliation, GST tracking (output GST from sales + vendor/purchase GST), and CA-ready Excel reports.
+
+### New Features
+- **Vendors & Vendor Bills** — track suppliers and their bills, with partial/full payment recording and GST amount per bill
+- **Chart of Accounts & Ledger** — create accounts (asset/liability/equity/revenue/expense), post balanced manual journal entries, view trial balance
+- **Bank Reconciliation** — record bank statement lines, match against internal records (vendor bill payments, etc.) or mark as ignored
+- **GST Summary** — output GST (CGST/SGST/IGST) collected from sales invoices, broken down by rate and HSN code
+- **Payments & Refunds** — collected/pending/refunded totals, online vs COD split, order counts by status
+- **Custom Range Report** — pick any date range (or use 7/30/90-day presets) for a combined sales + GST + vendor-GST summary, with a 5-sheet Excel export (Summary, Orders, GST By Rate, GST By HSN, Vendor GST)
+- **Delivery Partner Location** — admin can fetch a partner's last known GPS location (`GET /admin/delivery-partners/:id/location`)
+
+### New API Endpoints
+
+GET/POST/PUT/DELETE /api/v1/admin/finance/vendors
+GET/POST/DELETE /api/v1/admin/finance/vendor-bills
+POST /api/v1/admin/finance/vendor-bills/:id/pay
+GET/POST/PUT /api/v1/admin/finance/accounts
+GET/POST /api/v1/admin/finance/ledger
+GET /api/v1/admin/finance/ledger/trial-balance
+GET/POST /api/v1/admin/finance/bank-transactions
+POST /api/v1/admin/finance/bank-transactions/:id/match
+POST /api/v1/admin/finance/bank-transactions/:id/ignore
+GET /api/v1/admin/finance/gst
+GET /api/v1/admin/payments/reconciliation
+GET /api/v1/admin/reports/range-sales
+GET /api/v1/admin/reports/range-sales/export
+GET /api/v1/admin/delivery-partners/:id/location
+
+
+### Finance Panel (separate frontend)
+New sidebar sections: Payments & Refunds, GST, and an "Accounting" group with Vendors, Vendor Bills, Chart of Accounts, Ledger, and Bank Reconciliation.
+
+### Testing
+- All endpoints tested live against the deployed backend
+- End-to-end verified: created a vendor + GST-inclusive bill, recorded a partial payment, posted a balanced journal entry, matched a bank transaction, and downloaded/opened the range-report Excel export
