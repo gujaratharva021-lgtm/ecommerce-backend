@@ -296,7 +296,6 @@ adminBankTransactions.POST("/:id/void", handlers.VoidBankTransaction)
             {
                 adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
                 adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
-admin.POST("/debug/cleanup-test-credit-note", handlers.DebugCleanupTestCreditNote)
                 adminOrders.GET("/:id/tracking", handlers.GetOrderTrackingAdmin)
             }
 
