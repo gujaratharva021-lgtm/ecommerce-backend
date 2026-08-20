@@ -97,6 +97,7 @@ WarehouseID: req.WarehouseID,
 Note:        req.Note,
 ReceiptURL:  req.ReceiptURL,
 AddedByID:   adminID,
+ApprovalStatus: "draft",
 }
 if err := database.DB.Create(&expense).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create expense"})
@@ -105,11 +106,6 @@ return
 
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "create_expense", "expense", strconv.Itoa(int(expense.ID)), "created")
-
-if err := services.PostExpenseLedgerEntry(expense.ID); err != nil {
-log.Printf("failed to post expense ledger entry for expense %d: %v", expense.ID, err)
-}
-
 c.JSON(http.StatusCreated, expense)
 }
 
@@ -171,4 +167,127 @@ adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "delete_expense", "expense", id, "deleted")
 
 c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// SubmitExpense godoc
+// POST /api/v1/admin/finance/expenses/:id/submit
+func SubmitExpense(c *gin.Context) {
+id := c.Param("id")
+var expense models.Expense
+if err := database.DB.First(&expense, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
+if expense.ApprovalStatus != "draft" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only draft expenses can be submitted"})
+return
+}
+expense.ApprovalStatus = "submitted"
+if err := database.DB.Save(&expense).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit expense"})
+return
+}
+adminID := c.MustGet("user_id").(uint)
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "submit_expense", "expense", id, "draft->submitted")
+c.JSON(http.StatusOK, expense)
+}
+
+// ApproveExpense godoc
+// POST /api/v1/admin/finance/expenses/:id/approve
+// Maker-checker (12.13, 12.25): the approver must be a different admin
+// than the one who created the expense.
+func ApproveExpense(c *gin.Context) {
+id := c.Param("id")
+var expense models.Expense
+if err := database.DB.First(&expense, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
+if expense.ApprovalStatus != "submitted" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only submitted expenses can be approved"})
+return
+}
+adminID := c.MustGet("user_id").(uint)
+if adminID == expense.AddedByID {
+c.JSON(http.StatusForbidden, gin.H{"error": "Maker-checker: the expense creator cannot approve their own expense"})
+return
+}
+now := time.Now()
+expense.ApprovalStatus = "approved"
+expense.ApprovedByID = &adminID
+expense.ApprovedAt = &now
+if err := database.DB.Save(&expense).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve expense"})
+return
+}
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "approve_expense", "expense", id, "submitted->approved")
+c.JSON(http.StatusOK, expense)
+}
+
+// RejectExpense godoc
+// POST /api/v1/admin/finance/expenses/:id/reject
+func RejectExpense(c *gin.Context) {
+id := c.Param("id")
+var expense models.Expense
+if err := database.DB.First(&expense, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
+if expense.ApprovalStatus != "submitted" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only submitted expenses can be rejected"})
+return
+}
+var req models.ExpenseRejectRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+adminID := c.MustGet("user_id").(uint)
+if adminID == expense.AddedByID {
+c.JSON(http.StatusForbidden, gin.H{"error": "Maker-checker: the expense creator cannot reject their own expense"})
+return
+}
+expense.ApprovalStatus = "rejected"
+expense.RejectionReason = req.Reason
+if err := database.DB.Save(&expense).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject expense"})
+return
+}
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "reject_expense", "expense", id, req.Reason)
+c.JSON(http.StatusOK, expense)
+}
+
+// PayExpense godoc
+// POST /api/v1/admin/finance/expenses/:id/pay
+// Only an approved expense can be paid. This is the point where the
+// expense is actually recorded to the ledger (moved out of CreateExpense,
+// which now only creates a draft - see 12.13/12.25 maker-checker workflow).
+func PayExpense(c *gin.Context) {
+id := c.Param("id")
+var expense models.Expense
+if err := database.DB.First(&expense, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
+if expense.ApprovalStatus != "approved" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only approved expenses can be paid"})
+return
+}
+now := time.Now()
+expense.ApprovalStatus = "paid"
+expense.PaidAt = &now
+if err := database.DB.Save(&expense).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark expense paid"})
+return
+}
+if err := services.PostExpenseLedgerEntry(expense.ID); err != nil {
+log.Printf("failed to post expense ledger entry for expense %d: %v", expense.ID, err)
+}
+adminID := c.MustGet("user_id").(uint)
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "pay_expense", "expense", id, "approved->paid")
+c.JSON(http.StatusOK, expense)
 }

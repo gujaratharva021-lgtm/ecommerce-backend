@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -16,8 +16,23 @@ Warehouse   *Warehouse `gorm:"foreignKey:WarehouseID" json:"warehouse,omitempty"
 Note        string    `json:"note,omitempty"`
 ReceiptURL  string    `json:"receipt_url,omitempty"`
 AddedByID   uint      `gorm:"not null" json:"added_by_id"`
+// ApprovalStatus: draft -> submitted -> approved/rejected -> paid.
+// Maker-checker: ApprovedByID must differ from AddedByID (12.13, 12.25).
+ApprovalStatus string     `gorm:"not null;default:draft;index" json:"approval_status"`
+ApprovedByID   *uint      `json:"approved_by_id,omitempty"`
+ApprovedAt     *time.Time `json:"approved_at,omitempty"`
+RejectionReason string    `json:"rejection_reason,omitempty"`
+PaidAt         *time.Time `json:"paid_at,omitempty"`
 CreatedAt   time.Time `json:"created_at"`
 UpdatedAt   time.Time `json:"updated_at"`
+}
+
+var ValidExpenseApprovalStatuses = map[string]bool{
+"draft": true, "submitted": true, "approved": true, "rejected": true, "paid": true,
+}
+
+type ExpenseRejectRequest struct {
+Reason string `json:"reason" binding:"required"`
 }
 
 // ValidExpenseCategories restricts the category field to a known set, same

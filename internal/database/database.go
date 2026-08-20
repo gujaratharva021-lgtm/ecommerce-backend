@@ -351,6 +351,24 @@ log.Fatalf("Failed to add delivery_status column to orders: %v", err)
 if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_orders_delivery_status ON orders(delivery_status)`).Error; err != nil {
 log.Fatalf("Failed to create delivery_status index on orders: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'draft'`).Error; err != nil {
+log.Fatalf("Failed to add approval_status column to expenses: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_by_id BIGINT NULL REFERENCES users(id)`).Error; err != nil {
+log.Fatalf("Failed to add approved_by_id column to expenses: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add approved_at column to expenses: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS rejection_reason TEXT`).Error; err != nil {
+log.Fatalf("Failed to add rejection_reason column to expenses: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add paid_at column to expenses: %v", err)
+}
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_expenses_approval_status ON expenses(approval_status)`).Error; err != nil {
+log.Fatalf("Failed to create approval_status index on expenses: %v", err)
+}
 seedDefaultSettings()
 seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
