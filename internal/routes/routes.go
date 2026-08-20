@@ -217,6 +217,7 @@ warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole
                         {
                                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
                                 adminFinance.GET("/profit-loss", handlers.GetProfitLoss)
+                                adminFinance.GET("/gst", handlers.GetGSTSummary)
 adminFinance.GET("/expenses", handlers.ListExpenses)
 adminFinance.POST("/expenses", handlers.CreateExpense)
 adminFinance.PUT("/expenses/:id", handlers.UpdateExpense)
