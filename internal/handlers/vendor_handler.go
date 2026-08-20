@@ -265,7 +265,7 @@ Note:        req.Note,
 CreatedByID: adminID,
 }
 if err := database.DB.Create(&bill).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create vendor bill"})
+c.JSON(http.StatusInternalServerError, gin.H{"error": "DEBUG: " + err.Error()})
 return
 }
 
