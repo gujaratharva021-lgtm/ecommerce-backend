@@ -22,6 +22,7 @@ var defaultChartOfAccounts = []models.Account{
 {Code: "4001", Name: "Product Sales", Type: "revenue"},
 {Code: "5001", Name: "COGS", Type: "expense"},
 {Code: "5002", Name: "Discount Given", Type: "expense"},
+{Code: "5003", Name: "Operating Expenses", Type: "expense"},
 }
 
 func seedChartOfAccounts() {

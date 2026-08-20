@@ -1,6 +1,7 @@
 package handlers
 
 import (
+"log"
 "net/http"
 "strconv"
 "strings"
@@ -9,6 +10,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
@@ -236,6 +238,7 @@ Gateway:  gateway,
 }
 }
 
+previousRefundedAmount := payment.RefundedAmount
 payment.Status = req.Status
 if req.RefundedAmount != nil {
 // 12.28.6: a refund can never exceed the original payment amount -
@@ -255,6 +258,16 @@ payment.RefundedAmount = *req.RefundedAmount
 if err := database.DB.Save(&payment).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment status"})
 return
+}
+
+// Post the incremental refund (not the cumulative total) to the ledger:
+// Debit Customer Refund Payable, Credit Bank/Cash. Only fires when this
+// call actually increased the refunded amount.
+refundDelta := payment.RefundedAmount - previousRefundedAmount
+if refundDelta > 0 {
+if err := services.PostRefundLedgerEntry(order.ID, refundDelta, order.PaymentMethod); err != nil {
+log.Printf("failed to post refund ledger entry for order %d: %v", order.ID, err)
+}
 }
 
 switch req.Status {

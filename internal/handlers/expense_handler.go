@@ -1,6 +1,7 @@
-﻿package handlers
+package handlers
 
 import (
+"log"
 "net/http"
 "strconv"
 "time"
@@ -8,6 +9,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 )
 
@@ -103,6 +105,10 @@ return
 
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "create_expense", "expense", strconv.Itoa(int(expense.ID)), "created")
+
+if err := services.PostExpenseLedgerEntry(expense.ID); err != nil {
+log.Printf("failed to post expense ledger entry for expense %d: %v", expense.ID, err)
+}
 
 c.JSON(http.StatusCreated, expense)
 }
