@@ -265,5 +265,8 @@ CREATE INDEX IF NOT EXISTS idx_bank_transactions_status ON bank_transactions(sta
 CREATE INDEX IF NOT EXISTS idx_bank_transactions_transaction_date ON bank_transactions(transaction_date);`).Error; err != nil {
 log.Fatalf("Failed to create accounting module tables: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add gst_amount column to vendor_bills: %v", err)
+}
 seedDefaultSettings()
 }
