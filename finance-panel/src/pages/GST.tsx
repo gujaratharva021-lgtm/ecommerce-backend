@@ -114,14 +114,14 @@ export default function GST() {
                 </tr>
               </thead>
               <tbody>
-                {data.by_rate.length === 0 && (
+                {(data.by_rate ?? []).length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
                       No data for this period.
                     </td>
                   </tr>
                 )}
-                {data.by_rate.map((row) => (
+                {(data.by_rate ?? []).map((row) => (
                   <tr key={row.gst_percent} className="border-t border-slate-800">
                     <td className="px-4 py-2">{row.gst_percent}%</td>
                     <td className="px-4 py-2 text-right">{formatCurrency(row.taxable_amount)}</td>
@@ -144,14 +144,14 @@ export default function GST() {
                 </tr>
               </thead>
               <tbody>
-                {data.by_hsn.length === 0 && (
+                {(data.by_hsn ?? []).length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
                       No data for this period.
                     </td>
                   </tr>
                 )}
-                {data.by_hsn.map((row) => (
+                {(data.by_hsn ?? []).map((row) => (
                   <tr key={row.hsn_code} className="border-t border-slate-800">
                     <td className={`px-4 py-2 ${row.hsn_code === 'Not set' ? 'text-slate-500 italic' : ''}`}>
                       {row.hsn_code}

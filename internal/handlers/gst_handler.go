@@ -40,7 +40,7 @@ TaxableAmount float64 `json:"taxable_amount"`
 GSTAmount     float64 `json:"gst_amount"`
 Quantity      int64   `json:"quantity"`
 }
-var byHSN []hsnRow
+byHSN := []hsnRow{}
 database.DB.Table("invoice_items").
 Joins("JOIN invoices ON invoices.id = invoice_items.invoice_id").
 Where("invoices.generated_at >= ? AND invoices.generated_at < ?", from, to).
@@ -54,7 +54,7 @@ GSTPercent    float64 `json:"gst_percent"`
 TaxableAmount float64 `json:"taxable_amount"`
 GSTAmount     float64 `json:"gst_amount"`
 }
-var byRate []rateRow
+byRate := []rateRow{}
 database.DB.Table("invoice_items").
 Joins("JOIN invoices ON invoices.id = invoice_items.invoice_id").
 Where("invoices.generated_at >= ? AND invoices.generated_at < ?", from, to).
