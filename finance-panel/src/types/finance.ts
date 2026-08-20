@@ -184,6 +184,7 @@ export interface VendorBill {
   vendor?: Vendor
   bill_number?: string
   amount: number
+  gst_amount: number
   amount_paid: number
   bill_date: string
   due_date?: string
@@ -198,6 +199,7 @@ export interface VendorBillRequest {
   vendor_id: number
   bill_number?: string
   amount: number
+  gst_amount?: number
   bill_date: string
   due_date?: string
   note?: string

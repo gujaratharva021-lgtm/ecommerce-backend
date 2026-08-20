@@ -258,6 +258,7 @@ bill := models.VendorBill{
 VendorID:    req.VendorID,
 BillNumber:  req.BillNumber,
 Amount:      req.Amount,
+GSTAmount:   req.GSTAmount,
 BillDate:    billDate,
 DueDate:     dueDate,
 Note:        req.Note,

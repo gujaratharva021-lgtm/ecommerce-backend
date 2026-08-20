@@ -6,7 +6,7 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value)
 }
 
-const emptyForm: VendorBillRequest = { vendor_id: 0, bill_number: '', amount: 0, bill_date: '', due_date: '', note: '' }
+const emptyForm: VendorBillRequest = { vendor_id: 0, bill_number: '', amount: 0, gst_amount: 0, bill_date: '', due_date: '', note: '' }
 
 export default function VendorBills() {
   const [bills, setBills] = useState<VendorBill[]>([])
@@ -101,7 +101,7 @@ export default function VendorBills() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-semibold">Vendor Bills</h1>
-          <p className="text-sm text-slate-500">Accounts payable — bills raised by vendors.</p>
+          <p className="text-sm text-slate-500">Accounts payable Ã¢â‚¬â€ bills raised by vendors.</p>
         </div>
         <button
           onClick={() => setShowForm((s) => !s)}
@@ -145,6 +145,14 @@ export default function VendorBills() {
                 type="number"
                 value={form.amount || ''}
                 onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+              />
+            </Field>
+            <Field label="GST Amount">
+              <input
+                type="number"
+                value={form.gst_amount || ''}
+                onChange={(e) => setForm({ ...form, gst_amount: Number(e.target.value) })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
               />
             </Field>
@@ -211,6 +219,7 @@ export default function VendorBills() {
                 <th className="px-4 py-2 font-medium">Bill #</th>
                 <th className="px-4 py-2 font-medium">Date</th>
                 <th className="px-4 py-2 font-medium text-right">Amount</th>
+                <th className="px-4 py-2 font-medium text-right">GST</th>
                 <th className="px-4 py-2 font-medium text-right">Paid</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium text-right">Actions</th>
@@ -219,7 +228,7 @@ export default function VendorBills() {
             <tbody>
               {bills.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-500">
                     No bills found.
                   </td>
                 </tr>
@@ -227,9 +236,10 @@ export default function VendorBills() {
               {bills.map((b) => (
                 <tr key={b.id} className="border-t border-slate-800">
                   <td className="px-4 py-2 font-medium">{b.vendor?.name ?? `#${b.vendor_id}`}</td>
-                  <td className="px-4 py-2 text-slate-400">{b.bill_number || '—'}</td>
+                  <td className="px-4 py-2 text-slate-400">{b.bill_number || 'Ã¢â‚¬â€'}</td>
                   <td className="px-4 py-2 text-slate-400">{b.bill_date.slice(0, 10)}</td>
                   <td className="px-4 py-2 text-right">{formatCurrency(b.amount)}</td>
+                  <td className="px-4 py-2 text-right text-slate-400">{formatCurrency(b.gst_amount)}</td>
                   <td className="px-4 py-2 text-right text-slate-400">{formatCurrency(b.amount_paid)}</td>
                   <td className="px-4 py-2">{statusBadge(b.status)}</td>
                   <td className="px-4 py-2 text-right space-x-2">

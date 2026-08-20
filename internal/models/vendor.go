@@ -40,6 +40,7 @@ VendorID    uint       `gorm:"not null;index" json:"vendor_id"`
 Vendor      Vendor     `gorm:"foreignKey:VendorID" json:"vendor,omitempty"`
 BillNumber  string     `json:"bill_number,omitempty"`
 Amount      float64    `gorm:"not null" json:"amount"`
+GSTAmount   float64    `gorm:"not null;default:0" json:"gst_amount"`
 AmountPaid  float64    `gorm:"not null;default:0" json:"amount_paid"`
 BillDate    time.Time  `gorm:"not null" json:"bill_date"`
 DueDate     *time.Time `json:"due_date,omitempty"`
@@ -65,6 +66,7 @@ type VendorBillRequest struct {
 VendorID   uint    `json:"vendor_id" binding:"required"`
 BillNumber string  `json:"bill_number"`
 Amount     float64 `json:"amount" binding:"required,gt=0"`
+GSTAmount  float64 `json:"gst_amount"`
 BillDate   string  `json:"bill_date" binding:"required"`
 DueDate    string  `json:"due_date"`
 Note       string  `json:"note"`
