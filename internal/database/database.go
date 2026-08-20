@@ -345,6 +345,12 @@ CREATE INDEX IF NOT EXISTS idx_debit_notes_vendor_bill_id ON debit_notes(vendor_
 CREATE INDEX IF NOT EXISTS idx_debit_notes_vendor_id ON debit_notes(vendor_id);`).Error; err != nil {
 log.Fatalf("Failed to create credit/debit note tables: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_status VARCHAR(20)`).Error; err != nil {
+log.Fatalf("Failed to add delivery_status column to orders: %v", err)
+}
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_orders_delivery_status ON orders(delivery_status)`).Error; err != nil {
+log.Fatalf("Failed to create delivery_status index on orders: %v", err)
+}
 seedDefaultSettings()
 seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
