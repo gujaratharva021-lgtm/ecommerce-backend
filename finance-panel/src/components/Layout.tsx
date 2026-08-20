@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 
 const NAV_ITEMS = [
   { to: '/revenue', label: 'Revenue' },
+  { to: '/payments', label: 'Payments \u0026 Refunds' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/payroll', label: 'Payroll' },
   { to: '/profit-loss', label: 'Profit \u0026 Loss' },
@@ -67,4 +68,5 @@ export default function Layout() {
     </div>
   )
 }
+
 

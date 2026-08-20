@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Revenue from './pages/Revenue'
+import Payments from './pages/Payments'
 import Expenses from './pages/Expenses'
 import Payroll from './pages/Payroll'
 import ProfitLoss from './pages/ProfitLoss'
@@ -26,6 +27,7 @@ export default function App() {
             }
           >
             <Route path="/revenue" element={<Revenue />} />
+            <Route path="/payments" element={<Payments />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/payroll" element={<Payroll />} />
             <Route path="/profit-loss" element={<ProfitLoss />} />
@@ -40,4 +42,5 @@ export default function App() {
     </BrowserRouter>
   )
 }
+
 

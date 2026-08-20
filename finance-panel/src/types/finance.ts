@@ -116,3 +116,15 @@ export interface ProfitLoss {
   ebitda: number
   net_profit: number
 }
+
+export interface PaymentReconciliation {
+  total_collected: number
+  total_pending: number
+  total_refunded: number
+  count_paid: number
+  count_pending: number
+  count_failed: number
+  count_refunded: number
+  online_collected: number
+  cod_collected: number
+}

@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss } from '../types/finance'
+import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss, PaymentReconciliation } from '../types/finance'
 
 export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
   const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
@@ -65,6 +65,14 @@ export async function deletePayroll(id: number): Promise<void> {
 export async function getProfitLoss(from: string, to: string): Promise<ProfitLoss> {
   const { data } = await apiClient.get<ProfitLoss>('/admin/finance/profit-loss', {
     params: { from, to },
+  })
+  return data
+}
+
+
+export async function getPaymentReconciliation(dateFrom: string, dateTo: string): Promise<PaymentReconciliation> {
+  const { data } = await apiClient.get<PaymentReconciliation>('/admin/payments/reconciliation', {
+    params: { date_from: dateFrom, date_to: dateTo },
   })
   return data
 }
