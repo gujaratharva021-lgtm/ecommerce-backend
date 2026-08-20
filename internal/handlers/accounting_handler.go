@@ -238,7 +238,10 @@ return
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "create_journal_entry", "ledger_entry", transactionRef, "manual entry")
 
-c.JSON(http.StatusCreated, gin.H{"transaction_ref": transactionRef, "entries": created})
+var withAccounts []models.LedgerEntry
+database.DB.Preload("Account").Where("transaction_ref = ?", transactionRef).Order("id ASC").Find(&withAccounts)
+
+c.JSON(http.StatusCreated, gin.H{"transaction_ref": transactionRef, "entries": withAccounts})
 }
 
 // GetTrialBalance godoc
