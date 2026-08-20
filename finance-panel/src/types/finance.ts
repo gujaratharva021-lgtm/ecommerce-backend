@@ -186,13 +186,18 @@ export interface VendorBill {
   amount: number
   gst_amount: number
   amount_paid: number
+  hold_status: string
+  hold_reason?: string
+  voided_at?: string
+  void_reason?: string
+  voided_by_id?: number
   bill_date: string
   due_date?: string
   note?: string
   created_by_id: number
   created_at: string
   updated_at: string
-  status: 'unpaid' | 'partially_paid' | 'paid'
+  status: 'unpaid' | 'partially_paid' | 'paid' | 'on_hold' | 'disputed' | 'voided'
 }
 
 export interface VendorBillRequest {
@@ -272,12 +277,15 @@ export interface BankTransaction {
   description?: string
   amount: number
   reference_number?: string
-  status: 'unmatched' | 'matched' | 'ignored'
+  status: 'unmatched' | 'matched' | 'ignored' | 'voided'
   matched_type?: string
   matched_id?: number
   matched_at?: string
   matched_by_id?: number
   note?: string
+  voided_at?: string
+  void_reason?: string
+  voided_by_id?: number
   created_by_id: number
   created_at: string
   updated_at: string
@@ -294,4 +302,16 @@ export interface BankTransactionMatchRequest {
   matched_type: string
   matched_id?: number
   note?: string
+}
+
+export interface VendorBillHoldRequest {
+  reason: string
+}
+
+export interface VendorBillVoidRequest {
+  reason: string
+}
+
+export interface BankTransactionVoidRequest {
+  reason: string
 }

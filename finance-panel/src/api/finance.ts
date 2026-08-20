@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss, PaymentReconciliation, GSTSummary, Vendor, VendorRequest, VendorBill, VendorBillRequest, Account, AccountRequest, LedgerEntry, ManualJournalEntryRequest, TrialBalance, BankTransaction, BankTransactionRequest, BankTransactionMatchRequest } from '../types/finance'
+import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss, PaymentReconciliation, GSTSummary, Vendor, VendorRequest, VendorBill, VendorBillRequest, VendorBillHoldRequest, VendorBillVoidRequest, Account, AccountRequest, LedgerEntry, ManualJournalEntryRequest, TrialBalance, BankTransaction, BankTransactionRequest, BankTransactionMatchRequest, BankTransactionVoidRequest } from '../types/finance'
 
 export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
   const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
@@ -130,8 +130,24 @@ export async function payVendorBill(id: number, amount: number): Promise<VendorB
   return data
 }
 
-export async function deleteVendorBill(id: number): Promise<void> {
-  await apiClient.delete(`/admin/finance/vendor-bills/${id}`)
+export async function voidVendorBill(id: number, payload: VendorBillVoidRequest): Promise<VendorBill> {
+  const { data } = await apiClient.post<VendorBill>(`/admin/finance/vendor-bills/${id}/void`, payload)
+  return data
+}
+
+export async function holdVendorBill(id: number, payload: VendorBillHoldRequest): Promise<VendorBill> {
+  const { data } = await apiClient.post<VendorBill>(`/admin/finance/vendor-bills/${id}/hold`, payload)
+  return data
+}
+
+export async function disputeVendorBill(id: number, payload: VendorBillHoldRequest): Promise<VendorBill> {
+  const { data } = await apiClient.post<VendorBill>(`/admin/finance/vendor-bills/${id}/dispute`, payload)
+  return data
+}
+
+export async function releaseHoldVendorBill(id: number): Promise<VendorBill> {
+  const { data } = await apiClient.post<VendorBill>(`/admin/finance/vendor-bills/${id}/release-hold`, {})
+  return data
 }
 
 // ---- Chart of Accounts ----
@@ -209,6 +225,7 @@ export async function ignoreBankTransaction(id: number): Promise<BankTransaction
   return data
 }
 
-export async function deleteBankTransaction(id: number): Promise<void> {
-  await apiClient.delete(`/admin/finance/bank-transactions/${id}`)
+export async function voidBankTransaction(id: number, payload: BankTransactionVoidRequest): Promise<BankTransaction> {
+  const { data } = await apiClient.post<BankTransaction>(`/admin/finance/bank-transactions/${id}/void`, payload)
+  return data
 }

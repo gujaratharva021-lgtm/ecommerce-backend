@@ -4,7 +4,7 @@ import {
   createBankTransaction,
   matchBankTransaction,
   ignoreBankTransaction,
-  deleteBankTransaction,
+  voidBankTransaction,
 } from '../api/finance'
 import type { BankTransaction, BankTransactionRequest } from '../types/finance'
 
@@ -90,15 +90,21 @@ export default function BankReconciliation() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Delete this bank transaction? This cannot be undone.')) return
+  async function handleVoid(id: number) {
+    const reason = prompt('Void this bank transaction? Enter a reason:')
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('A reason is required to void a transaction.')
+      return
+    }
     try {
-      await deleteBankTransaction(id)
+      await voidBankTransaction(id, { reason })
       load()
     } catch (err: any) {
-      alert(err.response?.data?.error ?? 'Could not delete transaction.')
+      alert(err.response?.data?.error ?? 'Could not void transaction.')
     }
   }
+
 
   function statusBadge(status: string) {
     const cls =
@@ -106,9 +112,12 @@ export default function BankReconciliation() {
         ? 'bg-emerald-600/15 text-emerald-400'
         : status === 'ignored'
         ? 'bg-slate-800 text-slate-500'
+        : status === 'voided'
+        ? 'bg-slate-700/40 text-slate-500'
         : 'bg-amber-600/15 text-amber-400'
     return <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${cls}`}>{status}</span>
   }
+
 
   return (
     <div className="p-8">
@@ -217,8 +226,8 @@ export default function BankReconciliation() {
               {transactions.map((t) => (
                 <tr key={t.id} className="border-t border-slate-800">
                   <td className="px-4 py-2 text-slate-400">{t.transaction_date.slice(0, 10)}</td>
-                  <td className="px-4 py-2">{t.description || '—'}</td>
-                  <td className="px-4 py-2 text-slate-400">{t.reference_number || '—'}</td>
+                  <td className="px-4 py-2">{t.description || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</td>
+                  <td className="px-4 py-2 text-slate-400">{t.reference_number || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</td>
                   <td className={`px-4 py-2 text-right ${t.amount < 0 ? 'text-red-400' : ''}`}>
                     {formatCurrency(t.amount)}
                   </td>
@@ -278,10 +287,10 @@ export default function BankReconciliation() {
                         </>
                       ))}
                     <button
-                      onClick={() => handleDelete(t.id)}
+                      onClick={() => handleVoid(t.id)}
                       className="text-xs text-slate-500 hover:text-red-400 transition-colors"
                     >
-                      Delete
+                      Void
                     </button>
                   </td>
                 </tr>

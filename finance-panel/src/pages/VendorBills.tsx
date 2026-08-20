@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getVendorBills, createVendorBill, payVendorBill, deleteVendorBill, getVendors } from '../api/finance'
+import { getVendorBills, createVendorBill, payVendorBill, voidVendorBill, holdVendorBill, disputeVendorBill, releaseHoldVendorBill, getVendors } from '../api/finance'
 import type { VendorBill, VendorBillRequest, Vendor } from '../types/finance'
 
 function formatCurrency(value: number) {
@@ -75,13 +75,57 @@ export default function VendorBills() {
     }
   }
 
-  async function handleDelete(id: number, billNumber?: string) {
-    if (!confirm(`Delete bill "${billNumber || id}"? This cannot be undone.`)) return
+  async function handleVoid(id: number, billNumber?: string) {
+    const reason = prompt(`Void bill "${billNumber || id}"? Enter a reason:`)
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('A reason is required to void a bill.')
+      return
+    }
     try {
-      await deleteVendorBill(id)
+      await voidVendorBill(id, { reason })
       load()
     } catch (err: any) {
-      alert(err.response?.data?.error ?? 'Could not delete bill.')
+      alert(err.response?.data?.error ?? 'Could not void bill.')
+    }
+  }
+
+  async function handleHold(id: number) {
+    const reason = prompt('Put this bill on hold. Enter a reason:')
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('A reason is required to place a hold.')
+      return
+    }
+    try {
+      await holdVendorBill(id, { reason })
+      load()
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Could not place bill on hold.')
+    }
+  }
+
+  async function handleDispute(id: number) {
+    const reason = prompt('Mark this bill as disputed. Enter a reason:')
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('A reason is required to dispute a bill.')
+      return
+    }
+    try {
+      await disputeVendorBill(id, { reason })
+      load()
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Could not mark bill as disputed.')
+    }
+  }
+
+  async function handleReleaseHold(id: number) {
+    try {
+      await releaseHoldVendorBill(id)
+      load()
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Could not release hold.')
     }
   }
 
@@ -91,17 +135,31 @@ export default function VendorBills() {
         ? 'bg-emerald-600/15 text-emerald-400'
         : status === 'partially_paid'
         ? 'bg-amber-600/15 text-amber-400'
+        : status === 'on_hold'
+        ? 'bg-slate-600/20 text-slate-300'
+        : status === 'disputed'
+        ? 'bg-orange-600/15 text-orange-400'
+        : status === 'voided'
+        ? 'bg-slate-700/40 text-slate-500'
         : 'bg-red-600/15 text-red-400'
-    const labelMap: Record<string, string> = { paid: 'Paid', partially_paid: 'Partially Paid', unpaid: 'Unpaid' }
+    const labelMap: Record<string, string> = {
+      paid: 'Paid',
+      partially_paid: 'Partially Paid',
+      unpaid: 'Unpaid',
+      on_hold: 'On Hold',
+      disputed: 'Disputed',
+      voided: 'Voided',
+    }
     return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{labelMap[status] ?? status}</span>
   }
+
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-semibold">Vendor Bills</h1>
-          <p className="text-sm text-slate-500">Accounts payable Ã¢â‚¬â€ bills raised by vendors.</p>
+          <p className="text-sm text-slate-500">Accounts payable ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â bills raised by vendors.</p>
         </div>
         <button
           onClick={() => setShowForm((s) => !s)}
@@ -236,7 +294,7 @@ export default function VendorBills() {
               {bills.map((b) => (
                 <tr key={b.id} className="border-t border-slate-800">
                   <td className="px-4 py-2 font-medium">{b.vendor?.name ?? `#${b.vendor_id}`}</td>
-                  <td className="px-4 py-2 text-slate-400">{b.bill_number || 'Ã¢â‚¬â€'}</td>
+                  <td className="px-4 py-2 text-slate-400">{b.bill_number || 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â'}</td>
                   <td className="px-4 py-2 text-slate-400">{b.bill_date.slice(0, 10)}</td>
                   <td className="px-4 py-2 text-right">{formatCurrency(b.amount)}</td>
                   <td className="px-4 py-2 text-right text-slate-400">{formatCurrency(b.gst_amount)}</td>
@@ -277,12 +335,35 @@ export default function VendorBills() {
                           Pay
                         </button>
                       ))}
-                    <button
-                      onClick={() => handleDelete(b.id, b.bill_number)}
-                      className="text-xs text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      Delete
-                    </button>
+                    {b.status === 'unpaid' || b.status === 'partially_paid' ? (
+                      <>
+                        <button
+                          onClick={() => handleHold(b.id)}
+                          className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                        >
+                          Hold
+                        </button>
+                        <button
+                          onClick={() => handleDispute(b.id)}
+                          className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                        >
+                          Dispute
+                        </button>
+                        <button
+                          onClick={() => handleVoid(b.id, b.bill_number)}
+                          className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                        >
+                          Void
+                        </button>
+                      </>
+                    ) : (b.status === 'on_hold' || b.status === 'disputed') ? (
+                      <button
+                        onClick={() => handleReleaseHold(b.id)}
+                        className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        Release Hold
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
