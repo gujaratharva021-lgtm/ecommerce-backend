@@ -421,6 +421,8 @@ func SetupRoutes(router *gin.Engine) {
                 {
                     adminReports.GET("/daily-sales", handlers.GetDailySalesReport)
                     adminReports.GET("/daily-sales/export", handlers.ExportDailySalesReport)
+adminReports.GET("/range-sales", handlers.GetRangeSalesReport)
+adminReports.GET("/range-sales/export", handlers.ExportRangeSalesReport)
                 }
             }
         }
