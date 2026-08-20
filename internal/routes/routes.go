@@ -218,6 +218,40 @@ warehouseAuthed.PUT("/substitutions/:id/reject", middleware.RequireWarehouseRole
                                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
                                 adminFinance.GET("/profit-loss", handlers.GetProfitLoss)
                                 adminFinance.GET("/gst", handlers.GetGSTSummary)
+                                adminVendors := adminFinance.Group("/vendors")
+                                {
+                                        adminVendors.GET("", handlers.ListVendors)
+                                        adminVendors.POST("", handlers.CreateVendor)
+                                        adminVendors.PUT("/:id", handlers.UpdateVendor)
+                                        adminVendors.DELETE("/:id", handlers.DeleteVendor)
+                                }
+                                adminVendorBills := adminFinance.Group("/vendor-bills")
+                                {
+                                        adminVendorBills.GET("", handlers.ListVendorBills)
+                                        adminVendorBills.POST("", handlers.CreateVendorBill)
+                                        adminVendorBills.POST("/:id/pay", handlers.PayVendorBill)
+                                        adminVendorBills.DELETE("/:id", handlers.DeleteVendorBill)
+                                }
+                                adminAccounts := adminFinance.Group("/accounts")
+                                {
+                                        adminAccounts.GET("", handlers.ListAccounts)
+                                        adminAccounts.POST("", handlers.CreateAccount)
+                                        adminAccounts.PUT("/:id", handlers.UpdateAccount)
+                                }
+                                adminLedger := adminFinance.Group("/ledger")
+                                {
+                                        adminLedger.GET("", handlers.ListLedgerEntries)
+                                        adminLedger.POST("", handlers.CreateManualJournalEntry)
+                                        adminLedger.GET("/trial-balance", handlers.GetTrialBalance)
+                                }
+                                adminBankTransactions := adminFinance.Group("/bank-transactions")
+                                {
+                                        adminBankTransactions.GET("", handlers.ListBankTransactions)
+                                        adminBankTransactions.POST("", handlers.CreateBankTransaction)
+                                        adminBankTransactions.POST("/:id/match", handlers.MatchBankTransaction)
+                                        adminBankTransactions.POST("/:id/ignore", handlers.IgnoreBankTransaction)
+                                        adminBankTransactions.DELETE("/:id", handlers.DeleteBankTransaction)
+                                }
 adminFinance.GET("/expenses", handlers.ListExpenses)
 adminFinance.POST("/expenses", handlers.CreateExpense)
 adminFinance.PUT("/expenses/:id", handlers.UpdateExpense)
