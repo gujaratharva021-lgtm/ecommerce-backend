@@ -312,7 +312,7 @@ func SetupRoutes(router *gin.Engine) {
                 adminDeliveryPartners.PUT("/:id", handlers.UpdateDeliveryPartner)
                 adminDeliveryPartners.DELETE("/:id", handlers.DeleteDeliveryPartner)
                 // TODO: teammate WIP - handler not implemented yet, temporarily disabled to unblock build
-// adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
+adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
             }
 
             admin.PUT("/orders/:id/assign-delivery", handlers.AssignDeliveryPartner)

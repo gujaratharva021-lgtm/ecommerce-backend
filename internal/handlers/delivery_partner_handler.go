@@ -514,6 +514,25 @@ func ConfirmDelivery(c *gin.Context) {
 // so this is computed on the fly at a fixed rate per delivered order.
 const perDeliveryEarning = 30.0
 
+// GetDeliveryPartnerLocation godoc
+// GET /api/v1/admin/delivery-partners/:id/location (admin only)
+// Returns the partner's last known location, pushed via PUT /delivery/location.
+func GetDeliveryPartnerLocation(c *gin.Context) {
+id := c.Param("id")
+var partner models.DeliveryPartner
+if err := database.DB.Select("id", "name", "current_lat", "current_lng", "last_location_update").First(&partner, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
+return
+}
+c.JSON(http.StatusOK, gin.H{
+"id":                    partner.ID,
+"name":                  partner.Name,
+"current_lat":           partner.CurrentLat,
+"current_lng":           partner.CurrentLng,
+"last_location_update":  partner.LastLocationUpdate,
+})
+}
+
 func GetMyEarnings(c *gin.Context) {
 	partnerID := c.MustGet("user_id").(uint)
 
