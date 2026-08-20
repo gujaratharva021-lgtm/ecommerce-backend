@@ -20,9 +20,16 @@ MatchedID       *uint      `json:"matched_id,omitempty"`
 MatchedAt       *time.Time `json:"matched_at,omitempty"`
 MatchedByID     *uint      `json:"matched_by_id,omitempty"`
 Note            string     `json:"note,omitempty"`
+VoidedAt        *time.Time `json:"voided_at,omitempty"`
+VoidReason      string     `json:"void_reason,omitempty"`
+VoidedByID      *uint      `json:"voided_by_id,omitempty"`
 CreatedByID     uint       `gorm:"not null" json:"created_by_id"`
 CreatedAt       time.Time  `json:"created_at"`
 UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+type BankTransactionVoidRequest struct {
+Reason string `json:"reason" binding:"required"`
 }
 
 // ValidBankTransactionStatuses restricts BankTransaction.Status.

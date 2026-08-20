@@ -42,6 +42,11 @@ BillNumber  string     `json:"bill_number,omitempty"`
 Amount      float64    `gorm:"not null" json:"amount"`
 GSTAmount   float64    `gorm:"not null;default:0" json:"gst_amount"`
 AmountPaid  float64    `gorm:"not null;default:0" json:"amount_paid"`
+HoldStatus  string     `gorm:"not null;default:'';size:20" json:"hold_status"`
+HoldReason  string     `json:"hold_reason,omitempty"`
+VoidedAt    *time.Time `json:"voided_at,omitempty"`
+VoidReason  string     `json:"void_reason,omitempty"`
+VoidedByID  *uint      `json:"voided_by_id,omitempty"`
 BillDate    time.Time  `gorm:"not null" json:"bill_date"`
 DueDate     *time.Time `json:"due_date,omitempty"`
 Note        string     `json:"note,omitempty"`
@@ -52,6 +57,12 @@ UpdatedAt   time.Time  `json:"updated_at"`
 
 // VendorBillStatus computes the derived status from Amount vs AmountPaid.
 func VendorBillStatus(b VendorBill) string {
+if b.VoidedAt != nil {
+return "voided"
+}
+if b.HoldStatus != "" {
+return b.HoldStatus
+}
 if b.AmountPaid <= 0 {
 return "unpaid"
 }
@@ -59,6 +70,14 @@ if b.AmountPaid >= b.Amount {
 return "paid"
 }
 return "partially_paid"
+}
+
+type VendorBillHoldRequest struct {
+Reason string `json:"reason" binding:"required"`
+}
+
+type VendorBillVoidRequest struct {
+Reason string `json:"reason" binding:"required"`
 }
 
 // VendorBillRequest is the body for POST/PUT /admin/finance/vendor-bills

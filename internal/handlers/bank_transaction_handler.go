@@ -172,16 +172,44 @@ c.JSON(http.StatusOK, txn)
 
 // DeleteBankTransaction godoc
 // DELETE /api/v1/admin/finance/bank-transactions/:id
-func DeleteBankTransaction(c *gin.Context) {
+// VoidBankTransaction godoc
+// POST /api/v1/admin/finance/bank-transactions/:id/void
+// Voids a bank transaction line instead of hard-deleting it, preserving
+// the audit trail. If the line was matched to an internal record, voiding
+// does not automatically unwind that match - unmatch first via a separate
+// action if the match itself was wrong.
+func VoidBankTransaction(c *gin.Context) {
 id := c.Param("id")
-if err := database.DB.Delete(&models.BankTransaction{}, id).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete bank transaction"})
+var txn models.BankTransaction
+if err := database.DB.First(&txn, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Bank transaction not found"})
+return
+}
+
+if txn.VoidedAt != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Bank transaction is already voided"})
+return
+}
+
+var req models.BankTransactionVoidRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 return
 }
 
 adminID := c.MustGet("user_id").(uint)
-adminPhone := c.MustGet("phone").(string)
-utils.LogAudit(adminID, adminPhone, "delete_bank_transaction", "bank_transaction", id, "deleted")
+now := time.Now()
+txn.VoidedAt = &now
+txn.VoidReason = req.Reason
+txn.VoidedByID = &adminID
 
-c.JSON(http.StatusOK, gin.H{"success": true})
+if err := database.DB.Save(&txn).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to void bank transaction"})
+return
+}
+
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "void_bank_transaction", "bank_transaction", id, req.Reason)
+
+c.JSON(http.StatusOK, txn)
 }

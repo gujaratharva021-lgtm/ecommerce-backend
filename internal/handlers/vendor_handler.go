@@ -317,16 +317,140 @@ c.JSON(http.StatusOK, toVendorBillResponse(bill))
 
 // DeleteVendorBill godoc
 // DELETE /api/v1/admin/finance/vendor-bills/:id
-func DeleteVendorBill(c *gin.Context) {
+// VoidVendorBill godoc
+// POST /api/v1/admin/finance/vendor-bills/:id/void
+// Voids a bill instead of hard-deleting it, preserving the audit trail.
+// Blocked if any payment has already been recorded against the bill - per
+// SRS 12.x, a paid/partially-paid bill must have its payment(s) reversed
+// first (via a separate payment-reversal flow), not silently voided out
+// from under recorded cash movement.
+func VoidVendorBill(c *gin.Context) {
 id := c.Param("id")
-if err := database.DB.Delete(&models.VendorBill{}, id).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete vendor bill"})
+var bill models.VendorBill
+if err := database.DB.First(&bill, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Vendor bill not found"})
+return
+}
+
+if bill.VoidedAt != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Bill is already voided"})
+return
+}
+
+if bill.AmountPaid > 0 {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot void a bill with recorded payments - reverse the payment(s) first"})
+return
+}
+
+var req models.VendorBillVoidRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+adminID := c.MustGet("user_id").(uint)
+now := time.Now()
+bill.VoidedAt = &now
+bill.VoidReason = req.Reason
+bill.VoidedByID = &adminID
+
+if err := database.DB.Save(&bill).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to void vendor bill"})
+return
+}
+
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, "void_vendor_bill", "vendor_bill", id, req.Reason)
+
+database.DB.Preload("Vendor").First(&bill, bill.ID)
+c.JSON(http.StatusOK, toVendorBillResponse(bill))
+}
+
+// HoldVendorBill godoc
+// POST /api/v1/admin/finance/vendor-bills/:id/hold
+// Puts the bill on hold, e.g. pending internal review before payment.
+func HoldVendorBill(c *gin.Context) {
+setVendorBillHoldStatus(c, "on_hold", "hold_vendor_bill")
+}
+
+// DisputeVendorBill godoc
+// POST /api/v1/admin/finance/vendor-bills/:id/dispute
+// Marks the bill as disputed, e.g. amount or delivery is contested with
+// the vendor. Distinct from hold so finance can see why payment paused.
+func DisputeVendorBill(c *gin.Context) {
+setVendorBillHoldStatus(c, "disputed", "dispute_vendor_bill")
+}
+
+// ReleaseHoldVendorBill godoc
+// POST /api/v1/admin/finance/vendor-bills/:id/release-hold
+// Clears an on_hold or disputed status, returning the bill to its normal
+// paid/partially_paid/unpaid status derived from AmountPaid.
+func ReleaseHoldVendorBill(c *gin.Context) {
+id := c.Param("id")
+var bill models.VendorBill
+if err := database.DB.First(&bill, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Vendor bill not found"})
+return
+}
+
+if bill.HoldStatus == "" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Bill is not currently on hold or disputed"})
+return
+}
+
+var req models.VendorBillHoldRequest
+_ = c.ShouldBindJSON(&req) // reason optional on release
+
+bill.HoldStatus = ""
+bill.HoldReason = ""
+
+if err := database.DB.Save(&bill).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to release hold on vendor bill"})
 return
 }
 
 adminID := c.MustGet("user_id").(uint)
 adminPhone := c.MustGet("phone").(string)
-utils.LogAudit(adminID, adminPhone, "delete_vendor_bill", "vendor_bill", id, "deleted")
+utils.LogAudit(adminID, adminPhone, "release_hold_vendor_bill", "vendor_bill", id, "released")
 
-c.JSON(http.StatusOK, gin.H{"success": true})
+database.DB.Preload("Vendor").First(&bill, bill.ID)
+c.JSON(http.StatusOK, toVendorBillResponse(bill))
+}
+
+// setVendorBillHoldStatus is the shared implementation for HoldVendorBill
+// and DisputeVendorBill - same request shape, same validation, only the
+// resulting HoldStatus value and audit action differ.
+func setVendorBillHoldStatus(c *gin.Context, holdStatus string, auditAction string) {
+id := c.Param("id")
+var bill models.VendorBill
+if err := database.DB.First(&bill, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Vendor bill not found"})
+return
+}
+
+if bill.VoidedAt != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot change hold status on a voided bill"})
+return
+}
+
+var req models.VendorBillHoldRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+bill.HoldStatus = holdStatus
+bill.HoldReason = req.Reason
+
+if err := database.DB.Save(&bill).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update vendor bill hold status"})
+return
+}
+
+adminID := c.MustGet("user_id").(uint)
+adminPhone := c.MustGet("phone").(string)
+utils.LogAudit(adminID, adminPhone, auditAction, "vendor_bill", id, req.Reason)
+
+database.DB.Preload("Vendor").First(&bill, bill.ID)
+c.JSON(http.StatusOK, toVendorBillResponse(bill))
 }

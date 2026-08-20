@@ -268,5 +268,29 @@ log.Fatalf("Failed to create accounting module tables: %v", err)
 if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
 log.Fatalf("Failed to add gst_amount column to vendor_bills: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS hold_status VARCHAR(20) NOT NULL DEFAULT ''`).Error; err != nil {
+log.Fatalf("Failed to add hold_status column to vendor_bills: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS hold_reason TEXT`).Error; err != nil {
+log.Fatalf("Failed to add hold_reason column to vendor_bills: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add voided_at column to vendor_bills: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS void_reason TEXT`).Error; err != nil {
+log.Fatalf("Failed to add void_reason column to vendor_bills: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendor_bills ADD COLUMN IF NOT EXISTS voided_by_id BIGINT NULL REFERENCES users(id)`).Error; err != nil {
+log.Fatalf("Failed to add voided_by_id column to vendor_bills: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add voided_at column to bank_transactions: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS void_reason TEXT`).Error; err != nil {
+log.Fatalf("Failed to add void_reason column to bank_transactions: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS voided_by_id BIGINT NULL REFERENCES users(id)`).Error; err != nil {
+log.Fatalf("Failed to add voided_by_id column to bank_transactions: %v", err)
+}
 seedDefaultSettings()
 }
