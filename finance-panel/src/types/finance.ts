@@ -154,3 +154,142 @@ export interface GSTSummary {
   by_hsn: GSTByHSN[]
   by_rate: GSTByRate[]
 }
+
+export interface Vendor {
+  id: number
+  name: string
+  contact_name?: string
+  phone?: string
+  email?: string
+  gstin?: string
+  address?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface VendorRequest {
+  name: string
+  contact_name?: string
+  phone?: string
+  email?: string
+  gstin?: string
+  address?: string
+  is_active?: boolean
+}
+
+export interface VendorBill {
+  id: number
+  vendor_id: number
+  vendor?: Vendor
+  bill_number?: string
+  amount: number
+  amount_paid: number
+  bill_date: string
+  due_date?: string
+  note?: string
+  created_by_id: number
+  created_at: string
+  updated_at: string
+  status: 'unpaid' | 'partially_paid' | 'paid'
+}
+
+export interface VendorBillRequest {
+  vendor_id: number
+  bill_number?: string
+  amount: number
+  bill_date: string
+  due_date?: string
+  note?: string
+}
+
+export interface Account {
+  id: number
+  code: string
+  name: string
+  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AccountRequest {
+  code: string
+  name: string
+  type: string
+  is_active?: boolean
+}
+
+export interface LedgerEntry {
+  id: number
+  transaction_ref: string
+  account_id: number
+  account?: Account
+  type: 'debit' | 'credit'
+  amount: number
+  description?: string
+  reference_type?: string
+  reference_id?: number
+  entry_date: string
+  created_by_id: number
+  created_at: string
+}
+
+export interface LedgerEntryLine {
+  account_id: number
+  type: 'debit' | 'credit'
+  amount: number
+  description?: string
+}
+
+export interface ManualJournalEntryRequest {
+  entry_date: string
+  lines: LedgerEntryLine[]
+}
+
+export interface TrialBalanceRow {
+  account_id: number
+  account_code: string
+  account_name: string
+  account_type: string
+  total_debit: number
+  total_credit: number
+}
+
+export interface TrialBalance {
+  as_of: string
+  accounts: TrialBalanceRow[]
+  total_debit: number
+  total_credit: number
+  is_balanced: boolean
+}
+
+export interface BankTransaction {
+  id: number
+  transaction_date: string
+  description?: string
+  amount: number
+  reference_number?: string
+  status: 'unmatched' | 'matched' | 'ignored'
+  matched_type?: string
+  matched_id?: number
+  matched_at?: string
+  matched_by_id?: number
+  note?: string
+  created_by_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BankTransactionRequest {
+  transaction_date: string
+  description?: string
+  amount: number
+  reference_number?: string
+}
+
+export interface BankTransactionMatchRequest {
+  matched_type: string
+  matched_id?: number
+  note?: string
+}

@@ -12,6 +12,11 @@ import GST from './pages/GST'
 import Invoices from './pages/Invoices'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import Vendors from './pages/Vendors'
+import VendorBills from './pages/VendorBills'
+import Accounts from './pages/Accounts'
+import Ledger from './pages/Ledger'
+import BankReconciliation from './pages/BankReconciliation'
 
 export default function App() {
   return (
@@ -36,6 +41,11 @@ export default function App() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/accounting/vendors" element={<Vendors />} />
+            <Route path="/accounting/vendor-bills" element={<VendorBills />} />
+            <Route path="/accounting/accounts" element={<Accounts />} />
+            <Route path="/accounting/ledger" element={<Ledger />} />
+            <Route path="/accounting/bank-reconciliation" element={<BankReconciliation />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/revenue" replace />} />
@@ -44,6 +54,3 @@ export default function App() {
     </BrowserRouter>
   )
 }
-
-
-
