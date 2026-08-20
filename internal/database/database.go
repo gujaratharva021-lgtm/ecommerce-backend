@@ -118,6 +118,7 @@ func AutoMigrate() {
 	}
 
 	seedDefaultSettings()
+seedChartOfAccounts()
 
 	log.Println("Database migration completed")
 }
@@ -293,4 +294,5 @@ if err := DB.Exec(`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS voided
 log.Fatalf("Failed to add voided_by_id column to bank_transactions: %v", err)
 }
 seedDefaultSettings()
+seedChartOfAccounts()
 }
