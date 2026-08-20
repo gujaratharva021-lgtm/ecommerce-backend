@@ -254,6 +254,9 @@ adminVendorBankChanges.POST("/:id/reject", handlers.RejectVendorBankChange)
                 {
                     adminLedger.GET("", handlers.ListLedgerEntries)
                     adminLedger.POST("", handlers.CreateManualJournalEntry)
+adminLedger.GET("/pending", handlers.ListPendingJournalEntries)
+adminLedger.POST("/pending/:id/approve", handlers.ApprovePendingJournalEntry)
+adminLedger.POST("/pending/:id/reject", handlers.RejectPendingJournalEntry)
                     adminLedger.GET("/trial-balance", handlers.GetTrialBalance)
 adminCreditNotes := adminFinance.Group("/credit-notes")
 {

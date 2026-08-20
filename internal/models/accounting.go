@@ -80,3 +80,27 @@ type ManualJournalEntryRequest struct {
 EntryDate string            `json:"entry_date" binding:"required"`
 Lines     []LedgerEntryLine `json:"lines" binding:"required,min=2,dive"`
 }
+
+// PendingJournalEntry stages a manual journal entry for maker-checker
+// approval (12.25) before it becomes real LedgerEntry rows. Lines are
+// stored as JSON (same shape as ManualJournalEntryRequest.Lines) rather
+// than a child table, since they are never queried independently of the
+// parent - only re-parsed once, at approval time.
+type PendingJournalEntry struct {
+ID              uint       `gorm:"primaryKey" json:"id"`
+EntryDate       string     `json:"entry_date"`
+LinesJSON       string     `gorm:"type:text" json:"-"`
+Lines           []LedgerEntryLine `gorm:"-" json:"lines,omitempty"`
+Description     string     `json:"description,omitempty"`
+TotalAmount     float64    `json:"total_amount"`
+Status          string     `gorm:"not null;default:pending;index" json:"status"` // pending/approved/rejected
+RequestedByID   uint       `gorm:"not null" json:"requested_by_id"`
+ApprovedByID    *uint      `json:"approved_by_id,omitempty"`
+ApprovedAt      *time.Time `json:"approved_at,omitempty"`
+RejectionReason string     `json:"rejection_reason,omitempty"`
+CreatedAt       time.Time  `json:"created_at"`
+}
+
+type PendingJournalEntryRejectRequest struct {
+Reason string `json:"reason" binding:"required"`
+}

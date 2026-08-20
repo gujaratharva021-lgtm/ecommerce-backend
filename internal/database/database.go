@@ -109,6 +109,8 @@ func AutoMigrate() {
             &models.CreditNote{},
             &models.CreditNoteItem{},
             &models.DebitNote{},
+            &models.VendorBankChangeRequest{},
+            &models.PendingJournalEntry{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -394,6 +396,22 @@ if err := DB.Exec(`CREATE TABLE IF NOT EXISTS vendor_bank_change_requests (
 CREATE INDEX IF NOT EXISTS idx_vendor_bank_change_requests_vendor_id ON vendor_bank_change_requests(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_vendor_bank_change_requests_status ON vendor_bank_change_requests(status);`).Error; err != nil {
 log.Fatalf("Failed to create vendor_bank_change_requests table: %v", err)
+}
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS pending_journal_entries (
+    id BIGSERIAL PRIMARY KEY,
+    entry_date VARCHAR(10),
+    lines_json TEXT,
+    description TEXT,
+    total_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by_id BIGINT NOT NULL REFERENCES users(id),
+    approved_by_id BIGINT NULL REFERENCES users(id),
+    approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pending_journal_entries_status ON pending_journal_entries(status);`).Error; err != nil {
+log.Fatalf("Failed to create pending_journal_entries table: %v", err)
 }
 seedDefaultSettings()
 seedChartOfAccounts()
