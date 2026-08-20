@@ -14,6 +14,9 @@ Phone       string    `json:"phone,omitempty"`
 Email       string    `json:"email,omitempty"`
 GSTIN       string    `json:"gstin,omitempty"`
 Address     string    `json:"address,omitempty"`
+BankAccountHolder string `json:"bank_account_holder,omitempty"`
+BankAccountNumber string `json:"bank_account_number,omitempty"`
+BankIFSC          string `json:"bank_ifsc,omitempty"`
 IsActive    bool      `gorm:"default:true" json:"is_active"`
 CreatedAt   time.Time `json:"created_at"`
 UpdatedAt   time.Time `json:"updated_at"`
@@ -94,4 +97,31 @@ Note       string  `json:"note"`
 // VendorBillPaymentRequest is the body for POST /admin/finance/vendor-bills/:id/pay
 type VendorBillPaymentRequest struct {
 Amount float64 `json:"amount" binding:"required,gt=0"`
+}
+
+// VendorBankChangeRequest holds a pending change to a vendor''s bank
+// details (SRS 12.28.5). The change is only applied to the Vendor record
+// once a second admin (not the requester) approves it - maker-checker.
+type VendorBankChangeRequest struct {
+ID                uint       `gorm:"primaryKey" json:"id"`
+VendorID          uint       `gorm:"not null;index" json:"vendor_id"`
+NewAccountHolder  string     `json:"new_account_holder"`
+NewAccountNumber  string     `json:"new_account_number"`
+NewIFSC           string     `json:"new_ifsc"`
+Status            string     `gorm:"not null;default:pending;index" json:"status"` // pending/approved/rejected
+RequestedByID     uint       `gorm:"not null" json:"requested_by_id"`
+ApprovedByID      *uint      `json:"approved_by_id,omitempty"`
+ApprovedAt        *time.Time `json:"approved_at,omitempty"`
+RejectionReason   string     `json:"rejection_reason,omitempty"`
+CreatedAt         time.Time  `json:"created_at"`
+}
+
+type VendorBankChangeRequestBody struct {
+AccountHolder string `json:"account_holder" binding:"required"`
+AccountNumber string `json:"account_number" binding:"required"`
+IFSC          string `json:"ifsc" binding:"required"`
+}
+
+type VendorBankChangeRejectRequest struct {
+Reason string `json:"reason" binding:"required"`
 }

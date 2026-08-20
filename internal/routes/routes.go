@@ -224,6 +224,7 @@ func SetupRoutes(router *gin.Engine) {
                     adminVendors.GET("", handlers.ListVendors)
                     adminVendors.POST("", handlers.CreateVendor)
                     adminVendors.PUT("/:id", handlers.UpdateVendor)
+adminVendors.POST("/:id/bank-change-request", handlers.RequestVendorBankChange)
                     adminVendors.DELETE("/:id", handlers.DeleteVendor)
                 }
                 adminVendorBills := adminFinance.Group("/vendor-bills")
@@ -237,6 +238,12 @@ adminVendorBills.POST("/:id/dispute", handlers.DisputeVendorBill)
 adminVendorBills.POST("/:id/release-hold", handlers.ReleaseHoldVendorBill)
 adminVendorBills.POST("/:id/debit-note", handlers.CreateDebitNote)
                 }
+adminVendorBankChanges := adminFinance.Group("/vendor-bank-change-requests")
+{
+adminVendorBankChanges.GET("", handlers.ListVendorBankChangeRequests)
+adminVendorBankChanges.POST("/:id/approve", handlers.ApproveVendorBankChange)
+adminVendorBankChanges.POST("/:id/reject", handlers.RejectVendorBankChange)
+}
                 adminAccounts := adminFinance.Group("/accounts")
                 {
                     adminAccounts.GET("", handlers.ListAccounts)

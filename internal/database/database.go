@@ -369,6 +369,32 @@ log.Fatalf("Failed to add paid_at column to expenses: %v", err)
 if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_expenses_approval_status ON expenses(approval_status)`).Error; err != nil {
 log.Fatalf("Failed to create approval_status index on expenses: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS bank_account_holder VARCHAR(255) NOT NULL DEFAULT ''`).Error; err != nil {
+log.Fatalf("Failed to add bank_account_holder column to vendors: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(50) NOT NULL DEFAULT ''`).Error; err != nil {
+log.Fatalf("Failed to add bank_account_number column to vendors: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE vendors ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(20) NOT NULL DEFAULT ''`).Error; err != nil {
+log.Fatalf("Failed to add bank_ifsc column to vendors: %v", err)
+}
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS vendor_bank_change_requests (
+    id BIGSERIAL PRIMARY KEY,
+    vendor_id BIGINT NOT NULL REFERENCES vendors(id),
+    new_account_holder VARCHAR(255),
+    new_account_number VARCHAR(50),
+    new_ifsc VARCHAR(20),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_by_id BIGINT NOT NULL REFERENCES users(id),
+    approved_by_id BIGINT NULL REFERENCES users(id),
+    approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_vendor_bank_change_requests_vendor_id ON vendor_bank_change_requests(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_vendor_bank_change_requests_status ON vendor_bank_change_requests(status);`).Error; err != nil {
+log.Fatalf("Failed to create vendor_bank_change_requests table: %v", err)
+}
 seedDefaultSettings()
 seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
