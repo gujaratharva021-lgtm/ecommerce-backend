@@ -11,6 +11,7 @@ import ProfitLoss from './pages/ProfitLoss'
 import GST from './pages/GST'
 import Invoices from './pages/Invoices'
 import Reports from './pages/Reports'
+import RangeReport from './pages/RangeReport'
 import Settings from './pages/Settings'
 import Vendors from './pages/Vendors'
 import VendorBills from './pages/VendorBills'
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/gst" element={<GST />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/range" element={<RangeReport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/accounting/vendors" element={<Vendors />} />
             <Route path="/accounting/vendor-bills" element={<VendorBills />} />

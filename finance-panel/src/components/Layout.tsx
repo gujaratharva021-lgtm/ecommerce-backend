@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/gst', label: 'GST' },
   { to: '/invoices', label: 'Invoices' },
   { to: '/reports', label: 'Reports' },
+  { to: '/reports/range', label: 'Custom Range Report' },
   { to: '/settings', label: 'Settings' },
 ]
 
