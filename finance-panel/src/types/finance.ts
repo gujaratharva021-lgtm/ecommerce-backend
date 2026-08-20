@@ -128,3 +128,29 @@ export interface PaymentReconciliation {
   online_collected: number
   cod_collected: number
 }
+
+export interface GSTByHSN {
+  hsn_code: string
+  taxable_amount: number
+  gst_amount: number
+  quantity: number
+}
+
+export interface GSTByRate {
+  gst_percent: number
+  taxable_amount: number
+  gst_amount: number
+}
+
+export interface GSTSummary {
+  from: string
+  to: string
+  taxable_amount: number
+  cgst_amount: number
+  sgst_amount: number
+  igst_amount: number
+  total_gst: number
+  invoice_count: number
+  by_hsn: GSTByHSN[]
+  by_rate: GSTByRate[]
+}

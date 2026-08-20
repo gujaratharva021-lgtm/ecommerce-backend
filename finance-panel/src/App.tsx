@@ -8,6 +8,7 @@ import Payments from './pages/Payments'
 import Expenses from './pages/Expenses'
 import Payroll from './pages/Payroll'
 import ProfitLoss from './pages/ProfitLoss'
+import GST from './pages/GST'
 import Invoices from './pages/Invoices'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/payroll" element={<Payroll />} />
             <Route path="/profit-loss" element={<ProfitLoss />} />
+            <Route path="/gst" element={<GST />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
@@ -42,5 +44,6 @@ export default function App() {
     </BrowserRouter>
   )
 }
+
 
 
