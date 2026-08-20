@@ -238,6 +238,17 @@ Gateway:  gateway,
 
 payment.Status = req.Status
 if req.RefundedAmount != nil {
+// 12.28.6: a refund can never exceed the original payment amount -
+// reject rather than silently clamp, so a typo/bug surfaces as an
+// error instead of quietly capping the refund.
+if *req.RefundedAmount < 0 {
+c.JSON(http.StatusBadRequest, gin.H{"error": "refunded_amount cannot be negative"})
+return
+}
+if *req.RefundedAmount > payment.Amount {
+c.JSON(http.StatusBadRequest, gin.H{"error": "refunded_amount cannot exceed the original payment amount"})
+return
+}
 payment.RefundedAmount = *req.RefundedAmount
 }
 
