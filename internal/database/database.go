@@ -449,4 +449,6 @@ seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
 log.Fatalf("Failed to drop NOT NULL on ledger_entries.created_by_id: %v", err)
 }
+
+	RunMISMigration()
 }
