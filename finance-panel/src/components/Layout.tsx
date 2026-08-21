@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/invoices', label: 'Invoices' },
   { to: '/reports', label: 'Reports' },
   { to: '/reports/range', label: 'Custom Range Report' },
+  { to: '/reports/finance', label: 'Finance Reports' },
   { to: '/settings', label: 'Settings' },
 ]
 

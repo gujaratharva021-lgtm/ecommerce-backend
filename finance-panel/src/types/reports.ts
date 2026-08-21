@@ -34,3 +34,38 @@ export interface RangeSalesSummary {
   total_output_gst: number
   total_vendor_gst: number
 }
+
+export interface RiderPayableRow {
+  delivery_partner_id: number
+  name: string
+  phone: string
+  delivered_count: number
+  payable: number
+}
+
+export interface GatewaySettlementRow {
+  gateway: string
+  transaction_count: number
+  gross_amount: number
+  refunded_amount: number
+}
+
+export interface CashFlowRow {
+  reference_type: string
+  inflow: number
+  outflow: number
+}
+
+export interface BalanceSheetAccount {
+  code: string
+  name: string
+  balance: number
+}
+
+export interface BalanceSheet {
+  as_of: string
+  assets: { accounts: BalanceSheetAccount[]; total: number }
+  liabilities: { accounts: BalanceSheetAccount[]; total: number }
+  equity: { retained_earnings: number; total: number }
+  balances: boolean
+}
