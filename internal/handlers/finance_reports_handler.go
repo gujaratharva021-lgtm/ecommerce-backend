@@ -221,6 +221,15 @@ assets, totalAssets := sumByType("asset")
 liabilities, totalLiabilities := sumByType("liability")
 _, totalRevenue := sumByType("revenue")
 _, totalExpense := sumByType("expense")
+// Liability accounts carry credit-natural balances - the opposite way
+// round from assets - so normalize sign (same as retained earnings below)
+// so a liability reads as a positive number when money is owed, and so
+// Assets == Liabilities + Equity holds using positive-normal figures on
+// both sides.
+for i := range liabilities {
+liabilities[i].Balance = -liabilities[i].Balance
+}
+totalLiabilities = -totalLiabilities
 // Revenue/expense accounts carry credit/debit-natural balances the
 // opposite way round from assets - normalize sign so retained earnings
 // reads as a positive number when the business is profitable.
