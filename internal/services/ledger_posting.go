@@ -151,6 +151,90 @@ return nil
 })
 }
 
+
+// PostVendorBillLedgerEntry records the double-entry ledger lines for one
+// vendor bill at creation time: Debit Inventory for the goods-value portion,
+// Debit GST Input Credit (ITC) for the GST portion (claiming the input
+// credit on this purchase), and Credit Vendor Payable for the full amount
+// owed (amount + GST). This is the mirror image of PostDebitNoteLedgerEntry,
+// which reverses these same three legs when goods are returned to a vendor.
+//
+// Idempotent: if an entry already exists for this bill, it's a no-op, so
+// this is safe to call from CreateVendorBill without a separate "posted"
+// flag on VendorBill.
+func PostVendorBillLedgerEntry(billID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "vendor_bill", billID).First(&existing).Error; err == nil {
+return nil
+}
+
+var bill models.VendorBill
+if err := database.DB.First(&bill, billID).Error; err != nil {
+return fmt.Errorf("vendor bill not found: %w", err)
+}
+
+var vendorPayable, inventory models.Account
+if err := database.DB.Where("code = ?", "2001").First(&vendorPayable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2001 (Vendor Payable): %w", err)
+}
+if err := database.DB.Where("code = ?", "1004").First(&inventory).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1004 (Inventory): %w", err)
+}
+
+transactionRef := fmt.Sprintf("VENDORBILL-%d", billID)
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debitInventory := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      inventory.ID,
+Type:           "debit",
+Amount:         bill.Amount,
+Description:    fmt.Sprintf("Vendor bill %s", bill.BillNumber),
+ReferenceType:  "vendor_bill",
+ReferenceID:    &billID,
+EntryDate:      bill.BillDate,
+}
+if err := tx.Create(&debitInventory).Error; err != nil {
+return fmt.Errorf("failed to create inventory ledger entry: %w", err)
+}
+
+if bill.GSTAmount > 0 {
+var gstITC models.Account
+if err := tx.Where("code = ?", "1005").First(&gstITC).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1005 (GST Input Credit): %w", err)
+}
+debitGST := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      gstITC.ID,
+Type:           "debit",
+Amount:         bill.GSTAmount,
+Description:    fmt.Sprintf("Vendor bill %s - GST ITC", bill.BillNumber),
+ReferenceType:  "vendor_bill",
+ReferenceID:    &billID,
+EntryDate:      bill.BillDate,
+}
+if err := tx.Create(&debitGST).Error; err != nil {
+return fmt.Errorf("failed to create GST-ITC ledger entry: %w", err)
+}
+}
+
+creditVendorPayable := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      vendorPayable.ID,
+Type:           "credit",
+Amount:         bill.Amount + bill.GSTAmount,
+Description:    fmt.Sprintf("Vendor bill %s", bill.BillNumber),
+ReferenceType:  "vendor_bill",
+ReferenceID:    &billID,
+EntryDate:      bill.BillDate,
+}
+if err := tx.Create(&creditVendorPayable).Error; err != nil {
+return fmt.Errorf("failed to create vendor-payable ledger entry: %w", err)
+}
+
+return nil
+})
+}
 // PostExpenseLedgerEntry records the double-entry ledger lines for one
 // expense at creation time: Debit Operating Expenses, Credit Bank. This
 // posts once, at CreateExpense - if the expense amount is later edited via

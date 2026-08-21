@@ -270,6 +270,9 @@ if err := database.DB.Create(&bill).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create vendor bill"})
 return
 }
+if err := services.PostVendorBillLedgerEntry(bill.ID); err != nil {
+log.Printf("failed to post vendor bill ledger entry for bill %d: %v", bill.ID, err)
+}
 
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "create_vendor_bill", "vendor_bill", strconv.Itoa(int(bill.ID)), "created")
