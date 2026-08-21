@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -6,8 +6,6 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import Inventory from './pages/Inventory'
-import Picking from './pages/Picking'
-import Packing from './pages/Packing'
 import StockTransfers from './pages/StockTransfers'
 import Exceptions from './pages/Exceptions'
 import Performance from './pages/Performance'
@@ -36,8 +34,6 @@ function App() {
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
           <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
-          <Route path="/picking/:orderId" element={<Protected><Picking /></Protected>} />
-          <Route path="/packing/:orderId" element={<Protected><Packing /></Protected>} />
           <Route path="/stock-transfers" element={<Protected><StockTransfers /></Protected>} />
           <Route path="/exceptions" element={<Protected><Exceptions /></Protected>} />
           <Route path="/performance" element={<Protected><Performance /></Protected>} />

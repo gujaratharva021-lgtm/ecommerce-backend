@@ -385,3 +385,58 @@ export interface RiderCODDeposit {
   created_by_id: number
   created_at: string
 }
+
+// ---- Weekly MIS ----
+
+export interface MISRow {
+  label: string
+  current: number
+  previous: number
+  growth_pct: number
+}
+
+export interface MISManualEntry {
+  id: number
+  row_key: string
+  data: Record<string, any>
+}
+
+export interface MISExpenseApproval {
+  id: number
+  category: string
+  up_to_25k: string
+  range_25k_1l: string
+  range_1l_5l: string
+  above_5l: string
+  required_documents: string
+  approver: string
+}
+
+export interface VendorSettlementRow {
+  vendor_id: number
+  vendor_name: string
+  gross_sales: number
+  commission: number
+  discount: number
+  returns: number
+  delivery_recovery: number
+  other_charges: number
+  net_payable: number
+  amount_paid: number
+  balance: number
+  status: string
+}
+
+export interface WeeklyMIS {
+  week_start: string
+  week_end: string
+  prev_week_start: string
+  prev_week_end: string
+  revenue_mis: MISRow[]
+  vendor_expense_mis: MISRow[]
+  vendor_settlement: VendorSettlementRow[]
+  revenue_by_vendor: MISManualEntry[]
+  vendor_pl: MISManualEntry[]
+  vendor_reconciliation: MISManualEntry[]
+  expense_approval: MISExpenseApproval[]
+}

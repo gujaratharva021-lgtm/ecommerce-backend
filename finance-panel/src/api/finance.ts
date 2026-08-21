@@ -284,3 +284,59 @@ export async function verifyRiderCODDeposit(id: number): Promise<import('../type
   const { data } = await apiClient.post(`/admin/finance/rider-cod-deposits/${id}/verify`)
   return data
 }
+
+// ---- Weekly MIS ----
+
+export async function getWeeklyMIS(weekStart?: string): Promise<import('../types/finance').WeeklyMIS> {
+  const { data } = await apiClient.get('/admin/finance/mis', {
+    params: weekStart ? { week_start: weekStart } : {},
+  })
+  return data
+}
+
+export async function upsertMISManualEntry(payload: {
+  id?: number
+  sheet: string
+  week_start: string
+  row_key: string
+  data: Record<string, any>
+}): Promise<{ id: number }> {
+  const { data } = await apiClient.post('/admin/finance/mis/manual-entry', payload)
+  return data
+}
+
+export async function deleteMISManualEntry(id: number): Promise<void> {
+  await apiClient.delete(`/admin/finance/mis/manual-entry/${id}`)
+}
+
+export async function updateMISExpenseApproval(
+  id: number,
+  payload: {
+    category: string
+    up_to_25k: string
+    range_25k_1l: string
+    range_1l_5l: string
+    above_5l: string
+    required_documents: string
+    approver: string
+  }
+): Promise<{ updated: boolean }> {
+  const { data } = await apiClient.put(`/admin/finance/mis/expense-approval/${id}`, payload)
+  return data
+}
+
+export async function exportWeeklyMIS(weekStart: string): Promise<Blob> {
+  const { data } = await apiClient.get('/admin/finance/mis/weekly-template/export', {
+    params: { week_start: weekStart },
+    responseType: 'blob',
+  })
+  return data
+}
+
+export async function exportMonthlyMIS(month: string): Promise<Blob> {
+  const { data } = await apiClient.get('/admin/finance/mis/monthly/export', {
+    params: { month },
+    responseType: 'blob',
+  })
+  return data
+}

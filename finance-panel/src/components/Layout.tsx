@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/revenue', label: 'Revenue' },
+  { to: '/mis', label: 'Weekly MIS' },
   { to: '/payments', label: 'Payments \u0026 Refunds' },
   { to: '/expenses', label: 'Expenses' },
   { to: '/payroll', label: 'Payroll' },

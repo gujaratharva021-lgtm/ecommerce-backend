@@ -1,30 +1,19 @@
-﻿import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { acceptOrder, listWarehouseOrders, handoverOrder as handoverOrderApi, getOrderInvoice } from '../api/warehouse'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { listWarehouseOrders, getOrderInvoice } from '../api/warehouse'
 import type { Order, OrderStatus, OrderInvoice } from '../types/warehouse'
 import StatusBadge from '../components/StatusBadge'
 import { getErrorMessage } from '../utils/errors'
 
 const TABS: { label: string; status?: OrderStatus }[] = [
   { label: 'New Orders', status: 'confirmed' },
-  { label: 'Picking', status: 'picking' },
-  { label: 'Packing', status: 'packing' },
   { label: 'Ready for Dispatch', status: 'ready_for_dispatch' },
   { label: 'Handed Over', status: 'handed_over' },
   { label: 'Completed', status: 'delivered' },
   { label: 'All', status: undefined },
 ]
 
-// Where an order's action button should route the staff member.
-function actionFor(order: Order): { label: string; onClick: () => void } | null {
-  if (order.status === 'confirmed') return null // handled via Accept button
-  if (order.status === 'picking' || order.status === 'picked') return { label: 'Go to Picking', onClick: () => {} }
-  if (order.status === 'packing') return { label: 'Go to Packing', onClick: () => {} }
-  return null
-}
-
 export default function Orders() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeStatus = searchParams.get('status') ?? 'confirmed'
   const page = parseInt(searchParams.get('page') ?? '1', 10)
@@ -34,11 +23,6 @@ export default function Orders() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [acceptingId, setAcceptingId] = useState<number | null>(null)
-  const [handoverTarget, setHandoverTarget] = useState<Order | null>(null)
-  const [packageCount, setPackageCount] = useState(1)
-  const [handoverSubmitting, setHandoverSubmitting] = useState(false)
-  const [handoverError, setHandoverError] = useState<string | null>(null)
 
   const [invoiceTarget, setInvoiceTarget] = useState<number | null>(null)
   const [invoice, setInvoice] = useState<OrderInvoice | null>(null)
@@ -75,48 +59,6 @@ export default function Orders() {
     setSearchParams({ status: activeStatus, page: String(p) })
   }
 
-  async function handleAccept(order: Order) {
-    setAcceptingId(order.id)
-    setError(null)
-    try {
-      await acceptOrder(order.id)
-      await load()
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to accept order.'))
-    } finally {
-      setAcceptingId(null)
-    }
-  }
-
-  function openHandover(order: Order) {
-    setHandoverTarget(order)
-    setPackageCount(1)
-    setHandoverError(null)
-  }
-
-  async function handleConfirmHandover() {
-    if (!handoverTarget || !handoverTarget.delivery_partner) return
-    setHandoverSubmitting(true)
-    setHandoverError(null)
-    try {
-      await handoverOrderApi(handoverTarget.id, {
-        package_count: packageCount,
-        delivery_partner_id: handoverTarget.delivery_partner.id,
-      })
-      setHandoverTarget(null)
-      await load()
-    } catch (err) {
-      setHandoverError(getErrorMessage(err, 'Failed to record handover.'))
-    } finally {
-      setHandoverSubmitting(false)
-    }
-  }
-
-  function goToTask(order: Order) {
-    if (order.status === 'picking' || order.status === 'picked') navigate(`/picking/${order.id}`)
-    else if (order.status === 'packing' || order.status === 'packed') navigate(`/packing/${order.id}`)
-  }
-
   async function openInvoice(order: Order) {
     setInvoiceTarget(order.id)
     setInvoice(null)
@@ -134,7 +76,12 @@ export default function Orders() {
 
   return (
     <div className="p-6 max-w-6xl">
-      <h1 className="font-display text-2xl font-semibold mb-4">Orders</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="font-display text-2xl font-semibold">Orders</h1>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">
+        Read-only view. Order acceptance, picking, and packing are handled in the Store App.
+      </p>
 
       <div className="flex gap-1 border-b border-slate-800 mb-4 overflow-x-auto">
         {TABS.map((tab) => {
@@ -186,7 +133,6 @@ export default function Orders() {
               {orders.map((order) => {
                 const itemCount = order.items?.length ?? 0
                 const totalQty = order.items?.reduce((sum, i) => sum + i.quantity, 0) ?? 0
-                const action = actionFor(order)
                 return (
                   <tr key={order.id} className="border-b border-slate-800 last:border-0 hover:bg-slate-800/40">
                     <td className="px-4 py-3 font-medium">#{order.id}</td>
@@ -204,41 +150,16 @@ export default function Orders() {
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        {order.status !== 'confirmed' && order.status !== 'pending' && (
-                          <button
-                            onClick={() => openInvoice(order)}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-medium transition-colors text-slate-300"
-                          >
-                            Invoice
-                          </button>
-                        )}
-                        {order.status === 'confirmed' ? (
+                      {order.status !== 'confirmed' && order.status !== 'pending' ? (
                         <button
-                          onClick={() => handleAccept(order)}
-                          disabled={acceptingId === order.id}
-                          className="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                          onClick={() => openInvoice(order)}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-medium transition-colors text-slate-300"
                         >
-                          {acceptingId === order.id ? 'Accepting...' : 'Accept'}
+                          Invoice
                         </button>
-                      ) : order.status === 'ready_for_dispatch' ? (
-                        <button
-                          onClick={() => openHandover(order)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors"
-                        >
-                          Handover
-                        </button>
-                      ) : action ? (
-                        <button
-                          onClick={() => goToTask(order)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium transition-colors"
-                        >
-                          {action.label}
-                        </button>
-                        ) : (
-                          <span className="text-xs text-slate-600">&mdash;</span>
-                        )}
-                      </div>
+                      ) : (
+                        <span className="text-xs text-slate-600">&mdash;</span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -268,58 +189,6 @@ export default function Orders() {
             >
               Next
             </button>
-          </div>
-        </div>
-      )}
-
-      {handoverTarget && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-base font-semibold mb-4">Handover Order #{handoverTarget.id}</h2>
-            {handoverTarget.delivery_partner ? (
-              <div className="border border-slate-800 rounded-lg p-3 mb-4 text-sm">
-                <p className="text-slate-400 text-xs uppercase mb-1">Assigned Delivery Partner</p>
-                <p className="font-medium">{handoverTarget.delivery_partner.name}</p>
-                <p className="text-slate-400">{handoverTarget.delivery_partner.phone}</p>
-                {handoverTarget.delivery_partner.vehicle_number && (
-                  <p className="text-slate-400 text-xs">Vehicle: {handoverTarget.delivery_partner.vehicle_number}</p>
-                )}
-                <p className="text-xs text-amber-400 mt-2">Verify this partner is physically present before confirming.</p>
-              </div>
-            ) : (
-              <p className="text-sm text-rose-400 mb-4">No delivery partner assigned to this order yet. Cannot hand over.</p>
-            )}
-
-            <label className="block text-xs text-slate-400 mb-1">Package Count</label>
-            <input
-              type="number"
-              min={1}
-              value={packageCount}
-              onChange={(e) => setPackageCount(parseInt(e.target.value, 10) || 1)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm mb-4"
-            />
-
-            {handoverError && (
-              <div className="border border-rose-900 bg-rose-950/40 text-rose-300 text-sm rounded-lg px-3 py-2 mb-4">
-                {handoverError}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setHandoverTarget(null)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmHandover}
-                disabled={handoverSubmitting || !handoverTarget.delivery_partner}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
-              >
-                {handoverSubmitting ? 'Confirming...' : 'Confirm Handover'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -394,8 +263,7 @@ export default function Orders() {
                 </div>
 
                 <p className="text-xs text-slate-500">
-                  Generated {new Date(invoice.generated_at).toLocaleString()}. Warehouse staff cannot edit
-                  invoice values.
+                  Generated {new Date(invoice.generated_at).toLocaleString()}.
                 </p>
               </div>
             ) : null}

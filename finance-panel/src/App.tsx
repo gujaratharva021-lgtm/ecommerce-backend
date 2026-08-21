@@ -7,6 +7,7 @@ import FinanceDashboard from './pages/FinanceDashboard'
 import FinanceReports from './pages/FinanceReports'
 import Operations from './pages/Operations'
 import Revenue from './pages/Revenue'
+import MISReport from './pages/MISReport'
 import Payments from './pages/Payments'
 import Expenses from './pages/Expenses'
 import Payroll from './pages/Payroll'
@@ -38,6 +39,7 @@ export default function App() {
           >
             <Route path="/dashboard" element={<FinanceDashboard />} />
             <Route path="/revenue" element={<Revenue />} />
+            <Route path="/mis" element={<MISReport />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/payroll" element={<Payroll />} />

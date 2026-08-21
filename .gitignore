@@ -42,3 +42,20 @@ phase_*.txt
 daily_report_test.xlsx
 ~$*.xlsx
 render-cli-extracted/
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+
+# Sensitive files - never commit
+*.pem
+.env.production
+*.sql
+*_body.json
+otp-req.json
+verify-req.json
+manual-entry.json
+approval-update.json
+products_cost_price.csv
+*-test.xlsx
