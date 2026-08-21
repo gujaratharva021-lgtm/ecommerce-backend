@@ -17,10 +17,10 @@ UpdatedAt   time.Time `json:"updated_at"`
 type MISExpenseApproval struct {
 ID                uint   `json:"id" gorm:"primaryKey"`
 Category          string `json:"category"`
-UpTo25k           string `json:"up_to_25k"`
-Range25k1L        string `json:"range_25k_1l"`
-Range1L5L         string `json:"range_1l_5l"`
-Above5L           string `json:"above_5l"`
+UpTo25k           string `json:"up_to_25k" gorm:"column:up_to_25k"`
+Range25k1L        string `json:"range_25k_1l" gorm:"column:range_25k_1l"`
+Range1L5L         string `json:"range_1l_5l" gorm:"column:range_1l_5l"`
+Above5L           string `json:"above_5l" gorm:"column:above_5l"`
 RequiredDocuments string `json:"required_documents"`
 Approver          string `json:"approver"`
 }
