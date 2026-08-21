@@ -2,6 +2,7 @@ package handlers
 
 import (
 "encoding/json"
+"fmt"
 "math"
 "net/http"
 "time"
@@ -9,6 +10,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/xuri/excelize/v2"
 )
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
@@ -332,4 +334,104 @@ database.DB.Model(&models.MISExpenseApproval{}).Where("id = ?", id).Updates(map[
 "above_5l": req.Above5L, "required_documents": req.RequiredDocuments, "approver": req.Approver,
 })
 c.JSON(http.StatusOK, gin.H{"updated": true})
+}
+
+func ExportWeeklyMIS(c *gin.Context) {
+start, end := weekBounds(c.Query("week_start"))
+prevStart := start.AddDate(0, 0, -7)
+prevEnd := end.AddDate(0, 0, -7)
+
+revenueRows := computeRevenueMIS(start, end, prevStart, prevEnd)
+var netRevCur, netRevPrev float64
+for _, r := range revenueRows {
+if r.Label == "Net Revenue" {
+netRevCur = r.Current
+netRevPrev = r.Previous
+}
+}
+expenseRows := computeVendorExpenseMIS(start, end, prevStart, prevEnd, netRevCur, netRevPrev)
+settlementRows := computeVendorSettlement(start, end)
+
+xf := excelize.NewFile()
+defer xf.Close()
+
+revSheet := "Revenue MIS"
+xf.SetSheetName("Sheet1", revSheet)
+xf.SetSheetRow(revSheet, "A1", &[]interface{}{"Line Item", "This Week", "Last Week", "Growth %"})
+for i, r := range revenueRows {
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(revSheet, cell, &[]interface{}{r.Label, r.Current, r.Previous, r.GrowthPct})
+}
+for _, col := range []string{"A", "B", "C", "D"} {
+xf.SetColWidth(revSheet, col, col, 28)
+}
+
+expSheet := "Vendor Expense MIS"
+xf.NewSheet(expSheet)
+xf.SetSheetRow(expSheet, "A1", &[]interface{}{"Line Item", "This Week", "Last Week", "Growth %"})
+for i, r := range expenseRows {
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(expSheet, cell, &[]interface{}{r.Label, r.Current, r.Previous, r.GrowthPct})
+}
+for _, col := range []string{"A", "B", "C", "D"} {
+xf.SetColWidth(expSheet, col, col, 28)
+}
+
+setSheet := "Vendor Settlement"
+xf.NewSheet(setSheet)
+xf.SetSheetRow(setSheet, "A1", &[]interface{}{"Vendor", "Gross Sales", "Commission", "Discount", "Returns", "Delivery Recovery", "Other Charges", "Net Payable", "Amount Paid", "Balance", "Status"})
+for i, r := range settlementRows {
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(setSheet, cell, &[]interface{}{r.VendorName, r.GrossSales, r.Commission, r.Discount, r.Returns, r.DeliveryRecovery, r.OtherCharges, r.NetPayable, r.AmountPaid, r.Balance, r.Status})
+}
+for _, col := range []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"} {
+xf.SetColWidth(setSheet, col, col, 20)
+}
+
+weekKey := start.Format("2006-01-02")
+
+revByVendorSheet := "Revenue by Vendor"
+xf.NewSheet(revByVendorSheet)
+writeManualSheet(xf, revByVendorSheet, getManualEntries("revenue_by_vendor", weekKey))
+
+vendorPLSheet := "Vendor P&L"
+xf.NewSheet(vendorPLSheet)
+writeManualSheet(xf, vendorPLSheet, getManualEntries("vendor_pl", weekKey))
+
+vendorReconSheet := "Vendor Reconciliation"
+xf.NewSheet(vendorReconSheet)
+writeManualSheet(xf, vendorReconSheet, getManualEntries("vendor_reconciliation", weekKey))
+
+var approvalConfig []models.MISExpenseApproval
+database.DB.Order("id").Find(&approvalConfig)
+approvalSheet := "Expense Approval"
+xf.NewSheet(approvalSheet)
+xf.SetSheetRow(approvalSheet, "A1", &[]interface{}{"Category", "Up to 25k", "25k-1L", "1L-5L", "Above 5L", "Required Documents", "Approver"})
+for i, a := range approvalConfig {
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(approvalSheet, cell, &[]interface{}{a.Category, a.UpTo25k, a.Range25k1L, a.Range1L5L, a.Above5L, a.RequiredDocuments, a.Approver})
+}
+for _, col := range []string{"A", "B", "C", "D", "E", "F", "G"} {
+xf.SetColWidth(approvalSheet, col, col, 22)
+}
+
+xf.SetActiveSheet(0)
+
+filename := fmt.Sprintf("weekly-mis-%s.xlsx", weekKey)
+c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+if err := xf.Write(c.Writer); err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file"})
+}
+}
+
+func writeManualSheet(xf *excelize.File, sheet string, entries []manualEntryOut) {
+xf.SetSheetRow(sheet, "A1", &[]interface{}{"Row Key", "Data (JSON)"})
+for i, e := range entries {
+b, _ := json.Marshal(e.Data)
+cell, _ := excelize.CoordinatesToCellName(1, i+2)
+xf.SetSheetRow(sheet, cell, &[]interface{}{e.RowKey, string(b)})
+}
+xf.SetColWidth(sheet, "A", "A", 20)
+xf.SetColWidth(sheet, "B", "B", 60)
 }
