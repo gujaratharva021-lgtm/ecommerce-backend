@@ -269,6 +269,19 @@ adminDebitNotes := adminFinance.Group("/debit-notes")
 adminDebitNotes.GET("", handlers.ListDebitNotes)
 adminDebitNotes.GET("/:id", handlers.GetDebitNote)
 }
+adminRiderCODDeposits := adminFinance.Group("/rider-cod-deposits")
+{
+adminRiderCODDeposits.GET("", handlers.ListRiderCODDeposits)
+adminRiderCODDeposits.POST("", handlers.CreateRiderCODDeposit)
+adminRiderCODDeposits.POST("/:id/verify", handlers.VerifyRiderCODDeposit)
+}
+adminRiderPayouts := adminFinance.Group("/rider-payouts")
+{
+adminRiderPayouts.GET("", handlers.ListRiderPayouts)
+adminRiderPayouts.POST("", handlers.CreateRiderPayout)
+adminRiderPayouts.POST("/:id/approve", handlers.ApproveRiderPayout)
+adminRiderPayouts.POST("/:id/pay", handlers.PayRiderPayout)
+}
                 }
                 adminBankTransactions := adminFinance.Group("/bank-transactions")
                 {
@@ -438,6 +451,7 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                     adminPayments.GET("/reconciliation", handlers.GetAdminPaymentReconciliation)
                     adminPayments.GET("/:orderId", handlers.GetAdminPaymentDetail)
 adminPayments.PUT("/:order_id/status", handlers.UpdateAdminPaymentStatus)
+adminPayments.POST("/:id/settle-gateway", handlers.SettleGatewayPayment)
                 }
 
                 adminInvoices := admin.Group("/invoices")

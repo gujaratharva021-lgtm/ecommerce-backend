@@ -111,6 +111,8 @@ func AutoMigrate() {
             &models.DebitNote{},
             &models.VendorBankChangeRequest{},
             &models.PendingJournalEntry{},
+            &models.RiderCODDeposit{},
+            &models.RiderPayout{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -412,6 +414,47 @@ if err := DB.Exec(`CREATE TABLE IF NOT EXISTS pending_journal_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_pending_journal_entries_status ON pending_journal_entries(status);`).Error; err != nil {
 log.Fatalf("Failed to create pending_journal_entries table: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_fee DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add gateway_fee column to payments: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS is_settled BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+log.Fatalf("Failed to add is_settled column to payments: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add settled_at column to payments: %v", err)
+}
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS rider_cod_deposits (
+    id BIGSERIAL PRIMARY KEY,
+    delivery_partner_id BIGINT NOT NULL REFERENCES delivery_partners(id),
+    amount DOUBLE PRECISION NOT NULL,
+    deposit_date TIMESTAMPTZ NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    note TEXT,
+    verified_by_id BIGINT NULL REFERENCES users(id),
+    verified_at TIMESTAMPTZ,
+    created_by_id BIGINT NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_rider_cod_deposits_partner_id ON rider_cod_deposits(delivery_partner_id);
+CREATE INDEX IF NOT EXISTS idx_rider_cod_deposits_status ON rider_cod_deposits(status);
+CREATE TABLE IF NOT EXISTS rider_payouts (
+    id BIGSERIAL PRIMARY KEY,
+    delivery_partner_id BIGINT NOT NULL REFERENCES delivery_partners(id),
+    period_from TIMESTAMPTZ NOT NULL,
+    period_to TIMESTAMPTZ NOT NULL,
+    delivered_count INTEGER NOT NULL,
+    amount DOUBLE PRECISION NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    approved_by_id BIGINT NULL REFERENCES users(id),
+    approved_at TIMESTAMPTZ,
+    paid_at TIMESTAMPTZ,
+    created_by_id BIGINT NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_rider_payouts_partner_id ON rider_payouts(delivery_partner_id);
+CREATE INDEX IF NOT EXISTS idx_rider_payouts_status ON rider_payouts(status);`).Error; err != nil {
+log.Fatalf("Failed to create rider_cod_deposits/rider_payouts tables: %v", err)
 }
 seedDefaultSettings()
 seedChartOfAccounts()

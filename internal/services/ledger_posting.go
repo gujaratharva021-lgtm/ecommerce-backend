@@ -353,3 +353,193 @@ return fmt.Errorf("failed to create credit ledger entry: %w", err)
 return nil
 })
 }
+
+// PostGatewaySettlementLedgerEntry records the gateway fee deduction for
+// one online payment (SRS 12.10): Debit Gateway Fees (expense), Credit
+// Bank - the fee is deducted from what the gateway actually pays out, so
+// this reduces the Bank balance already recorded at sale time rather than
+// re-booking the whole gross amount.
+func PostGatewaySettlementLedgerEntry(paymentID uint, feeAmount float64) error {
+if feeAmount <= 0 {
+return nil
+}
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "gateway_settlement", paymentID).First(&existing).Error; err == nil {
+return nil
+}
+
+var gatewayFees, bank models.Account
+if err := database.DB.Where("code = ?", "5005").First(&gatewayFees).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 5005 (Gateway Fees): %w", err)
+}
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+
+transactionRef := fmt.Sprintf("GWSETTLE-%d", paymentID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: gatewayFees.ID, Type: "debit", Amount: feeAmount,
+Description: fmt.Sprintf("Gateway fee for payment #%d", paymentID),
+ReferenceType: "gateway_settlement", ReferenceID: &paymentID, EntryDate: now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create gateway fee ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: bank.ID, Type: "credit", Amount: feeAmount,
+Description: fmt.Sprintf("Gateway fee for payment #%d", paymentID),
+ReferenceType: "gateway_settlement", ReferenceID: &paymentID, EntryDate: now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create bank ledger entry: %w", err)
+}
+return nil
+})
+}
+
+// PostRiderPayoutAccrualLedgerEntry recognizes a rider payout as owed
+// (SRS 12.11), the moment it's approved: Debit Rider Delivery Expense,
+// Credit Rider Payable.
+func PostRiderPayoutAccrualLedgerEntry(payoutID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_payout_accrual", payoutID).First(&existing).Error; err == nil {
+return nil
+}
+
+var payout models.RiderPayout
+if err := database.DB.First(&payout, payoutID).Error; err != nil {
+return fmt.Errorf("rider payout not found: %w", err)
+}
+if payout.Amount <= 0 {
+return nil
+}
+
+var expense, payable models.Account
+if err := database.DB.Where("code = ?", "5004").First(&expense).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 5004 (Rider Delivery Expense): %w", err)
+}
+if err := database.DB.Where("code = ?", "2003").First(&payable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2003 (Rider Payable): %w", err)
+}
+
+transactionRef := fmt.Sprintf("RIDERACCRUAL-%d", payoutID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: expense.ID, Type: "debit", Amount: payout.Amount,
+Description: fmt.Sprintf("Rider payout #%d accrual", payoutID),
+ReferenceType: "rider_payout_accrual", ReferenceID: &payoutID, EntryDate: now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create rider expense ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: payable.ID, Type: "credit", Amount: payout.Amount,
+Description: fmt.Sprintf("Rider payout #%d accrual", payoutID),
+ReferenceType: "rider_payout_accrual", ReferenceID: &payoutID, EntryDate: now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create rider payable ledger entry: %w", err)
+}
+return nil
+})
+}
+
+// PostRiderPayoutSettlementLedgerEntry records actually paying out a rider
+// (SRS 12.11): Debit Rider Payable, Credit Bank. Only meaningful after
+// PostRiderPayoutAccrualLedgerEntry has already run for the same payout.
+func PostRiderPayoutSettlementLedgerEntry(payoutID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_payout_settlement", payoutID).First(&existing).Error; err == nil {
+return nil
+}
+
+var payout models.RiderPayout
+if err := database.DB.First(&payout, payoutID).Error; err != nil {
+return fmt.Errorf("rider payout not found: %w", err)
+}
+if payout.Amount <= 0 {
+return nil
+}
+
+var payable, bank models.Account
+if err := database.DB.Where("code = ?", "2003").First(&payable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2003 (Rider Payable): %w", err)
+}
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+
+transactionRef := fmt.Sprintf("RIDERPAY-%d", payoutID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: payable.ID, Type: "debit", Amount: payout.Amount,
+Description: fmt.Sprintf("Rider payout #%d settlement", payoutID),
+ReferenceType: "rider_payout_settlement", ReferenceID: &payoutID, EntryDate: now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create rider payable ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: bank.ID, Type: "credit", Amount: payout.Amount,
+Description: fmt.Sprintf("Rider payout #%d settlement", payoutID),
+ReferenceType: "rider_payout_settlement", ReferenceID: &payoutID, EntryDate: now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create bank ledger entry: %w", err)
+}
+return nil
+})
+}
+
+// PostRiderCODDepositLedgerEntry moves the recorded balance of a verified
+// COD deposit from Cash (where COD sales are already booked, since the
+// rider physically holds the cash) into Bank (SRS 12.9).
+func PostRiderCODDepositLedgerEntry(depositID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_cod_deposit", depositID).First(&existing).Error; err == nil {
+return nil
+}
+
+var deposit models.RiderCODDeposit
+if err := database.DB.First(&deposit, depositID).Error; err != nil {
+return fmt.Errorf("rider COD deposit not found: %w", err)
+}
+
+var cash, bank models.Account
+if err := database.DB.Where("code = ?", "1001").First(&cash).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1001 (Cash): %w", err)
+}
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+
+transactionRef := fmt.Sprintf("CODDEPOSIT-%d", depositID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: bank.ID, Type: "debit", Amount: deposit.Amount,
+Description: fmt.Sprintf("Rider COD deposit #%d", depositID),
+ReferenceType: "rider_cod_deposit", ReferenceID: &depositID, EntryDate: now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create bank ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef, AccountID: cash.ID, Type: "credit", Amount: deposit.Amount,
+Description: fmt.Sprintf("Rider COD deposit #%d", depositID),
+ReferenceType: "rider_cod_deposit", ReferenceID: &depositID, EntryDate: now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create cash ledger entry: %w", err)
+}
+return nil
+})
+}

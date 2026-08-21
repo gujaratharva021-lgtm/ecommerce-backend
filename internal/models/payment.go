@@ -28,6 +28,9 @@ Currency          string    `gorm:"default:INR" json:"currency"`
 Status            string    `gorm:"default:created" json:"status"` // created/paid/failed/refunded/partially_refunded
 Gateway           string    `gorm:"default:razorpay" json:"gateway"`
 RefundedAmount    float64   `gorm:"default:0" json:"refunded_amount"`
+GatewayFee        float64    `gorm:"default:0" json:"gateway_fee,omitempty"`
+IsSettled         bool       `gorm:"default:false" json:"is_settled"`
+SettledAt         *time.Time `json:"settled_at,omitempty"`
 CreatedAt         time.Time `json:"created_at"`
 UpdatedAt         time.Time `json:"updated_at"`
 }
