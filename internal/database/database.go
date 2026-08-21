@@ -1,9 +1,7 @@
 package database
-
 import (
 	"log"
 	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/config"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
@@ -11,9 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
-
 var DB *gorm.DB
-
 // ConnectDatabase opens a connection to PostgreSQL and stores it in DB.
 func ConnectDatabase(cfg *config.Config) {
 	// Only log every SQL query in dev mode. In production this slows down
@@ -22,14 +18,12 @@ func ConnectDatabase(cfg *config.Config) {
 	if cfg.GinMode == gin.ReleaseMode {
 		logLevel = logger.Warn
 	}
-
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-
 	sqlDB, err := db.DB()
 	if err != nil {
 		log.Fatalf("Failed to get underlying sql.DB: %v", err)
@@ -40,11 +34,9 @@ func ConnectDatabase(cfg *config.Config) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 	sqlDB.SetConnMaxIdleTime(2 * time.Minute)
-
 	DB = db
 	log.Println("Database connected successfully")
 }
-
 // AutoMigrate creates/updates all tables based on the models.
 // This covers: Users, OTPs, Categories, Products, Inventory, Cart,
 // CartItems, Addresses, Orders, OrderItems, Payments.
@@ -123,14 +115,10 @@ func AutoMigrate() {
 	if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`).Error; err != nil {
 		log.Fatalf("Failed to add gst_percent column: %v", err)
 	}
-
 	seedDefaultSettings()
 seedChartOfAccounts()
-
 	log.Println("Database migration completed")
 }
-
-
 // EnsureProductionSchemaPatches applies small, idempotent schema patches
 // that are needed even in production (GIN_MODE=release), where the full
 // AutoMigrate() is skipped in favor of versioned migrations. This lets a
