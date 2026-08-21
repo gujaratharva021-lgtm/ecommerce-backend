@@ -234,3 +234,53 @@ export async function getFinanceDashboard(): Promise<FinanceDashboard> {
   const { data } = await apiClient.get<FinanceDashboard>('/admin/finance/dashboard')
   return data
 }
+
+export async function listAdminPayments(params: { status?: string; gateway?: string; payment_method?: string; page?: number; limit?: number }): Promise<{ payments: import('../types/finance').AdminPaymentRow[]; total: number }> {
+  const { data } = await apiClient.get('/admin/payments', { params })
+  return data
+}
+
+export async function getAdminPaymentDetail(orderId: number): Promise<{ payment: { id: number; is_settled: boolean } }> {
+  const { data } = await apiClient.get(`/admin/payments/${orderId}`)
+  return data
+}
+
+export async function settleGatewayPayment(paymentId: number): Promise<any> {
+  const { data } = await apiClient.post(`/admin/payments/${paymentId}/settle-gateway`)
+  return data
+}
+
+export async function listRiderPayouts(params: { status?: string; delivery_partner_id?: number }): Promise<{ rider_payouts: import('../types/finance').RiderPayout[] }> {
+  const { data } = await apiClient.get('/admin/finance/rider-payouts', { params })
+  return data
+}
+
+export async function createRiderPayout(payload: { delivery_partner_id: number; period_from: string; period_to: string }): Promise<import('../types/finance').RiderPayout> {
+  const { data } = await apiClient.post('/admin/finance/rider-payouts', payload)
+  return data
+}
+
+export async function approveRiderPayout(id: number): Promise<import('../types/finance').RiderPayout> {
+  const { data } = await apiClient.post(`/admin/finance/rider-payouts/${id}/approve`)
+  return data
+}
+
+export async function payRiderPayout(id: number): Promise<import('../types/finance').RiderPayout> {
+  const { data } = await apiClient.post(`/admin/finance/rider-payouts/${id}/pay`)
+  return data
+}
+
+export async function listRiderCODDeposits(params: { status?: string; delivery_partner_id?: number }): Promise<{ rider_cod_deposits: import('../types/finance').RiderCODDeposit[] }> {
+  const { data } = await apiClient.get('/admin/finance/rider-cod-deposits', { params })
+  return data
+}
+
+export async function createRiderCODDeposit(payload: { delivery_partner_id: number; amount: number; deposit_date: string; note?: string }): Promise<import('../types/finance').RiderCODDeposit> {
+  const { data } = await apiClient.post('/admin/finance/rider-cod-deposits', payload)
+  return data
+}
+
+export async function verifyRiderCODDeposit(id: number): Promise<import('../types/finance').RiderCODDeposit> {
+  const { data } = await apiClient.post(`/admin/finance/rider-cod-deposits/${id}/verify`)
+  return data
+}

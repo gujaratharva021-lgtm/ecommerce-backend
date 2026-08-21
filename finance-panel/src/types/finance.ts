@@ -344,3 +344,44 @@ export interface FinanceDashboard {
     bank_changes: number
   }
 }
+
+export interface AdminPaymentRow {
+  order_id: number
+  transaction_id: string
+  customer_name: string
+  customer_phone: string
+  amount: number
+  refunded_amount: number
+  payment_method: string
+  gateway: string
+  status: string
+  created_at: string
+}
+
+export interface RiderPayout {
+  id: number
+  delivery_partner_id: number
+  period_from: string
+  period_to: string
+  delivered_count: number
+  amount: number
+  status: string
+  approved_by_id?: number
+  approved_at?: string
+  paid_at?: string
+  created_by_id: number
+  created_at: string
+}
+
+export interface RiderCODDeposit {
+  id: number
+  delivery_partner_id: number
+  amount: number
+  deposit_date: string
+  status: string
+  note?: string
+  verified_by_id?: number
+  verified_at?: string
+  created_by_id: number
+  created_at: string
+}

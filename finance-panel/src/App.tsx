@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import FinanceDashboard from './pages/FinanceDashboard'
 import FinanceReports from './pages/FinanceReports'
+import Operations from './pages/Operations'
 import Revenue from './pages/Revenue'
 import Payments from './pages/Payments'
 import Expenses from './pages/Expenses'
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/range" element={<RangeReport />} />
             <Route path="/reports/finance" element={<FinanceReports />} />
+            <Route path="/operations" element={<Operations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/accounting/vendors" element={<Vendors />} />
             <Route path="/accounting/vendor-bills" element={<VendorBills />} />
