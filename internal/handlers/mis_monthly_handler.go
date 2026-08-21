@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "fmt"
@@ -273,3 +273,7 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel 
 }
 
 var _ = math.Round
+
+func monthBoundsYearStart(t time.Time) time.Time {
+return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+}
