@@ -449,7 +449,7 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                 {
                     adminPayments.GET("", handlers.GetAdminPayments)
                     adminPayments.GET("/reconciliation", handlers.GetAdminPaymentReconciliation)
-                    adminPayments.GET("/:orderId", handlers.GetAdminPaymentDetail)
+                    adminPayments.GET("/:order_id", handlers.GetAdminPaymentDetail)
 adminPayments.PUT("/:order_id/status", handlers.UpdateAdminPaymentStatus)
 adminPayments.POST("/:id/settle-gateway", handlers.SettleGatewayPayment)
                 }
