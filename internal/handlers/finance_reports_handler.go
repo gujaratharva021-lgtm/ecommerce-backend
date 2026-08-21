@@ -1,6 +1,7 @@
 package handlers
 
 import (
+"math"
 "net/http"
 "time"
 
@@ -240,6 +241,6 @@ c.JSON(http.StatusOK, gin.H{
 "assets": gin.H{"accounts": assets, "total": totalAssets},
 "liabilities": gin.H{"accounts": liabilities, "total": totalLiabilities},
 "equity": gin.H{"retained_earnings": retainedEarnings, "total": retainedEarnings},
-"balances": totalAssets == totalLiabilities+retainedEarnings,
+"balances": math.Abs(totalAssets-(totalLiabilities+retainedEarnings)) < 0.01,
 })
 }
