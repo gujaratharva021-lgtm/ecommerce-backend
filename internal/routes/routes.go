@@ -372,9 +372,6 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                 admin.POST("/wallet/credit/:user_id", handlers.AdminCreditWallet)
 
                 admin.POST("/products/:id/barcode", handlers.GenerateProductBarcode)
-admin.POST("/debug/merge-duplicate-accounts", handlers.DebugMergeDuplicateAccounts)
-admin.GET("/debug/trial-balance", handlers.DebugTrialBalance)
-admin.POST("/debug/backfill-vendor-bill-ledger", handlers.DebugBackfillVendorBillLedger)
                 admin.DELETE("/coupons/:id", handlers.DeleteCoupon)
                 admin.PUT("/stock-transfers/:id/cancel", handlers.CancelStockTransfer)
 
