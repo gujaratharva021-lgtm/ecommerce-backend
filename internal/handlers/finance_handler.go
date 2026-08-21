@@ -72,7 +72,7 @@ Name        string  `json:"warehouse_name"`
 Revenue     float64 `json:"revenue"`
 OrderCount  int64   `json:"order_count"`
 }
-var byWarehouse []warehouseRow
+byWarehouse := []warehouseRow{}
 database.DB.Table("orders").
 Select("orders.warehouse_id, COALESCE(warehouses.name, 'Unassigned') as name, COALESCE(SUM(orders.items_amount),0) as revenue, COUNT(*) as order_count").
 Joins("LEFT JOIN warehouses ON warehouses.id = orders.warehouse_id").
@@ -89,7 +89,7 @@ ProductName string  `json:"product_name"`
 Revenue     float64 `json:"revenue"`
 Quantity    int64   `json:"quantity"`
 }
-var byProduct []productRow
+byProduct := []productRow{}
 database.DB.Table("order_items").
 Select("order_items.product_id, products.name as product_name, COALESCE(SUM(order_items.price * order_items.quantity),0) as revenue, COALESCE(SUM(order_items.quantity),0) as quantity").
 Joins("JOIN orders ON orders.id = order_items.order_id").
