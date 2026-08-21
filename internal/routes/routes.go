@@ -325,6 +325,7 @@ adminFinance.POST("/expenses/:id/pay", handlers.PayExpense)
                 adminProducts.PUT("/:id", handlers.UpdateProduct)
                 adminProducts.DELETE("/:id", handlers.DeleteProduct)
                 adminProducts.PUT("/:id/inventory", handlers.UpdateInventory)
+                adminProducts.POST("/bulk-cost-price", handlers.BulkUpdateCostPrice)
             }
 
             adminOrders := admin.Group("/orders")
