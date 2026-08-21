@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const NAV_ITEMS = [
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/revenue', label: 'Revenue' },
   { to: '/payments', label: 'Payments \u0026 Refunds' },
   { to: '/expenses', label: 'Expenses' },

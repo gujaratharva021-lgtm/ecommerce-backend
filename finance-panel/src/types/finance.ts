@@ -315,3 +315,32 @@ export interface VendorBillVoidRequest {
 export interface BankTransactionVoidRequest {
   reason: string
 }
+
+export interface FinanceDashboard {
+  period_start: string
+  revenue: {
+    total_revenue: number
+    cogs: number
+    gross_profit: number
+    expenses: number
+    net_profit: number
+  }
+  accounts_payable: {
+    vendor_payable: number
+  }
+  accounts_receivable: {
+    gateway_pending: number
+    cod_pending: number
+  }
+  gst: {
+    output_gst: number
+    vendor_gst: number
+    net_gst_payable: number
+  }
+  bank_balance: number
+  pending_approvals: {
+    expenses: number
+    journal_entries: number
+    bank_changes: number
+  }
+}

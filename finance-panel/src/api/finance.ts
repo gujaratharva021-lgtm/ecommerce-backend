@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss, PaymentReconciliation, GSTSummary, Vendor, VendorRequest, VendorBill, VendorBillRequest, VendorBillHoldRequest, VendorBillVoidRequest, Account, AccountRequest, LedgerEntry, ManualJournalEntryRequest, TrialBalance, BankTransaction, BankTransactionRequest, BankTransactionMatchRequest, BankTransactionVoidRequest } from '../types/finance'
+import type { RevenueSummary, Expense, ExpenseListResponse, ExpenseFormInput, Payroll, PayrollListResponse, PayrollFormInput, ProfitLoss, PaymentReconciliation, GSTSummary, Vendor, VendorRequest, VendorBill, VendorBillRequest, VendorBillHoldRequest, VendorBillVoidRequest, Account, AccountRequest, LedgerEntry, ManualJournalEntryRequest, TrialBalance, BankTransaction, BankTransactionRequest, BankTransactionMatchRequest, BankTransactionVoidRequest, FinanceDashboard } from '../types/finance'
 
 export async function getRevenue(from: string, to: string): Promise<RevenueSummary> {
   const { data } = await apiClient.get<RevenueSummary>('/admin/finance/revenue', {
@@ -227,5 +227,10 @@ export async function ignoreBankTransaction(id: number): Promise<BankTransaction
 
 export async function voidBankTransaction(id: number, payload: BankTransactionVoidRequest): Promise<BankTransaction> {
   const { data } = await apiClient.post<BankTransaction>(`/admin/finance/bank-transactions/${id}/void`, payload)
+  return data
+}
+
+export async function getFinanceDashboard(): Promise<FinanceDashboard> {
+  const { data } = await apiClient.get<FinanceDashboard>('/admin/finance/dashboard')
   return data
 }

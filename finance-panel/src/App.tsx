@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import FinanceDashboard from './pages/FinanceDashboard'
 import Revenue from './pages/Revenue'
 import Payments from './pages/Payments'
 import Expenses from './pages/Expenses'
@@ -33,6 +34,7 @@ export default function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="/dashboard" element={<FinanceDashboard />} />
             <Route path="/revenue" element={<Revenue />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/expenses" element={<Expenses />} />
@@ -50,7 +52,7 @@ export default function App() {
             <Route path="/accounting/bank-reconciliation" element={<BankReconciliation />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/revenue" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
