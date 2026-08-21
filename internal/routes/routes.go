@@ -216,6 +216,7 @@ func SetupRoutes(router *gin.Engine) {
             adminFinance := admin.Group("/finance")
             adminFinance.Use(middleware.FinanceOnly())
             {
+adminFinance.GET("/dashboard", handlers.FinanceDashboard)
                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
                 adminFinance.GET("/profit-loss", handlers.GetProfitLoss)
                 adminFinance.GET("/gst", handlers.GetGSTSummary)
