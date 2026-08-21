@@ -133,7 +133,7 @@ LIMIT $` + strconv.Itoa(argN) + ` OFFSET $` + strconv.Itoa(argN+1)
 
 args = append(args, limit, (page-1)*limit)
 
-var rows []models.AdminPaymentRow
+rows := []models.AdminPaymentRow{}
 if err := database.DB.Raw(selectSQL, args...).Scan(&rows).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch payments"})
 return
