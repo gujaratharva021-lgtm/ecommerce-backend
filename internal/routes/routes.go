@@ -453,6 +453,12 @@ adminPayments.PUT("/:order_id/status", handlers.UpdateAdminPaymentStatus)
                     adminReports.GET("/daily-sales/export", handlers.ExportDailySalesReport)
 adminReports.GET("/range-sales", handlers.GetRangeSalesReport)
 adminReports.GET("/range-sales/export", handlers.ExportRangeSalesReport)
+adminReports.GET("/sales-register", handlers.GetSalesRegister)
+adminReports.GET("/purchase-register", handlers.GetPurchaseRegister)
+adminReports.GET("/rider-payable", handlers.GetRiderPayableReport)
+adminReports.GET("/gateway-settlement", handlers.GetGatewaySettlementReport)
+adminReports.GET("/cash-flow", handlers.GetCashFlowReport)
+adminReports.GET("/balance-sheet", handlers.GetBalanceSheet)
                 }
             }
         }
