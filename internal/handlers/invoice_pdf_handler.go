@@ -47,7 +47,7 @@ if qrPNG, err := qrcode.Encode(qrContent, qrcode.Medium, 256); err == nil {
 qrReader := bytes.NewReader(qrPNG)
 opts := gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
 pdf.RegisterImageOptionsReader("invoice_qr", opts, qrReader)
-pdf.ImageOptions("invoice_qr", 170, 12, 26, 26, false, opts, 0, "")
+pdf.ImageOptions("invoice_qr", 174, 12, 20, 20, false, opts, 0, "")
 }
 
 // ---- Seller header ----
