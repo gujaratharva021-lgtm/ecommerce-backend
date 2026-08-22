@@ -193,6 +193,7 @@ func SetupRoutes(router *gin.Engine) {
             orders.POST("/:id/return", handlers.RequestReturn)
             orders.POST("/:id/payment", handlers.CreatePaymentOrder)   // creates Razorpay order (payment_method: online only)
             orders.POST("/:id/payment/verify", handlers.VerifyPayment) // verifies signature, marks order paid
+orders.GET("/:id/invoice/pdf", handlers.GetMyOrderInvoicePDF)
         }
 
         // ---- Coupon routes (protected) ----
