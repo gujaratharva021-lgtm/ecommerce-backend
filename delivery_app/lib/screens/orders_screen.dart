@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -19,6 +19,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _loading = true;
   String? _error;
   String _filter = 'all';
+  bool? _isOnline;
+  bool _togglingOnline = false;
 
   final Set<int> _actingOrderIds = {};
 
@@ -31,6 +33,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     _loadAll();
+    _loadAvailability();
   }
 
   Future<void> _loadAll() async {
@@ -56,6 +59,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _error = 'Failed to load orders';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadAvailability() async {
+    try {
+      final data = await ApiService.getAvailability();
+      if (mounted) setState(() => _isOnline = data['is_online'] == true);
+    } catch (_) {
+      // Silently ignore - badge just wont show a definite state yet.
+    }
+  }
+
+  Future<void> _toggleOnline() async {
+    final next = !(_isOnline ?? false);
+    setState(() => _togglingOnline = true);
+    try {
+      final data = await ApiService.updateAvailability(next);
+      if (mounted) setState(() => _isOnline = data['is_online'] == true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _togglingOnline = false);
     }
   }
 
@@ -264,19 +293,37 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 style: TextStyle(fontSize: 13, color: Colors.black54),
                               ),
                               const SizedBox(height: 14),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.circle, color: Color(0xFF22C55E), size: 10),
-                                    SizedBox(width: 6),
-                                    Text('Online', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                  ],
+                              GestureDetector(
+                                onTap: _togglingOnline ? null : _toggleOnline,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.circle,
+                                        color: _isOnline == true ? const Color(0xFF22C55E) : Colors.grey,
+                                        size: 10,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _isOnline == true ? 'Online' : 'Offline',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                      ),
+                                      if (_togglingOnline) ...[
+                                        const SizedBox(width: 6),
+                                        const SizedBox(
+                                          height: 10,
+                                          width: 10,
+                                          child: CircularProgressIndicator(strokeWidth: 1.5),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],

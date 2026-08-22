@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -40,23 +40,52 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Future<void> _confirmDelivery() async {
+  Future<void> _advanceDeliveryStatus(String status, {String? otp}) async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final data = await ApiService.confirmDelivery(_order['order_id']);
+      final data = await ApiService.updateDeliveryStatus(_order['order_id'], status, otp: otp);
       setState(() {
         _order = data['order'];
-        _loading = false;
       });
+      if (status == 'delivered') {
+        final confirmData = await ApiService.confirmDelivery(_order['order_id']);
+        setState(() => _order = confirmData['order']);
+      }
+      setState(() => _loading = false);
     } catch (e) {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
     }
+  }
+
+  Future<void> _promptForOtpAndDeliver() async {
+    final otpController = TextEditingController();
+    final otp = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter delivery OTP'),
+        content: TextField(
+          controller: otpController,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: const InputDecoration(hintText: 'Ask the customer for their OTP'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, otpController.text.trim()),
+            child: const Text('Verify & Deliver'),
+          ),
+        ],
+      ),
+    );
+    if (otp == null || otp.isEmpty) return;
+    await _advanceDeliveryStatus('delivered', otp: otp);
   }
 
   Future<void> _acceptAssignment() async {
@@ -285,16 +314,43 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   : const Text('Mark as Shipped (Picked Up)'),
             )
           else if (canProgressOrder && status == 'shipped')
-            ElevatedButton(
-              onPressed: _loading ? null : _confirmDelivery,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-                backgroundColor: Colors.green,
-              ),
-              child: _loading
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Confirm Delivery'),
-            )
+            Builder(builder: (context) {
+              final deliveryStatus = _order['delivery_status'];
+              switch (deliveryStatus) {
+                case 'picked_up':
+                  return ElevatedButton(
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('out_for_delivery'),
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Out for Delivery'),
+                  );
+                case 'out_for_delivery':
+                  return ElevatedButton(
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('arrived'),
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Arrived at Location'),
+                  );
+                case 'arrived':
+                  return ElevatedButton(
+                    onPressed: _loading ? null : _promptForOtpAndDeliver,
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16), backgroundColor: Colors.green),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Enter OTP & Confirm Delivery'),
+                  );
+                default:
+                  return ElevatedButton(
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('picked_up'),
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Mark Picked Up'),
+                  );
+              }
+            })
           else if (status == 'delivered')
             const Center(
               child: Text('Delivered', style: TextStyle(color: Colors.green, fontSize: 18)),

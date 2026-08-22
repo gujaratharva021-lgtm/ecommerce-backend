@@ -9,6 +9,7 @@ import (
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/middleware"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // newStatusGPSTestRouter wires up exactly the routes exercised by this
@@ -27,6 +28,7 @@ func newStatusGPSTestRouter() *gin.Engine {
 	delivery.PUT("/location", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), UpdateLocation)
 	delivery.PUT("/orders/:id/accept", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), AcceptAssignment)
 	delivery.PUT("/orders/:id/delivery-status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), UpdateDeliveryStatus)
+	delivery.GET("/orders", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), GetMyDeliveries)
 
 	return r
 }
@@ -122,7 +124,7 @@ func acceptedOrderForStatusTest(t *testing.T, r *gin.Engine) (models.DeliveryPar
 
 func TestUpdateDeliveryStatus_ValidTransitionSucceeds(t *testing.T) {
 	r := newStatusGPSTestRouter()
-	_, order, token := acceptedOrderForStatusTest(t, r)
+	partner, order, token := acceptedOrderForStatusTest(t, r)
 
 	// ACCEPTED -> PICKED_UP is the first step a partner may take through
 	// this endpoint (ASSIGNED -> ACCEPTED already happened via /accept).
@@ -137,14 +139,29 @@ func TestUpdateDeliveryStatus_ValidTransitionSucceeds(t *testing.T) {
 		t.Errorf("expected delivery_status 'picked_up', got %v", fresh.DeliveryStatus)
 	}
 
-	// Continue the full chain to make sure every subsequent step also
-	// succeeds in order.
-	steps := []string{"out_for_delivery", "arrived", "delivered"}
-	for _, step := range steps {
-		w := doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": step})
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200 transitioning to %s, got %d: %s", step, w.Code, w.Body.String())
-		}
+	// PICKED_UP -> OUT_FOR_DELIVERY generates the delivery OTP. Called
+	// directly on the service (instead of via HTTP) purely so the test can
+	// capture the plaintext code - the real HTTP response never includes it.
+	_, otpCode, err := services.UpdateDeliveryStatus(order.ID, partner.ID, models.DeliveryStatusOutForDelivery, "")
+	if err != nil {
+		t.Fatalf("expected OUT_FOR_DELIVERY transition to succeed, got %v", err)
+	}
+	if otpCode == "" {
+		t.Fatalf("expected a delivery OTP to be generated")
+	}
+
+	w = doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "arrived"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 transitioning to arrived, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// The partner must be inside the geofence before DELIVERED is allowed -
+	// put them exactly at the seeded address coordinates.
+	setPartnerLocation(t, partner.ID, 23.0225, 72.5714)
+
+	w = doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "delivered", "otp": otpCode})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 transitioning to delivered, got %d: %s", w.Code, w.Body.String())
 	}
 
 	database.DB.First(&fresh, order.ID)
