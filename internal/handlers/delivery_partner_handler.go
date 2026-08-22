@@ -3,8 +3,8 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
-"log"
 	"strconv"
 	"time"
 
@@ -393,6 +393,12 @@ func respondToAssignment(c *gin.Context, newStatus string, reason string) {
 // Only the partner the order is currently assigned to can advance it
 // (IDOR/BOLA protection via services.UpdateDeliveryStatus), and an
 // invalid/out-of-order transition is rejected.
+//
+// The ARRIVED -> DELIVERED step additionally requires a valid "otp" in
+// the request body (matching the OTP generated when the order entered
+// OUT_FOR_DELIVERY) and the partner's last-known GPS to be within the
+// configured delivery geofence of the address - see
+// services.UpdateDeliveryStatus for the exact checks and error cases.
 func UpdateDeliveryStatus(c *gin.Context) {
 	partnerID := c.MustGet("user_id").(uint)
 
@@ -408,13 +414,25 @@ func UpdateDeliveryStatus(c *gin.Context) {
 		return
 	}
 
-	order, err := services.UpdateDeliveryStatus(uint(orderID64), partnerID, req.Status)
+	// The second return value (the plaintext OTP, only non-empty on the
+	// OUT_FOR_DELIVERY step) is intentionally discarded here - it must
+	// never be included in a delivery-partner-facing API response.
+	order, _, err := services.UpdateDeliveryStatus(uint(orderID64), partnerID, req.Status, req.OTP)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrDeliveryStatusOrderNotOwned):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
 		case errors.Is(err, services.ErrDeliveryStatusInvalidTransition):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delivery status transition"})
+		case errors.Is(err, services.ErrDeliveryOTPRequired),
+			errors.Is(err, services.ErrDeliveryOTPInvalid),
+			errors.Is(err, services.ErrDeliveryOTPExpired),
+			errors.Is(err, services.ErrDeliveryOTPLocked):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, services.ErrDeliveryGPSMissing),
+			errors.Is(err, services.ErrDeliveryAddressLocationMissing),
+			errors.Is(err, services.ErrDeliveryOutsideGeofence):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update delivery status"})
 		}
@@ -487,6 +505,12 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
+	// Bypass fix: require secure OTP+geofence delivery-status flow to have already completed.
+	if order.DeliveryStatus == nil || *order.DeliveryStatus != models.DeliveryStatusDelivered {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Order must complete OTP and geofence verification via the delivery-status endpoint before it can be confirmed delivered"})
+		return
+	}
+
 	order.Status = models.OrderStatusDelivered
 	if order.PaymentMethod == models.PaymentMethodCOD {
 		order.PaymentStatus = models.OrderPaymentStatusPaid
@@ -497,11 +521,11 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-// Revenue is recognized now (COD delivery just confirmed) - post the
-// double-entry sales ledger entry at this exact moment, not earlier.
-if err := services.PostSalesLedgerEntry(order.ID); err != nil {
-log.Printf("failed to post sales ledger entry for order %s: %v", orderID, err)
-}
+	// Revenue is recognized now (COD delivery just confirmed) - post the
+	// double-entry sales ledger entry at this exact moment, not earlier.
+	if err := services.PostSalesLedgerEntry(order.ID); err != nil {
+		log.Printf("failed to post sales ledger entry for order %s: %v", orderID, err)
+	}
 
 	// Notify the customer that their order has been delivered.
 	go services.SendPushToUser(
@@ -525,19 +549,19 @@ const perDeliveryEarning = 30.0
 // GET /api/v1/admin/delivery-partners/:id/location (admin only)
 // Returns the partner's last known location, pushed via PUT /delivery/location.
 func GetDeliveryPartnerLocation(c *gin.Context) {
-id := c.Param("id")
-var partner models.DeliveryPartner
-if err := database.DB.Select("id", "name", "current_lat", "current_lng", "last_location_update").First(&partner, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
-return
-}
-c.JSON(http.StatusOK, gin.H{
-"id":                    partner.ID,
-"name":                  partner.Name,
-"current_lat":           partner.CurrentLat,
-"current_lng":           partner.CurrentLng,
-"last_location_update":  partner.LastLocationUpdate,
-})
+	id := c.Param("id")
+	var partner models.DeliveryPartner
+	if err := database.DB.Select("id", "name", "current_lat", "current_lng", "last_location_update").First(&partner, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Delivery partner not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":                   partner.ID,
+		"name":                 partner.Name,
+		"current_lat":          partner.CurrentLat,
+		"current_lng":          partner.CurrentLng,
+		"last_location_update": partner.LastLocationUpdate,
+	})
 }
 
 func GetMyEarnings(c *gin.Context) {

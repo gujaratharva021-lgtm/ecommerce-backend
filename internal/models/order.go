@@ -108,10 +108,27 @@ type Order struct {
 	// DeliveryStatus is the granular courier-driven delivery lifecycle
 	// state (see the DeliveryStatus* constants above). Nil until a partner
 	// is first assigned.
-	DeliveryStatus *string     `gorm:"index;size:20" json:"delivery_status,omitempty"`
-	Items          []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
-	CreatedAt      time.Time   `json:"created_at"`
-	UpdatedAt      time.Time   `json:"updated_at"`
+	DeliveryStatus *string `gorm:"index;size:20" json:"delivery_status,omitempty"`
+	// Delivery-completion OTP fields. Only the bcrypt hash is ever
+	// persisted - the plaintext code is never stored and is never
+	// serialized to JSON (json:"-"), so it can never leak through any
+	// delivery-partner or admin API response, including
+	// toAssignedOrderSummary and every other order payload.
+	// DeliveryOTPHash is set when the order moves to OUT_FOR_DELIVERY and
+	// cleared once DELIVERED succeeds (or a fresh OTP is issued).
+	DeliveryOTPHash *string `json:"-"`
+	// DeliveryOTPExpiresAt is when the current OTP stops being valid -
+	// config.DeliveryOTPExpiryMinutes after it was generated.
+	DeliveryOTPExpiresAt *time.Time `json:"-"`
+	// DeliveryOTPAttempts counts consecutive wrong-OTP guesses against the
+	// current OTP. Reset to 0 whenever a fresh OTP is generated. Once it
+	// reaches config.DeliveryOTPMaxAttempts, the OTP is locked and DELIVERED
+	// is refused until a fresh OTP is issued (i.e. the order would need to
+	// re-enter OUT_FOR_DELIVERY).
+	DeliveryOTPAttempts int         `gorm:"not null;default:0" json:"-"`
+	Items               []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	CreatedAt           time.Time   `json:"created_at"`
+	UpdatedAt           time.Time   `json:"updated_at"`
 }
 
 type OrderItem struct {
@@ -153,6 +170,10 @@ type RejectAssignmentRequest struct {
 // assign/accept flow and can't be set through this endpoint.
 type UpdateDeliveryStatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=picked_up out_for_delivery arrived delivered"`
+	// OTP is required only when Status is "delivered" - validated in
+	// services.UpdateDeliveryStatus, not by a binding tag here, so the same
+	// request struct still works for every other step.
+	OTP string `json:"otp"`
 }
 
 // OrderListResponse wraps paginated order results.

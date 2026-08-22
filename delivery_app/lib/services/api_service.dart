@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -71,6 +71,25 @@ class ApiService {
     return data;
   }
 
+  static Future<Map<String, dynamic>> updateDeliveryStatus(
+    int orderId,
+    String status, {
+    String? otp,
+  }) async {
+    final body = <String, dynamic>{'status': status};
+    if (otp != null) body['otp'] = otp;
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/orders/$orderId/delivery-status'),
+      headers: await _headers(),
+      body: jsonEncode(body),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Failed to update delivery status');
+    }
+    return data;
+  }
+
   static Future<Map<String, dynamic>> confirmDelivery(int orderId) async {
     final res = await http.put(
       Uri.parse('$baseUrl/delivery/orders/$orderId/deliver'),
@@ -110,6 +129,24 @@ class ApiService {
       headers: await _headers(),
       body: jsonEncode({'lat': lat, 'lng': lng}),
     );
+  }
+
+  static Future<Map<String, dynamic>> getAvailability() async {
+    final res = await http.get(Uri.parse('$baseUrl/delivery/availability'), headers: await _headers());
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load availability');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> updateAvailability(bool isOnline) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/availability'),
+      headers: await _headers(),
+      body: jsonEncode({'status': isOnline ? 'online' : 'offline'}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to update availability');
+    return data;
   }
 
   static Future<Map<String, dynamic>> getEarnings() async {
