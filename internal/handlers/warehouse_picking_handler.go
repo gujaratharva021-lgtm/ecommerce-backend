@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -18,7 +18,7 @@ import (
 // GET /api/v1/warehouse/picking/:order_id (warehouse staff only)
 func GetPickingTask(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 
 var task models.PickingTask
 if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
@@ -73,7 +73,7 @@ c.JSON(http.StatusOK, gin.H{
 func StartPicking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 
 var task models.PickingTask
 statusCode := http.StatusInternalServerError
@@ -127,7 +127,7 @@ Reason         string `json:"reason"`
 func MarkPickItem(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
-itemID := c.Param("item_id")
+itemID := c.Param("itemId")
 
 var req PickItemRequest
 if err := c.ShouldBindJSON(&req); err != nil {
@@ -219,7 +219,7 @@ c.JSON(http.StatusOK, item)
 // have been marked (picked/unavailable/short) - no item left pending.
 func CompletePicking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 staffID := c.MustGet("staff_id").(uint)
 
 var task models.PickingTask

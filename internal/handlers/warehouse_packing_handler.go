@@ -18,7 +18,7 @@ import (
 // GET /api/v1/warehouse/packing/:order_id (warehouse staff only)
 func GetPackingTask(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 
 var task models.PackingTask
 if err := database.DB.Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
@@ -43,7 +43,7 @@ c.JSON(http.StatusOK, gin.H{
 func StartPacking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 
 var task models.PackingTask
 statusCode := http.StatusInternalServerError
@@ -108,7 +108,7 @@ c.JSON(http.StatusOK, task)
 func CompletePacking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
-orderID := c.Param("order_id")
+orderID := c.Param("id")
 
 var task models.PackingTask
 statusCode := http.StatusInternalServerError
