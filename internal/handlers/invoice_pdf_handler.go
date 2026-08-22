@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "bytes"
@@ -52,16 +52,18 @@ pdf.ImageOptions("invoice_qr", 170, 12, 26, 26, false, opts, 0, "")
 
 // ---- Seller header ----
 pdf.SetFont("Arial", "B", 12)
-pdf.CellFormat(150, 6, "Seller Name: "+cfg.SellerCompanyName, "", 1, "L", false, 0, "")
+notConfigured := func(v string) string {
+if v == "" {
+return "Not configured"
+}
+return v
+}
+pdf.CellFormat(150, 6, "Seller Name: "+notConfigured(cfg.SellerCompanyName), "", 1, "L", false, 0, "")
 pdf.SetFont("Arial", "", 9)
-pdf.MultiCell(150, 5, cfg.SellerAddress, "", "L", false)
+pdf.MultiCell(150, 5, notConfigured(cfg.SellerAddress), "", "L", false)
 pdf.SetFont("Arial", "B", 9)
-if cfg.SellerGSTIN != "" {
-pdf.CellFormat(0, 5, "GSTIN: "+cfg.SellerGSTIN, "", 1, "L", false, 0, "")
-}
-if cfg.SellerFSSAINumber != "" {
-pdf.CellFormat(0, 5, "FSSAI: "+cfg.SellerFSSAINumber, "", 1, "L", false, 0, "")
-}
+pdf.CellFormat(0, 5, "GSTIN: "+notConfigured(cfg.SellerGSTIN), "", 1, "L", false, 0, "")
+pdf.CellFormat(0, 5, "FSSAI: "+notConfigured(cfg.SellerFSSAINumber), "", 1, "L", false, 0, "")
 pdf.Ln(2)
 pdf.SetDrawColor(0, 0, 0)
 pdf.Line(12, pdf.GetY(), 198, pdf.GetY())
