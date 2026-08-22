@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -153,6 +153,12 @@ return
 staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_packing", "order", orderID,
 "status=packing", "status=ready_for_dispatch")
+
+// Fire-and-forget: as soon as the order is ready_for_dispatch, try to
+// auto-assign the nearest available delivery partner instead of waiting
+// for an admin to manually assign one (this was the missing Zepto-style
+// instant-assignment step).
+go services.AutoAssignDeliveryPartner(task.OrderID)
 
 services.NotifyWarehouse(warehouseID, models.WhNotifyHandoverRequired,
 "Order #"+orderID+" ready for handover",
