@@ -402,6 +402,15 @@ func UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
+	if (req.Status == models.OrderStatusConfirmed || req.Status == models.OrderStatusShipped || req.Status == models.OrderStatusDelivered) &&
+		order.PaymentMethod == models.PaymentMethodOnline &&
+		order.PaymentStatus != models.OrderPaymentStatusPaid {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Cannot move an online-payment order to '" + req.Status + "' until payment is verified (payment_status is currently '" + order.PaymentStatus + "')",
+		})
+		return
+	}
+
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if req.Status == models.OrderStatusCancelled {
 			for _, item := range order.Items {
