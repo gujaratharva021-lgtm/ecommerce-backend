@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -262,9 +262,11 @@ message := "Your order #" + strconv.Itoa(int(order.ID)) + " has been placed succ
 utils.SendNotification(order.Address.Phone, message, "order_placed", &order.ID)
 services.SendPushToUser(order.UserID, "Order Placed", message)
 if order.Status == models.OrderStatusConfirmed {
-// Delivery partner assignment is admin-only now (see
-// AssignDeliveryPartner) - it no longer happens automatically the
-// moment an order is confirmed.
+                // Order confirmed at checkout time (COD, or zero-total) -
+                // try to auto-assign the nearest available delivery
+                // partner right away instead of waiting for warehouse
+                // packing to complete.
+                go services.AutoAssignDeliveryPartner(order.ID)
 if order.WarehouseID != nil {
 services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyNewOrder,
 "New order #"+strconv.Itoa(int(order.ID)),
