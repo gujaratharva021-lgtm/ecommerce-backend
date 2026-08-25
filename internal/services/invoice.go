@@ -65,35 +65,11 @@ return fmt.Errorf("failed to ensure invoice sequence exists: %w", err)
 // versioned migrations instead - but until that migration is actually
 // applied to prod, these ADD COLUMN IF NOT EXISTS statements make the
 // invoice snapshot fields self-provisioning rather than a hard failure.
-// Run as separate statements (not one multi-statement Exec) since not
-// every Postgres driver path supports batching several DDL statements
-// in a single simple-protocol call.
-addColumnStatements := []string{
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_line1 VARCHAR(255) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_line2 VARCHAR(255) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_city VARCHAR(100) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_state VARCHAR(100) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_pincode VARCHAR(20) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_inter_state BOOLEAN NOT NULL DEFAULT false`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS taxable_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS igst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
-`ALTER TABLE products ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
-`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE orders ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`,
-`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS platform_fee DOUBLE PRECISION NOT NULL DEFAULT 0`,
-}
-for _, stmt := range addColumnStatements {
-if err := tx.Exec(stmt).Error; err != nil {
-return fmt.Errorf("failed to ensure invoice columns exist: %w", err)
-}
-}
+// Schema patches for these columns now run once at startup (see
+// EnsureInvoiceSchemaPatches in database.go) instead of inside this
+// per-invoice transaction - running ALTER TABLE here took an ACCESS
+// EXCLUSIVE lock on every invoice generation and deadlocked against
+// AutoAssignDeliveryPartner's concurrent row updates on orders.
 var seqVal int64
 if err := tx.Raw("SELECT nextval('invoice_number_seq')").Scan(&seqVal).Error; err != nil {
 return fmt.Errorf("failed to allocate invoice number: %w", err)
