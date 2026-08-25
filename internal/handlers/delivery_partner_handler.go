@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"errors"
@@ -166,7 +166,7 @@ func AssignDeliveryPartner(c *gin.Context) {
 		// concurrent assignment (admin or auto-assign) for the same
 		// order has to wait, rather than racing on the read-then-write
 		// below.
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, orderID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Address").First(&order, orderID).Error; err != nil {
 			return errAssignOrderNotFound
 		}
 
@@ -253,6 +253,12 @@ func AssignDeliveryPartner(c *gin.Context) {
 // deliberately surfaces only what a courier needs to fulfil the delivery -
 // it does not include the customer's account/user record, other saved
 // addresses, product cost/margin fields, etc.
+type OrderItemSummary struct {
+ProductName string  `json:"product_name"`
+Quantity    int     `json:"quantity"`
+Price       float64 `json:"price"`
+}
+
 type AssignedOrderSummary struct {
 	OrderID             uint       `json:"order_id"`
 	Status              string     `json:"status"`
@@ -266,6 +272,7 @@ type AssignedOrderSummary struct {
 	TotalAmount         float64    `json:"total_amount"`
 	PaymentMethod       string     `json:"payment_method"`
 	ItemCount           int        `json:"item_count"`
+Items               []OrderItemSummary `json:"items"`
 	CreatedAt           time.Time  `json:"created_at"`
 }
 
@@ -274,7 +281,15 @@ func toAssignedOrderSummary(o models.Order) AssignedOrderSummary {
 	if o.Address.Line2 != "" {
 		addr = fmt.Sprintf("%s, %s, %s, %s - %s", o.Address.Line1, o.Address.Line2, o.Address.City, o.Address.State, o.Address.Pincode)
 	}
-	return AssignedOrderSummary{
+	itemSummaries := make([]OrderItemSummary, 0, len(o.Items))
+for _, it := range o.Items {
+itemSummaries = append(itemSummaries, OrderItemSummary{
+ProductName: it.Product.Name,
+Quantity:    it.Quantity,
+Price:       it.Price,
+})
+}
+return AssignedOrderSummary{
 		OrderID:             o.ID,
 		Status:              o.Status,
 		AssignmentStatus:    o.DeliveryAssignmentStatus,
@@ -287,6 +302,7 @@ func toAssignedOrderSummary(o models.Order) AssignedOrderSummary {
 		TotalAmount:         o.TotalAmount,
 		PaymentMethod:       o.PaymentMethod,
 		ItemCount:           len(o.Items),
+Items:               itemSummaries,
 		CreatedAt:           o.CreatedAt,
 	}
 }
@@ -304,7 +320,7 @@ func GetMyDeliveries(c *gin.Context) {
 
 	query := database.DB.
 		Preload("Address").
-		Preload("Items").
+		Preload("Items.Product").
 		Where("delivery_partner_id = ?", partnerID)
 
 	if status := c.Query("status"); status != "" {
@@ -609,3 +625,13 @@ func GetMyEarnings(c *gin.Context) {
 		"entries":           entries,
 	})
 }
+
+
+
+
+
+
+
+
+
+
