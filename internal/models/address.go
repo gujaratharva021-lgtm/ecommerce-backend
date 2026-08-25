@@ -23,6 +23,7 @@ Pincode   string    `gorm:"not null" json:"pincode"`
 Lat       *float64  `json:"lat,omitempty"`
 Lng       *float64  `json:"lng,omitempty"`
 IsDefault bool      `gorm:"default:false" json:"is_default"`
+IsDeleted bool      `gorm:"default:false;index" json:"-"`
 CreatedAt time.Time `json:"created_at"`
 UpdatedAt time.Time `json:"updated_at"`
 }
@@ -41,3 +42,4 @@ Lat       *float64 `json:"lat"`
 Lng       *float64 `json:"lng"`
 IsDefault bool     `json:"is_default"`
 }
+

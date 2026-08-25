@@ -1,4 +1,4 @@
-package database
+﻿package database
 import (
 	"log"
 	"time"
@@ -449,6 +449,48 @@ seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
 log.Fatalf("Failed to drop NOT NULL on ledger_entries.created_by_id: %v", err)
 }
-
-	RunMISMigration()
+if err := DB.Exec(`ALTER TABLE addresses ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
+log.Fatalf("Failed to add is_deleted column to addresses: %v", err)
 }
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_addresses_is_deleted ON addresses(is_deleted)`).Error; err != nil {
+log.Fatalf("Failed to create addresses is_deleted index: %v", err)
+}
+
+    RunMISMigration()
+}
+// EnsureInvoiceSchemaPatches applies the invoice-related idempotent schema
+// patches once at startup, instead of running them inside every
+// GenerateInvoiceIfNotExists transaction (which took an ACCESS EXCLUSIVE
+// lock on orders/invoices on every call and deadlocked against
+// AutoAssignDeliveryPartner row locks).
+func EnsureInvoiceSchemaPatches() {
+if err := DB.Exec("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1").Error; err != nil {
+log.Fatalf("Failed to ensure invoice sequence exists: %v", err)
+}
+invoiceColumnStatements := []string{
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_line1 VARCHAR(255) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_line2 VARCHAR(255) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_city VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_state VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address_pincode VARCHAR(20) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_inter_state BOOLEAN NOT NULL DEFAULT false`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS taxable_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS igst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_percent DOUBLE PRECISION NOT NULL DEFAULT 0`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
+`ALTER TABLE products ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(20) NOT NULL DEFAULT ''`,
+`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS gst_amount DOUBLE PRECISION NOT NULL DEFAULT 0`,
+}
+for _, stmt := range invoiceColumnStatements {
+if err := DB.Exec(stmt).Error; err != nil {
+log.Fatalf("Failed to ensure invoice columns exist: %v", err)
+}
+}
+}
+
+

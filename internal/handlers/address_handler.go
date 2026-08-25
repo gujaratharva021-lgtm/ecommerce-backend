@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -15,7 +15,7 @@ userID := c.MustGet("user_id").(uint)
 
 var addresses []models.Address
 if err := database.DB.
-Where("user_id = ?", userID).
+Where("user_id = ? AND is_deleted = false", userID).
 Order("is_default DESC, created_at DESC").
 Find(&addresses).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load addresses"})
@@ -139,7 +139,7 @@ c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this addr
 return
 }
 
-if err := database.DB.Delete(&address).Error; err != nil {
+if err := database.DB.Model(&address).Update("is_deleted", true).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete address"})
 return
 }
@@ -147,7 +147,7 @@ return
 if address.IsDefault {
 var nextAddress models.Address
 if err := database.DB.
-Where("user_id = ?", userID).
+Where("user_id = ? AND is_deleted = false", userID).
 Order("created_at DESC").
 First(&nextAddress).Error; err == nil {
 database.DB.Model(&nextAddress).Update("is_default", true)
@@ -185,3 +185,5 @@ return
 
 c.JSON(http.StatusOK, address)
 }
+
+
