@@ -242,12 +242,39 @@ return err
 // pricier, absorb the difference rather than charging the customer
 // more than they agreed to pay.
 priceDiff := (orderItem.Price - substituteProduct.Price) * float64(sub.Quantity)
+originalPrice := orderItem.Price
+if sub.Quantity >= orderItem.Quantity {
+// Full-line substitution: every unit on this order line is being
+// substituted, so it's safe to swap the existing row in place.
 orderItem.ProductID = sub.SubstituteProductID
-if substituteProduct.Price < orderItem.Price {
+if substituteProduct.Price < originalPrice {
 orderItem.Price = substituteProduct.Price
 }
 if err := tx.Save(&orderItem).Error; err != nil {
 return err
+}
+} else {
+// Partial substitution: only sub.Quantity of the line's units are
+// being substituted. Shrink the original line and add a separate
+// order item for the substituted units, instead of converting the
+// whole line (which would corrupt quantity/inventory accounting).
+orderItem.Quantity -= sub.Quantity
+if err := tx.Save(&orderItem).Error; err != nil {
+return err
+}
+substitutePrice := originalPrice
+if substituteProduct.Price < originalPrice {
+substitutePrice = substituteProduct.Price
+}
+newItem := models.OrderItem{
+OrderID:   order.ID,
+ProductID: sub.SubstituteProductID,
+Quantity:  sub.Quantity,
+Price:     substitutePrice,
+}
+if err := tx.Create(&newItem).Error; err != nil {
+return err
+}
 }
 
 if priceDiff > 0 {

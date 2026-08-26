@@ -505,7 +505,13 @@ return err
 }
 }
 
-return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
+return tx.Model(&order).Updates(map[string]interface{}{
+"status":                      models.OrderStatusCancelled,
+"delivery_partner_id":         nil,
+"delivery_assignment_status":  nil,
+"delivery_status":             nil,
+"delivery_assignment_expires_at": nil,
+}).Error
 })
 
 if txErr != nil {
@@ -529,6 +535,15 @@ services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyOrderCancelled,
 "Order #"+orderID+" cancelled",
 "Customer cancelled this order before it left the warehouse.", &order.ID, nil)
 }
+
+// The delivery partner (if one had already been assigned before
+// cancellation) is no longer responsible for this order - the DB
+// fields were cleared above, but this in-memory order snapshot still
+// has the pre-cancellation partner, so use it to notify them.
+if order.DeliveryPartner != nil {
+utils.SendNotification(order.DeliveryPartner.Phone, "Order #"+orderID+" was cancelled by the customer and is no longer assigned to you.", "delivery_order_cancelled", &order.ID)
+}
 c.JSON(http.StatusOK, order)
 }
+
 

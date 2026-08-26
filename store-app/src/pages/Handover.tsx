@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { listWarehouseOrders, handoverOrder as handoverOrderApi } from '../api/warehouse'
 import type { Order } from '../types/warehouse'
 import { getErrorMessage } from '../utils/errors'
@@ -37,7 +37,11 @@ export default function Handover() {
   }
 
   async function handleConfirmHandover() {
-    if (!handoverTarget || !handoverTarget.delivery_partner) return
+    if (!handoverTarget) return
+    if (!handoverTarget.delivery_partner) {
+      setHandoverError('This order has no delivery partner assigned yet. Assign one before confirming handover.')
+      return
+    }
     setHandoverSubmitting(true)
     setHandoverError(null)
     try {
@@ -177,3 +181,4 @@ export default function Handover() {
     </div>
   )
 }
+

@@ -170,7 +170,7 @@ func AssignDeliveryPartner(c *gin.Context) {
 			return errAssignOrderNotFound
 		}
 
-		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusShipped {
+		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusReadyForDispatch && order.Status != models.OrderStatusShipped {
 			return errAssignBadOrderStatus
 		}
 
@@ -625,6 +625,7 @@ func GetMyEarnings(c *gin.Context) {
 		"entries":           entries,
 	})
 }
+
 
 
 

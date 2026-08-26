@@ -1,4 +1,4 @@
-package services
+﻿package services
 
 import (
 	"errors"
@@ -158,7 +158,7 @@ func pickEligiblePartnerExcluding(tx *gorm.DB, order *models.Order, exclude map[
 	var loads []loadRow
 	if err := tx.Model(&models.Order{}).
 		Select("delivery_partner_id, count(*) as cnt").
-		Where("delivery_partner_id IS NOT NULL AND status IN ?", []string{models.OrderStatusConfirmed, models.OrderStatusShipped}).
+		Where("delivery_partner_id IS NOT NULL AND status IN ?", []string{models.OrderStatusConfirmed, models.OrderStatusPicking, models.OrderStatusPicked, models.OrderStatusPacking, models.OrderStatusPacked, models.OrderStatusReadyForDispatch, models.OrderStatusHandedOver, models.OrderStatusShipped}).
 		Group("delivery_partner_id").
 		Scan(&loads).Error; err != nil {
 		return nil, fmt.Errorf("failed to load partner workloads: %w", err)
@@ -347,3 +347,4 @@ func ExpireStaleAssignments() {
 		TryAssignNextPartner(id)
 	}
 }
+

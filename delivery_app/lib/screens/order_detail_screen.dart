@@ -303,7 +303,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Items ($itemCount)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
                   ...(_order['items'] as List<dynamic>? ?? []).map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -337,7 +337,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Text(_error!, style: const TextStyle(color: Colors.red)),
           ],
           const SizedBox(height: 20),
-          if (canProgressOrder && status == 'confirmed')
+          if (canProgressOrder && status == 'handed_over')
             ElevatedButton(
               onPressed: _loading ? null : _markShipped,
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
@@ -453,6 +453,8 @@ class _CountdownTextState extends State<_CountdownText> {
     );
   }
 }
+
+
 
 
 
