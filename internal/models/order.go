@@ -88,6 +88,11 @@ type Order struct {
 	DeliveryCharge    float64          `gorm:"not null;default:0" json:"delivery_charge"`
 	PlatformFee       float64          `gorm:"not null;default:0" json:"platform_fee"`
 	WalletAmountUsed  float64          `gorm:"not null;default:0" json:"wallet_amount_used"`
+// CouponDiscount is not a DB column - it's populated from the OrderCoupon
+// table (if one exists for this order) by GetOrders/GetOrderByID so the
+// customer app can display/account for the coupon discount without a
+// separate API call.
+CouponDiscount    float64          `gorm:"-" json:"coupon_discount"`
 	TotalAmount       float64          `gorm:"not null" json:"total_amount"`
 	Status            string           `gorm:"default:pending;index:idx_orders_warehouse_status,priority:2" json:"status"` // pending/confirmed/shipped/delivered/cancelled
 	PaymentMethod     string           `gorm:"default:cod" json:"payment_method"`                                          // cod/online
@@ -186,3 +191,4 @@ type OrderListResponse struct {
 	Total      int64   `json:"total"`
 	TotalPages int     `json:"total_pages"`
 }
+

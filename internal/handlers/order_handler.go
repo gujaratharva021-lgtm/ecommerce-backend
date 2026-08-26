@@ -375,6 +375,24 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load orders"})
 return
 }
 
+// Batch-fetch coupon discounts for all orders on this page in one query
+// (instead of N+1) and attach them to each order.
+if len(orders) > 0 {
+orderIDs := make([]uint, len(orders))
+for i, o := range orders {
+orderIDs[i] = o.ID
+}
+var orderCoupons []models.OrderCoupon
+database.DB.Where("order_id IN ?", orderIDs).Find(&orderCoupons)
+discountByOrderID := make(map[uint]float64, len(orderCoupons))
+for _, oc := range orderCoupons {
+discountByOrderID[oc.OrderID] = oc.DiscountAmount
+}
+for i := range orders {
+orders[i].CouponDiscount = discountByOrderID[orders[i].ID]
+}
+}
+
 totalPages := int((total + int64(limit) - 1) / int64(limit))
 c.JSON(http.StatusOK, models.OrderListResponse{
 Orders:     orders,
@@ -399,6 +417,11 @@ return
 if order.UserID != userID {
 c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this order"})
 return
+}
+
+var orderCoupon models.OrderCoupon
+if err := database.DB.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == nil {
+order.CouponDiscount = orderCoupon.DiscountAmount
 }
 
 c.JSON(http.StatusOK, order)
