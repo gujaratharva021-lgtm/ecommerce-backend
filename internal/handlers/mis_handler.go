@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "encoding/json"
@@ -85,7 +85,7 @@ database.DB.Raw(`SELECT COALESCE(SUM(oi.quantity * p.cost_price),0) FROM order_i
 m["cogs"] = v
 
 m["gross_revenue"] = m["product_sales"] + m["delivery"] + m["platform_fee"]
-m["net_revenue"] = m["gross_revenue"] - m["discounts"] - m["refunds"] - m["cancellations"]
+m["net_revenue"] = m["gross_revenue"] - m["discounts"] - m["refunds"]
 m["gross_profit"] = m["net_revenue"] - m["cogs"]
 if m["net_revenue"] != 0 {
 m["gross_margin_pct"] = m["gross_profit"] / m["net_revenue"] * 100
@@ -435,3 +435,4 @@ xf.SetSheetRow(sheet, cell, &[]interface{}{e.RowKey, string(b)})
 xf.SetColWidth(sheet, "A", "A", 20)
 xf.SetColWidth(sheet, "B", "B", 60)
 }
+

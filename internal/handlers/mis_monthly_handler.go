@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "fmt"
@@ -105,7 +105,7 @@ prev := calcMonthlyAgg(prevStart, prevEnd)
 ytd := calcMonthlyAgg(ytdStart, end)
 
 netRev := func(a monthlyAgg) float64 {
-return a.productSales + a.delivery - a.discounts - a.refunds - a.cancellationsAmt
+return a.productSales + a.delivery - a.discounts - a.refunds
 }
 netRevCur, netRevPrev, netRevYTD := netRev(cur), netRev(prev), netRev(ytd)
 gpCur, gpPrev, gpYTD := netRevCur-cur.cogs, netRevPrev-prev.cogs, netRevYTD-ytd.cogs
@@ -180,7 +180,7 @@ prev := calcMonthlyAgg(prevStart, prevEnd)
 ytd := calcMonthlyAgg(ytdStart, end)
 
 netRev := func(a monthlyAgg) float64 {
-return a.productSales + a.delivery - a.discounts - a.refunds - a.cancellationsAmt
+return a.productSales + a.delivery - a.discounts - a.refunds
 }
 netRevCur, netRevPrev, netRevYTD := netRev(cur), netRev(prev), netRev(ytd)
 gpCur, gpPrev, gpYTD := netRevCur-cur.cogs, netRevPrev-prev.cogs, netRevYTD-ytd.cogs
@@ -277,3 +277,4 @@ var _ = math.Round
 func monthBoundsYearStart(t time.Time) time.Time {
 return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
 }
+

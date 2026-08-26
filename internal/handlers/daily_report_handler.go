@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "fmt"
@@ -57,26 +57,26 @@ database.DB.Model(&models.Order{}).Where(f+" AND status = ?", start, end, "cance
 database.DB.Model(&models.Order{}).Where(f+" AND status = ?", start, end, "pending").Count(&s.PendingOrders)
 
 database.DB.Model(&models.Order{}).
-Where(f+" AND status != ?", start, end, "cancelled").
+Where(f+" AND status NOT IN (?, ?)", start, end, "cancelled", "returned").
 Select("COALESCE(SUM(total_amount), 0)").Scan(&s.TotalRevenue)
 
 database.DB.Model(&models.Order{}).
-Where(f+" AND status != ? AND payment_method = ?", start, end, "cancelled", "cod").
+Where(f+" AND status NOT IN (?, ?) AND payment_method = ?", start, end, "cancelled", "returned", "cod").
 Select("COALESCE(SUM(total_amount), 0)").Scan(&s.CODRevenue)
 
 database.DB.Model(&models.Order{}).
-Where(f+" AND status != ? AND payment_method = ?", start, end, "cancelled", "online").
+Where(f+" AND status NOT IN (?, ?) AND payment_method = ?", start, end, "cancelled", "returned", "online").
 Select("COALESCE(SUM(total_amount), 0)").Scan(&s.OnlineRevenue)
 
 database.DB.Model(&models.Order{}).Where(f+" AND payment_method = ?", start, end, "cod").Count(&s.CODOrders)
 database.DB.Model(&models.Order{}).Where(f+" AND payment_method = ?", start, end, "online").Count(&s.OnlineOrders)
 
 database.DB.Model(&models.Order{}).
-Where(f+" AND status != ?", start, end, "cancelled").
+Where(f+" AND status NOT IN (?, ?)", start, end, "cancelled", "returned").
 Select("COALESCE(SUM(delivery_charge), 0)").Scan(&s.TotalDeliveryFee)
 
 database.DB.Model(&models.Order{}).
-Where(f+" AND status != ?", start, end, "cancelled").
+Where(f+" AND status NOT IN (?, ?)", start, end, "cancelled", "returned").
 Select("COALESCE(SUM(wallet_amount_used), 0)").Scan(&s.TotalWalletUsed)
 
 nonCancelled := s.TotalOrders - s.CancelledOrders
@@ -208,3 +208,4 @@ if err := xf.Write(c.Writer); err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file"})
 }
 }
+
