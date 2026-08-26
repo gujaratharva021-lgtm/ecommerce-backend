@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -12,6 +12,7 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Map<String, dynamic> _order;
+  late final int _orderId;
   bool _loading = false;
   String? _error;
 
@@ -19,6 +20,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _order = widget.order;
+    // Cache the id from the initial list summary (keyed "order_id") once.
+    // Action responses below return the raw Order model instead (keyed
+    // "id" with a different field set entirely), so re-reading
+    // _order['order_id'] after any action would be null - see BUG-37.
+    _orderId = (_order['order_id'] as num).toInt();
+  }
+
+  // Merges fields from a raw Order response (returned by the action
+  // endpoints below) into the existing summary-shaped _order map,
+  // translating field names that differ between the two shapes
+  // (e.g. "delivery_assignment_status" -> "assignment_status").
+  // Never replaces _order wholesale - see BUG-37.
+  void _applyOrderUpdate(Map<String, dynamic> rawOrder) {
+    setState(() {
+      _order = {
+        ..._order,
+        'status': rawOrder['status'] ?? _order['status'],
+        'assignment_status': rawOrder['delivery_assignment_status'],
+        'rejection_reason': rawOrder['delivery_rejection_reason'],
+        'assignment_expires_at': rawOrder['delivery_assignment_expires_at'],
+        'delivery_status': rawOrder['delivery_status'],
+      };
+    });
   }
 
   Future<void> _markShipped() async {
@@ -27,9 +51,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.markShipped(_order['order_id']);
+      final data = await ApiService.markShipped(_orderId);
+      _applyOrderUpdate(data['order']);
       setState(() {
-        _order = data['order'];
         _loading = false;
       });
     } catch (e) {
@@ -46,13 +70,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.updateDeliveryStatus(_order['order_id'], status, otp: otp);
-      setState(() {
-        _order = data['order'];
-      });
+      final data = await ApiService.updateDeliveryStatus(_orderId, status, otp: otp);
+      _applyOrderUpdate(data['order']);
       if (status == 'delivered') {
-        final confirmData = await ApiService.confirmDelivery(_order['order_id']);
-        setState(() => _order = confirmData['order']);
+        final confirmData = await ApiService.confirmDelivery(_orderId);
+        _applyOrderUpdate(confirmData['order']);
       }
       setState(() => _loading = false);
     } catch (e) {
@@ -94,9 +116,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.acceptAssignment(_order['order_id']);
+      final data = await ApiService.acceptAssignment(_orderId);
+      _applyOrderUpdate(data['order']);
       setState(() {
-        _order = data['order'];
         _loading = false;
       });
     } catch (e) {
@@ -134,9 +156,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _error = null;
     });
     try {
-      final data = await ApiService.rejectAssignment(_order['order_id'], reason: reasonController.text);
+      final data = await ApiService.rejectAssignment(_orderId, reason: reasonController.text);
+      _applyOrderUpdate(data['order']);
       setState(() {
-        _order = data['order'];
         _loading = false;
       });
     } catch (e) {
@@ -164,7 +186,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final canProgressOrder = assignmentStatus == null || assignmentStatus == 'accepted';
 
     return Scaffold(
-      appBar: AppBar(title: Text('Order #${_order['order_id']}')),
+      appBar: AppBar(title: Text('Order #$_orderId')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -283,7 +305,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 children: [
                   const Text('Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
-                  Text('$itemCount item(s)'),
+                  ...(_order['items'] as List<dynamic>? ?? []).map((item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text("${item['product_name']} x${item['quantity']}")),
+                        Text("\u20B9${item['price']}"),
+                      ],
+                    ),
+                  )),
+
                   const Divider(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -421,3 +453,6 @@ class _CountdownTextState extends State<_CountdownText> {
     );
   }
 }
+
+
+
