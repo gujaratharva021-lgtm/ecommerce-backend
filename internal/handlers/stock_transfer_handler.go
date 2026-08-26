@@ -43,7 +43,7 @@ return
 
 var destWarehouse models.Warehouse
 if err := database.DB.First(&destWarehouse, req.ToWarehouseID).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Destination warehouse not found"})
+c.JSON(http.StatusNotFound, gin.H{"error": "Supplying warehouse not found"})
 return
 }
 
@@ -55,8 +55,8 @@ return
 
 transfer := models.StockTransfer{
 ProductID:       req.ProductID,
-FromWarehouseID: staff.WarehouseID,
-ToWarehouseID:   req.ToWarehouseID,
+FromWarehouseID: req.ToWarehouseID,
+ToWarehouseID:   staff.WarehouseID,
 Quantity:        req.Quantity,
 Status:          models.StockTransferPending,
 RequestedBy:     staffID,
@@ -233,8 +233,8 @@ c.JSON(http.StatusNotFound, gin.H{"error": "Stock transfer not found"})
 return
 }
 
-if transfer.ToWarehouseID != staff.WarehouseID {
-c.JSON(http.StatusForbidden, gin.H{"error": "Only the destination warehouse can approve this transfer"})
+if transfer.FromWarehouseID != staff.WarehouseID {
+c.JSON(http.StatusForbidden, gin.H{"error": "Only the supplying warehouse can approve this transfer"})
 return
 }
 
