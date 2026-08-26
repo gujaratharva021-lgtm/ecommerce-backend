@@ -76,7 +76,7 @@ export default function Cart() {
 
             <div className="flex items-center border border-line rounded-lg">
               <button
-                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                onClick={() => item.quantity <= 1 ? handleRemove(item.id) : handleQuantityChange(item.id, item.quantity - 1)}
                 disabled={busyId === item.id}
                 className="w-8 h-8 flex items-center justify-center hover:bg-line/40 disabled:opacity-50"
               >
