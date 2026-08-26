@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "log"
@@ -277,6 +277,10 @@ case models.PaymentStatusFailed:
 order.PaymentStatus = models.OrderPaymentStatusFailed
 case models.PaymentStatusCreated:
 order.PaymentStatus = models.OrderPaymentStatusPending
+case models.PaymentStatusRefunded:
+order.PaymentStatus = models.OrderPaymentStatusRefunded
+case models.PaymentStatusPartiallyRefunded:
+order.PaymentStatus = models.OrderPaymentStatusPartiallyRefunded
 }
 database.DB.Save(&order)
 

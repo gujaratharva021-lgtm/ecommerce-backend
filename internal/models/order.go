@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import "time"
 
@@ -27,6 +27,8 @@ const (
 	OrderPaymentStatusPending = "pending"
 	OrderPaymentStatusPaid    = "paid"
 	OrderPaymentStatusFailed  = "failed"
+    OrderPaymentStatusRefunded = "refunded"
+    OrderPaymentStatusPartiallyRefunded = "partially_refunded"
 )
 
 // Delivery assignment lifecycle. This tracks the state of the *courier's*

@@ -43,12 +43,13 @@ var existing models.DeviceToken
 result := database.DB.Where("token = ?", req.Token).First(&existing)
 if result.Error == nil {
 existing.Platform = req.Platform
-if userID != nil {
+// Always set both fields from the current auth context - clearing
+// whichever role ID is NOT present this time - so a token reused across
+// roles (e.g. same device logged in as customer, then later as a
+// delivery partner) never keeps a stale pointer to the previous role
+// and leaks push notifications to the wrong recipient.
 existing.UserID = userID
-}
-if deliveryPartnerID != nil {
 existing.DeliveryPartnerID = deliveryPartnerID
-}
 database.DB.Save(&existing)
 c.JSON(http.StatusOK, gin.H{"message": "Token refreshed"})
 return
@@ -66,3 +67,4 @@ return
 }
 c.JSON(http.StatusCreated, gin.H{"message": "Token registered"})
 }
+
