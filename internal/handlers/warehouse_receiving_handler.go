@@ -196,6 +196,11 @@ statusCode = http.StatusBadRequest
 return errors.New("Only received records can go through QC, current status: " + rec.Status)
 }
 
+if req.Action != "accept" && req.Action != "reject" {
+statusCode = http.StatusBadRequest
+return errors.New("action must be either \"accept\" or \"reject\"")
+}
+
 if req.Action == "accept" && (req.AcceptedQuantity <= 0 || req.AcceptedQuantity > rec.ReceivedQuantity) {
 statusCode = http.StatusBadRequest
 return errors.New("accepted_quantity must be between 1 and received_quantity")
@@ -330,3 +335,4 @@ services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "receiv
 
 c.JSON(http.StatusOK, rec)
 }
+

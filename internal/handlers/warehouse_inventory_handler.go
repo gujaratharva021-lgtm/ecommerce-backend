@@ -93,7 +93,7 @@ return
 
 offset := (query.Page - 1) * query.Limit
 var invs []models.Inventory
-if err := db.Preload("Product").Preload("Product.Category").Preload("Bin.Rack.Zone").
+if err := db.Select("inventories.*").Preload("Product").Preload("Product.Category").Preload("Bin.Rack.Zone").
 Order("inventories.stock ASC").Offset(offset).Limit(query.Limit).Find(&invs).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch inventory"})
 return
