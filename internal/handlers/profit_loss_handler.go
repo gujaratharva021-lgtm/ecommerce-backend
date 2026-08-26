@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -76,6 +76,7 @@ grossProfit := grossRevenue - cogs
 var operatingExpenses float64
 database.DB.Table("expenses").
 Where("expense_date >= ? AND expense_date < ?", from, to).
+Where("approval_status IN ?", []string{"approved", "paid"}).
 Select("COALESCE(SUM(amount),0)").
 Scan(&operatingExpenses)
 
@@ -93,3 +94,4 @@ c.JSON(http.StatusOK, gin.H{
 "net_profit":          ebitda,
 })
 }
+

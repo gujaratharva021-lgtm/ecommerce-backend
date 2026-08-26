@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "log"
@@ -11,6 +11,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // ---- Vendors ----
@@ -288,11 +290,6 @@ c.JSON(http.StatusCreated, toVendorBillResponse(bill))
 // surface as an error, not get quietly capped and hide the mistake.
 func PayVendorBill(c *gin.Context) {
 id := c.Param("id")
-var bill models.VendorBill
-if err := database.DB.First(&bill, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Vendor bill not found"})
-return
-}
 
 var req models.VendorBillPaymentRequest
 if err := c.ShouldBindJSON(&req); err != nil {
@@ -300,14 +297,33 @@ c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 return
 }
 
+var bill models.VendorBill
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+// Lock the row for the duration of this transaction so two concurrent
+// payments on the same bill can't both read the same AmountPaid and
+// both pass the remaining-balance check.
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&bill, id).Error; err != nil {
+return err
+}
+
 remaining := bill.Amount - bill.AmountPaid
 if req.Amount > remaining {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Payment exceeds remaining balance of the bill"})
-return
+return gorm.ErrInvalidData
 }
 
 bill.AmountPaid += req.Amount
-if err := database.DB.Save(&bill).Error; err != nil {
+return tx.Save(&bill).Error
+})
+
+if txErr != nil {
+if txErr == gorm.ErrInvalidData {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Payment exceeds remaining balance of the bill"})
+return
+}
+if txErr == gorm.ErrRecordNotFound {
+c.JSON(http.StatusNotFound, gin.H{"error": "Vendor bill not found"})
+return
+}
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record payment"})
 return
 }
