@@ -82,6 +82,18 @@ if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == n
 discountAmount = orderCoupon.DiscountAmount
 }
 
+// Section 15(3) CGST Act: trade discounts must reduce the taxable
+// value before GST is computed. Apply the coupon discount
+// proportionally across line items via a ratio on ItemsAmount.
+discountRatio := 1.0
+if order.ItemsAmount > 0 {
+netItemsAmount := order.ItemsAmount - discountAmount
+if netItemsAmount < 0 {
+netItemsAmount = 0
+}
+discountRatio = netItemsAmount / order.ItemsAmount
+}
+
 // Gateway transaction reference for online payments only - COD has no
 // gateway leg, so this stays blank rather than a fabricated value.
 paymentReference := ""
@@ -113,7 +125,7 @@ amount  float64
 itemGST := make([]gstLine, len(order.Items))
 
 for i, item := range order.Items {
-lineTotal := item.Price * float64(item.Quantity)
+lineTotal := item.Price * float64(item.Quantity) * discountRatio
 gstPercent := item.Product.GSTPercent
 taxableLine := lineTotal
 gstLineAmount := 0.0
@@ -228,3 +240,4 @@ return nil, txErr
 }
 return &invoice, nil
 }
+
