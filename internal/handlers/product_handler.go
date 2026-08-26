@@ -67,10 +67,10 @@ func GetProducts(c *gin.Context) {
 		db = db.Where("price <= ?", query.MaxPrice)
 	}
 
-	// Filter by stock availability (joins inventory)
+// Filter by stock availability (correlated subquery avoids duplicate rows from a JOIN)
 	if query.InStock != nil {
-		db = db.Joins("JOIN inventories ON inventories.product_id = products.id").
-			Where("inventories.in_stock = ?", *query.InStock)
+db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = ?)", *query.InStock)
+
 	}
 
 	// Count total before pagination
