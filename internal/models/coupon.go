@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import "time"
 
@@ -19,6 +19,7 @@ type Coupon struct {
 	MinOrderAmount    float64   `gorm:"default:0" json:"min_order_amount"`
 	MaxDiscountAmount *float64  `json:"max_discount_amount,omitempty"` // optional cap, mainly for percentage coupons
 	UsageLimit        int       `gorm:"default:1" json:"usage_limit"`
+    PerUserLimit      int       `gorm:"default:1" json:"per_user_limit"`
 	UsedCount         int       `gorm:"default:0" json:"used_count"`
 	ExpiryDate        time.Time `json:"expiry_date"`
 	IsActive          bool      `gorm:"default:true" json:"is_active"`
@@ -27,7 +28,7 @@ type Coupon struct {
 }
 
 // OrderCoupon records which coupon was applied to a given order and how much
-// discount it gave. One row per order — an order can only use one coupon.
+// discount it gave. One row per order â€” an order can only use one coupon.
 type OrderCoupon struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	OrderID        uint      `gorm:"uniqueIndex;not null" json:"order_id"`
@@ -46,6 +47,7 @@ type CreateCouponRequest struct {
 	MinOrderAmount    float64  `json:"min_order_amount"`
 	MaxDiscountAmount *float64 `json:"max_discount_amount"`
 	UsageLimit        int      `json:"usage_limit"`
+    PerUserLimit      int      `json:"per_user_limit"`
 	ExpiryDate        string   `json:"expiry_date" binding:"required"` // format: "2006-01-02"
 }
 

@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"errors"
@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	ErrCouponNotFound = errors.New("coupon not found")
-	ErrCouponInactive = errors.New("this coupon is no longer active")
-	ErrCouponExpired  = errors.New("this coupon has expired")
-	ErrCouponUsedUp   = errors.New("this coupon has reached its usage limit")
-	ErrMinOrderNotMet = errors.New("order amount does not meet the minimum required for this coupon")
+	ErrCouponNotFound         = errors.New("coupon not found")
+	ErrCouponInactive         = errors.New("this coupon is no longer active")
+	ErrCouponExpired          = errors.New("this coupon has expired")
+	ErrCouponUsedUp           = errors.New("this coupon has reached its usage limit")
+	ErrMinOrderNotMet         = errors.New("order amount does not meet the minimum required for this coupon")
+	ErrCouponUserLimitReached = errors.New("you have already used this coupon the maximum number of times")
 )
 
 // ValidateCoupon checks a coupon code against an order amount and returns the
@@ -26,7 +27,7 @@ var (
 // checkout always agree on the discount. Pass database.DB for a standalone
 // check, or a *gorm.DB transaction (tx) when validating inside Checkout so
 // the read is consistent with the rest of that transaction.
-func ValidateCoupon(db *gorm.DB, code string, orderAmount float64) (*models.Coupon, float64, error) {
+func ValidateCoupon(db *gorm.DB, code string, orderAmount float64, userID uint) (*models.Coupon, float64, error) {
 	var coupon models.Coupon
 	if err := db.Where("UPPER(code) = UPPER(?)", code).First(&coupon).Error; err != nil {
 		return nil, 0, ErrCouponNotFound
@@ -39,6 +40,22 @@ func ValidateCoupon(db *gorm.DB, code string, orderAmount float64) (*models.Coup
 	}
 	if coupon.UsedCount >= coupon.UsageLimit {
 		return nil, 0, ErrCouponUsedUp
+	}
+
+	// Per-user usage limit: count how many of this user's orders have
+	// already used this coupon, joining through orders so we don't need
+	// a denormalized user_id on order_coupons itself.
+	perUserLimit := coupon.PerUserLimit
+	if perUserLimit <= 0 {
+		perUserLimit = 1
+	}
+	var userUsage int64
+	db.Table("order_coupons").
+		Joins("JOIN orders ON orders.id = order_coupons.order_id").
+		Where("order_coupons.coupon_id = ? AND orders.user_id = ?", coupon.ID, userID).
+		Count(&userUsage)
+	if int(userUsage) >= perUserLimit {
+		return nil, 0, ErrCouponUserLimitReached
 	}
 	if orderAmount < coupon.MinOrderAmount {
 		return nil, 0, ErrMinOrderNotMet
@@ -91,13 +108,14 @@ func ApplyCoupon(db *gorm.DB, coupon *models.Coupon, orderID uint, discount floa
 // Lets the frontend show a discount preview on the checkout screen before
 // actually placing the order.
 func ValidateCouponHandler(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
 	var req models.ValidateCouponRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	coupon, discount, err := ValidateCoupon(database.DB, req.Code, req.OrderAmount)
+	coupon, discount, err := ValidateCoupon(database.DB, req.Code, req.OrderAmount, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -124,11 +142,11 @@ func CreateCoupon(c *gin.Context) {
 	}
 
 	expiry, err := time.Parse("2006-01-02", req.ExpiryDate)
-if err == nil {
-// Coupon should remain valid through the entire expiry day, not expire
-// at 00:00:00 UTC the moment that date begins.
-expiry = expiry.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-}
+	if err == nil {
+		// Coupon should remain valid through the entire expiry day, not expire
+		// at 00:00:00 UTC the moment that date begins.
+		expiry = expiry.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid expiry_date, use YYYY-MM-DD"})
 		return
@@ -145,6 +163,7 @@ expiry = expiry.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 		MinOrderAmount:    req.MinOrderAmount,
 		MaxDiscountAmount: req.MaxDiscountAmount,
 		UsageLimit:        usageLimit,
+		PerUserLimit:      req.PerUserLimit,
 		ExpiryDate:        expiry,
 		IsActive:          true,
 	}
@@ -200,27 +219,25 @@ func UpdateCouponStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, coupon)
 }
 
-
 // DeleteCoupon godoc
 // DELETE /api/v1/admin/coupons/:id (admin only, requires coupon:delete permission)
 func DeleteCoupon(c *gin.Context) {
-id, err := strconv.Atoi(c.Param("id"))
-if err != nil {
-c.JSON(http.StatusBadRequest, gin.H{"error": "invalid coupon id"})
-return
-}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid coupon id"})
+		return
+	}
 
-var coupon models.Coupon
-if err := database.DB.First(&coupon, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Coupon not found"})
-return
-}
+	var coupon models.Coupon
+	if err := database.DB.First(&coupon, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Coupon not found"})
+		return
+	}
 
-if err := database.DB.Delete(&coupon).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete coupon"})
-return
-}
+	if err := database.DB.Delete(&coupon).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete coupon"})
+		return
+	}
 
-c.JSON(http.StatusOK, gin.H{"success": true})
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

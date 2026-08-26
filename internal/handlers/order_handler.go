@@ -162,7 +162,7 @@ platformFee := utils.GetSettingFloat("platform_fee", 5.0)
 var appliedCoupon *models.Coupon
 var discount float64
 if req.CouponCode != "" {
-coupon, d, err := ValidateCoupon(tx, req.CouponCode, itemsAmount)
+coupon, d, err := ValidateCoupon(tx, req.CouponCode, itemsAmount, userID)
 if err != nil {
 return err
 }
@@ -545,6 +545,7 @@ utils.SendNotification(order.DeliveryPartner.Phone, "Order #"+orderID+" was canc
 }
 c.JSON(http.StatusOK, order)
 }
+
 
 
 
