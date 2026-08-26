@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import { listOrders, updateOrderStatus, assignDeliveryPartner, listDeliveryPartners } from '../api/admin'
 import type { Order, DeliveryPartner } from '../types/admin'
@@ -6,16 +6,30 @@ import type { Order, DeliveryPartner } from '../types/admin'
 const STATUS_OPTIONS = [
   'pending',
   'confirmed',
+  'picking',
+  'picked',
+  'packing',
+  'packed',
+  'ready_for_dispatch',
+  'handed_over',
   'shipped',
   'delivered',
+  'returned',
   'cancelled',
 ]
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-500/15 text-amber-300',
   confirmed: 'bg-blue-500/15 text-blue-300',
+  picking: 'bg-sky-500/15 text-sky-300',
+  picked: 'bg-sky-500/15 text-sky-300',
+  packing: 'bg-cyan-500/15 text-cyan-300',
+  packed: 'bg-cyan-500/15 text-cyan-300',
+  ready_for_dispatch: 'bg-violet-500/15 text-violet-300',
+  handed_over: 'bg-purple-500/15 text-purple-300',
   shipped: 'bg-indigo-500/15 text-indigo-300',
   delivered: 'bg-emerald-500/15 text-emerald-300',
+  returned: 'bg-orange-500/15 text-orange-300',
   cancelled: 'bg-red-500/15 text-red-300',
 }
 
@@ -132,7 +146,7 @@ export default function Orders() {
                           {o.items.map((it) => (
                             <div key={it.id} className="text-slate-300">
                               {it.product?.name ?? `Product #${it.product_id}`}
-                              <span className="text-slate-500"> × {it.quantity}</span>
+                              <span className="text-slate-500"> Ãƒâ€” {it.quantity}</span>
                             </div>
                           ))}
                         </div>
@@ -140,7 +154,7 @@ export default function Orders() {
                         <span className="text-xs text-slate-500">No items</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">₹{o.total_amount}</td>
+                    <td className="px-4 py-3">â‚¹{o.total_amount}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-md text-xs font-medium ${
@@ -167,7 +181,7 @@ export default function Orders() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      {(o.status === 'confirmed' || o.status === 'shipped') ? (
+                      {(o.status === 'confirmed' || o.status === 'shipped' || o.status === 'ready_for_dispatch' || o.status === 'delivered') ? (
                         <div className="space-y-1">
                           {o.delivery_partner_id ? (
                             <div className="text-xs text-emerald-300">
@@ -204,3 +218,4 @@ export default function Orders() {
     </Layout>
   )
 }
+
