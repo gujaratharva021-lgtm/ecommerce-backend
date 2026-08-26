@@ -36,7 +36,7 @@ class LocationService {
       final hasPermission = await requestPermission();
       if (!hasPermission) return;
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       await ApiService.updateLocation(pos.latitude, pos.longitude);
     } catch (_) {
@@ -44,3 +44,4 @@ class LocationService {
     }
   }
 }
+

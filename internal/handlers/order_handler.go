@@ -520,7 +520,7 @@ return
 }
 
 if gatewayRefundAmount > 0 {
-if err := services.PostRefundLedgerEntry(order.ID, gatewayRefundAmount, order.PaymentMethod); err != nil {
+if err := services.PostWalletRefundLedgerEntry(order.ID, gatewayRefundAmount); err != nil {
 log.Printf("failed to post refund ledger entry for order %d: %v", order.ID, err)
 }
 }
@@ -545,5 +545,6 @@ utils.SendNotification(order.DeliveryPartner.Phone, "Order #"+orderID+" was canc
 }
 c.JSON(http.StatusOK, order)
 }
+
 
 

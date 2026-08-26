@@ -440,6 +440,58 @@ return nil
 })
 }
 
+// PostWalletRefundLedgerEntry books a refund that was credited to the
+// customer's in-app wallet rather than paid out via bank/cash. No money
+// actually leaves the business, so unlike PostRefundLedgerEntry (which
+// credits Bank/Cash), this credits Customer Wallet Liability (2005) -
+// the business now owes the customer that amount as store credit.
+func PostWalletRefundLedgerEntry(orderID uint, deltaAmount float64) error {
+if deltaAmount <= 0 {
+return nil
+}
+
+var refundPayable, walletLiability models.Account
+if err := database.DB.Where("code = ?", "2004").First(&refundPayable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2004 (Customer Refund Payable): %w", err)
+}
+if err := database.DB.Where("code = ?", "2005").First(&walletLiability).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2005 (Customer Wallet Liability): %w", err)
+}
+
+transactionRef := fmt.Sprintf("WALLET-REFUND-%d-%d", orderID, time.Now().UnixNano())
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      refundPayable.ID,
+Type:           "debit",
+Amount:         deltaAmount,
+Description:    fmt.Sprintf("Refund to wallet for order #%d", orderID),
+ReferenceType:  "refund",
+ReferenceID:    &orderID,
+EntryDate:      now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create debit ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      walletLiability.ID,
+Type:           "credit",
+Amount:         deltaAmount,
+Description:    fmt.Sprintf("Refund to wallet for order #%d", orderID),
+ReferenceType:  "refund",
+ReferenceID:    &orderID,
+EntryDate:      now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create credit ledger entry: %w", err)
+}
+return nil
+})
+}
+
 // PostGatewaySettlementLedgerEntry records the gateway fee deduction for
 // one online payment (SRS 12.10): Debit Gateway Fees (expense), Credit
 // Bank - the fee is deducted from what the gateway actually pays out, so
