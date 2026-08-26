@@ -1,4 +1,4 @@
-package models
+﻿package models
 
 import (
 	"time"
@@ -28,7 +28,7 @@ Barcode     string     `gorm:"index" json:"barcode,omitempty"`
 }
 
 // ProductRequest is the body for POST/PUT /admin/products (admin only).
-// Stock is only used on create, to seed the product's Inventory row ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
+// Stock is only used on create, to seed the product's Inventory row ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â
 // use PUT /admin/products/:id/inventory to adjust stock afterwards.
 type ProductRequest struct {
 	Name        string  `json:"name" binding:"required"`
@@ -45,6 +45,7 @@ CostPrice   float64 `json:"cost_price" binding:"gte=0"`
 // ProductListQuery binds query params for GET /products (filter, sort, search, paginate).
 type ProductListQuery struct {
 	Search     string  `form:"search"`
+    Q          string  `form:"q"` // alias for Search, used by the mobile app's /products/search endpoint
 	CategoryID uint    `form:"category_id"`
 	MinPrice   float64 `form:"min_price"`
 	MaxPrice   float64 `form:"max_price"`

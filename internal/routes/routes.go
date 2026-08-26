@@ -1,4 +1,4 @@
-package routes
+﻿package routes
 
 import (
     "time"
@@ -33,6 +33,7 @@ func SetupRoutes(router *gin.Engine) {
         products := api.Group("/products")
         {
             products.GET("", handlers.GetProducts) // ?search=&category_id=&min_price=&max_price=&in_stock=&sort=&page=&limit=
+            products.GET("/search", handlers.GetProducts) // ?q=... (alias for /products?search=...) - registered before /:id so "search" is never parsed as a product ID
             products.GET("/:id", handlers.GetProductByID)
 
             products.GET("/:id/reviews", handlers.GetProductReviews)
@@ -377,6 +378,7 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                 adminWarehouses.GET("/:id", handlers.GetWarehouse)
                 adminWarehouses.PUT("/:id", handlers.UpdateWarehouse)
                 adminWarehouses.DELETE("/:id", handlers.DeleteWarehouse)
+                adminWarehouses.PUT("/:id/service-area", handlers.SetWarehouseServiceArea)
 
                 adminWarehouseStaff := admin.Group("/warehouse-staff")
                 {

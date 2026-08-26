@@ -22,6 +22,9 @@ func GetProducts(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+        if query.Search == "" && query.Q != "" {
+                query.Search = query.Q
+        }
 
 	if query.Page < 1 {
 		query.Page = 1
