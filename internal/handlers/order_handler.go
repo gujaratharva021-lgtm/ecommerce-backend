@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "errors"
@@ -366,6 +366,9 @@ c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending or confirmed orders c
 return
 }
 
+var payment models.Payment
+var gatewayRefundAmount float64
+
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 for _, item := range order.Items {
 var inventory models.Inventory
@@ -380,9 +383,23 @@ q = q.Where("warehouse_id = ?", *order.WarehouseID)
 // for this product - the combined total across warehouses ends
 // up correct either way.
 if err := q.Order("id").First(&inventory).Error; err == nil {
+previousQty := inventory.Stock
 inventory.Stock += item.Quantity
 inventory.InStock = true
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+movement := models.StockMovement{
+ProductID:    item.ProductID,
+WarehouseID:  inventory.WarehouseID,
+PreviousQty:  previousQty,
+Change:       item.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementReturn,
+Reason:       "Order cancelled",
+ReferenceID:  &order.ID,
+}
+if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 }
@@ -394,12 +411,41 @@ return err
 }
 }
 
+// Refund the online-gateway portion of the payment (if any) back to
+// the customer's wallet, since there is no live Razorpay refund
+// integration wired up yet. Only applies to orders that actually
+// reached "paid" - unpaid/failed online orders have nothing to refund.
+if order.PaymentMethod == models.PaymentMethodOnline {
+if err := tx.Where("order_id = ?", order.ID).First(&payment).Error; err == nil {
+if payment.Status == models.PaymentStatusPaid {
+gatewayRefundAmount = payment.Amount - payment.RefundedAmount
+if gatewayRefundAmount > 0 {
+refID := order.ID
+if err := utils.CreditWallet(tx, userID, gatewayRefundAmount, models.WalletReasonOrderRefund, "order", &refID, "Gateway refund for cancelled order"); err != nil {
+return err
+}
+payment.RefundedAmount = payment.Amount
+payment.Status = models.PaymentStatusRefunded
+if err := tx.Save(&payment).Error; err != nil {
+return err
+}
+}
+}
+}
+}
+
 return tx.Model(&order).Update("status", models.OrderStatusCancelled).Error
 })
 
 if txErr != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
 return
+}
+
+if gatewayRefundAmount > 0 {
+if err := services.PostRefundLedgerEntry(order.ID, gatewayRefundAmount, order.PaymentMethod); err != nil {
+log.Printf("failed to post refund ledger entry for order %d: %v", order.ID, err)
+}
 }
 
 order.Status = models.OrderStatusCancelled
@@ -414,3 +460,4 @@ services.NotifyWarehouse(*order.WarehouseID, models.WhNotifyOrderCancelled,
 }
 c.JSON(http.StatusOK, order)
 }
+

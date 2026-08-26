@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "math"
@@ -129,9 +129,7 @@ Select("gateway, COUNT(*) as transaction_count, COALESCE(SUM(amount),0) as gross
 Where("status = ? AND created_at >= ? AND created_at < ?", "paid", start, end).
 Group("gateway").
 Scan(&rows)
-for i := range rows {
-rows[i].GrossAmount = rows[i].GrossAmount // no-op, keeps shape explicit
-}
+
 c.JSON(http.StatusOK, gin.H{
 "from": start.Format("2006-01-02"), "to": end.AddDate(0, 0, -1).Format("2006-01-02"),
 "note": "gateway fees are not tracked in this system; net_settlement is gross minus refunds only",
@@ -244,3 +242,4 @@ c.JSON(http.StatusOK, gin.H{
 "balances": math.Abs(totalAssets-(totalLiabilities+retainedEarnings)) < 0.01,
 })
 }
+
