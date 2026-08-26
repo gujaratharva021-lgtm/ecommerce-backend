@@ -63,7 +63,7 @@ export const acceptOrder = (orderId: number) =>
 
 export const handoverOrder = (orderId: number, data: { package_count: number; delivery_partner_id: number }) =>
   apiClient
-    .put(`/warehouse/orders/${orderId}/handover`, data)
+    .post(`/warehouse/orders/${orderId}/handover`, data)
     .then((r) => r.data as { success: boolean; order_id: number; status: string })
 
 export const getHandover = (orderId: number) =>
@@ -298,3 +298,4 @@ export const approveSubstitutionRequest = (id: number, note?: string) =>
 
 export const rejectSubstitutionRequest = (id: number, note?: string) =>
   apiClient.put(`/warehouse/substitutions/${id}/reject`, { note }).then((r) => r.data as SubstitutionRequest)
+

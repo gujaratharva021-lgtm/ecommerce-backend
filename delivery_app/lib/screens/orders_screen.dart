@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -428,7 +428,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                                             borderRadius: BorderRadius.circular(20),
                                                           ),
                                                           child: Text(
-                                                            status.isEmpty ? '' : status[0].toUpperCase() + status.substring(1),
+                                                            status.isEmpty
+                                                              ? ''
+                                                              : status.split('_').map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join(' '),
                                                             style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                                                           ),
                                                         ),
@@ -645,3 +647,4 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
     );
   }
 }
+
