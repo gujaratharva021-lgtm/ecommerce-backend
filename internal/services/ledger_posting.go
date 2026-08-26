@@ -1,4 +1,4 @@
-package services
+﻿package services
 
 import (
 "fmt"
@@ -230,6 +230,92 @@ EntryDate:      bill.BillDate,
 }
 if err := tx.Create(&creditVendorPayable).Error; err != nil {
 return fmt.Errorf("failed to create vendor-payable ledger entry: %w", err)
+}
+
+return nil
+})
+}
+
+// ReverseVendorBillLedgerEntry reverses the ledger entries created by
+// PostVendorBillLedgerEntry when a vendor bill is voided: Credit Inventory,
+// Credit GST Input Credit (if any), Debit Vendor Payable - the exact mirror
+// of the original posting. Idempotent per bill via reference_type="vendor_bill_void".
+// No-op if the original bill was never posted to the ledger in the first place.
+func ReverseVendorBillLedgerEntry(billID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "vendor_bill_void", billID).First(&existing).Error; err == nil {
+return nil
+}
+
+var original models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "vendor_bill", billID).First(&original).Error; err != nil {
+// Bill was never posted to the ledger (e.g. void before posting ran) - nothing to reverse.
+return nil
+}
+
+var bill models.VendorBill
+if err := database.DB.First(&bill, billID).Error; err != nil {
+return fmt.Errorf("vendor bill not found: %w", err)
+}
+
+var vendorPayable, inventory models.Account
+if err := database.DB.Where("code = ?", "2001").First(&vendorPayable).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2001 (Vendor Payable): %w", err)
+}
+if err := database.DB.Where("code = ?", "1004").First(&inventory).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1004 (Inventory): %w", err)
+}
+
+transactionRef := fmt.Sprintf("VENDORBILLVOID-%d", billID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+creditInventory := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      inventory.ID,
+Type:           "credit",
+Amount:         bill.Amount,
+Description:    fmt.Sprintf("Void vendor bill %s", bill.BillNumber),
+ReferenceType:  "vendor_bill_void",
+ReferenceID:    &billID,
+EntryDate:      now,
+}
+if err := tx.Create(&creditInventory).Error; err != nil {
+return fmt.Errorf("failed to create inventory reversal ledger entry: %w", err)
+}
+
+if bill.GSTAmount > 0 {
+var gstITC models.Account
+if err := tx.Where("code = ?", "1005").First(&gstITC).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1005 (GST Input Credit): %w", err)
+}
+creditGST := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      gstITC.ID,
+Type:           "credit",
+Amount:         bill.GSTAmount,
+Description:    fmt.Sprintf("Void vendor bill %s - GST ITC reversal", bill.BillNumber),
+ReferenceType:  "vendor_bill_void",
+ReferenceID:    &billID,
+EntryDate:      now,
+}
+if err := tx.Create(&creditGST).Error; err != nil {
+return fmt.Errorf("failed to create GST-ITC reversal ledger entry: %w", err)
+}
+}
+
+debitVendorPayable := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      vendorPayable.ID,
+Type:           "debit",
+Amount:         bill.Amount + bill.GSTAmount,
+Description:    fmt.Sprintf("Void vendor bill %s", bill.BillNumber),
+ReferenceType:  "vendor_bill_void",
+ReferenceID:    &billID,
+EntryDate:      now,
+}
+if err := tx.Create(&debitVendorPayable).Error; err != nil {
+return fmt.Errorf("failed to create vendor-payable reversal ledger entry: %w", err)
 }
 
 return nil

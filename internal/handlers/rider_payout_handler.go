@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "net/http"
@@ -115,6 +115,19 @@ c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid period_to, use YYYY-MM-DD"
 return
 }
 periodToExclusive := periodTo.AddDate(0, 0, 1)
+
+// Block duplicate payouts: if any payout already exists for this rider
+// whose period overlaps the requested range, refuse rather than create a
+// second one that would double-count and double-accrue the same deliveries.
+var overlapCount int64
+database.DB.Model(&models.RiderPayout{}).
+Where("delivery_partner_id = ? AND period_from < ? AND period_to >= ?",
+req.DeliveryPartnerID, periodToExclusive, periodFrom).
+Count(&overlapCount)
+if overlapCount > 0 {
+c.JSON(http.StatusConflict, gin.H{"error": "A payout already exists for this rider covering an overlapping period"})
+return
+}
 
 var deliveredCount int64
 database.DB.Model(&models.Order{}).

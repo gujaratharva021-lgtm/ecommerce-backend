@@ -385,6 +385,13 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to void vendor bil
 return
 }
 
+// Reverse the ledger entries posted when this bill was created (Debit
+// Inventory/GST-ITC, Credit Vendor Payable) so voiding it doesn't leave
+// stale entries corrupting the general ledger.
+if err := services.ReverseVendorBillLedgerEntry(bill.ID); err != nil {
+log.Printf("failed to reverse vendor bill ledger entry for bill %s: %v", id, err)
+}
+
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "void_vendor_bill", "vendor_bill", id, req.Reason)
 
