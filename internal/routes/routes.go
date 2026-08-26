@@ -187,6 +187,7 @@ func SetupRoutes(router *gin.Engine) {
         orders.Use(middleware.AuthMiddleware())
         {
             orders.POST("/checkout", handlers.Checkout) // body: { address_id?, payment_method?: "cod"|"online" }
+            orders.GET("/checkout/estimate", handlers.GetCheckoutEstimate) // ?address_id= - preview items_amount/delivery_charge/platform_fee before placing the order
             orders.GET("", handlers.GetOrders)
             orders.GET("/:id", handlers.GetOrderByID)
             orders.GET("/:id/tracking", handlers.GetOrderTracking)

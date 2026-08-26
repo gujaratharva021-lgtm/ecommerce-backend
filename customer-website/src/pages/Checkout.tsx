@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { listAddresses } from '../api/addresses'
-import { checkout, createPaymentOrder, verifyPayment } from '../api/orders'
+import { checkout, createPaymentOrder, verifyPayment, getCheckoutEstimate, type CheckoutEstimate } from '../api/orders'
 import { validateCoupon, getWallet } from '../api/misc'
 import { useCart } from '../context/CartContext'
 import type { Address, Coupon } from '../types'
@@ -26,6 +26,7 @@ export default function Checkout() {
   const [walletBalance, setWalletBalance] = useState(0)
   const [isPlacing, setIsPlacing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [estimate, setEstimate] = useState<CheckoutEstimate | null>(null)
 
   useEffect(() => {
     listAddresses().then((addrs) => {
@@ -45,11 +46,34 @@ export default function Checkout() {
     document.body.appendChild(script)
   }, [])
 
+  useEffect(() => {
+    // Fetch the real delivery charge / platform fee for the selected
+    // address so the displayed total matches what checkout will actually
+    // charge, instead of only summing item subtotals.
+    if (!addressId) {
+      setEstimate(null)
+      return
+    }
+    let cancelled = false
+    getCheckoutEstimate(addressId)
+      .then((est) => {
+        if (!cancelled) setEstimate(est)
+      })
+      .catch(() => {
+        if (!cancelled) setEstimate(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [addressId])
+
   const itemsAmount = cart?.total_amount ?? 0
   const discount = appliedCoupon?.discount_amount ?? 0
   const walletUsable = Math.min(walletBalance, Math.max(0, itemsAmount - discount))
   const walletApplied = useWallet ? walletUsable : 0
-  const estimatedTotal = Math.max(0, itemsAmount - discount - walletApplied)
+  const deliveryCharge = estimate?.delivery_charge ?? 0
+  const platformFee = estimate?.platform_fee ?? 0
+  const estimatedTotal = Math.max(0, itemsAmount + deliveryCharge + platformFee - discount - walletApplied)
 
   async function handleApplyCoupon() {
     setCouponError(null)

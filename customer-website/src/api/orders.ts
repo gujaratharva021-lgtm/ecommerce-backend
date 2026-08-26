@@ -12,6 +12,18 @@ import type {
 export const checkout = (data: CheckoutRequest) =>
   apiClient.post<Order>('/orders/checkout', data).then((r) => r.data)
 
+export interface CheckoutEstimate {
+  items_amount: number
+  delivery_charge: number
+  platform_fee: number
+  estimated_total: number
+}
+
+export const getCheckoutEstimate = (addressId: number) =>
+  apiClient
+    .get<CheckoutEstimate>('/orders/checkout/estimate', { params: { address_id: addressId } })
+    .then((r) => r.data)
+
 export const listOrders = () =>
   apiClient.get<OrderListResponse>('/orders').then((r) => r.data)
 

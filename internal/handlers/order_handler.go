@@ -285,6 +285,66 @@ log.Printf("failed to generate invoice for COD order %d: %v", order.ID, err)
 c.JSON(http.StatusCreated, order)
 }
 
+// GetCheckoutEstimate godoc
+// GET /api/v1/orders/checkout/estimate?address_id=X (protected)
+// Returns items_amount, delivery_charge, platform_fee, and the resulting
+// estimated_total for the caller's current cart against a given delivery
+// address, computed with the exact same rules Checkout uses, so the
+// frontend can show an accurate total before placing the order instead of
+// only summing item subtotals.
+func GetCheckoutEstimate(c *gin.Context) {
+    userID := c.MustGet("user_id").(uint)
+
+    addressIDStr := c.Query("address_id")
+    var address models.Address
+    if addressIDStr != "" {
+        if err := database.DB.First(&address, addressIDStr).Error; err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
+            return
+        }
+        if address.UserID != userID {
+            c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this address"})
+            return
+        }
+    } else {
+        if err := database.DB.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error; err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "No address_id given and no default address saved."})
+            return
+        }
+    }
+
+    cart, err := getOrCreateCart(userID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart"})
+        return
+    }
+    var cartItems []models.CartItem
+    if err := database.DB.Preload("Product").Where("cart_id = ?", cart.ID).Find(&cartItems).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load cart items"})
+        return
+    }
+
+    itemsAmount := 0.0
+    for _, ci := range cartItems {
+        itemsAmount += ci.Product.Price * float64(ci.Quantity)
+    }
+
+    deliveryCharge := services.CalculateDeliveryCharge(address.Lat, address.Lng)
+    if itemsAmount >= freeDeliveryThreshold {
+        deliveryCharge = 0
+    }
+    platformFee := utils.GetSettingFloat("platform_fee", 5.0)
+
+    estimatedTotal := itemsAmount + deliveryCharge + platformFee
+
+    c.JSON(http.StatusOK, gin.H{
+        "items_amount":    itemsAmount,
+        "delivery_charge": deliveryCharge,
+        "platform_fee":    platformFee,
+        "estimated_total": estimatedTotal,
+    })
+}
+
 // GetOrders godoc
 // GET /api/v1/orders (protected) - ?page=&limit=
 func GetOrders(c *gin.Context) {
