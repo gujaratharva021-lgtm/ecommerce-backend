@@ -26,6 +26,8 @@ import type {
   AuditLogsResponse,
   OrderInvoice,
   WarehouseNotificationsResponse,
+  SubstitutionRequest,
+  SubstitutionRequestsResponse,
 } from '../types/warehouse'
 
 export const listMyStockTransfers = () =>
@@ -43,6 +45,33 @@ export const rejectStockTransfer = (id: number) =>
   apiClient.put(`/warehouse/stock-transfers/${id}/reject`).then((r) => r.data)
 export const listProducts = (params?: Record<string, any>) =>
   apiClient.get('/products', { params }).then((r) => r.data)
+
+// ---- Substitution ----
+
+export const listSubstitutionRequests = (params: {
+  status?: string
+  order_id?: number
+  page?: number
+  limit?: number
+}) => apiClient.get('/warehouse/substitutions', { params }).then((r) => r.data as SubstitutionRequestsResponse)
+
+export const getSubstitutionRequest = (id: number) =>
+  apiClient.get(`/warehouse/substitutions/${id}`).then((r) => r.data as SubstitutionRequest)
+
+export const createSubstitutionRequest = (data: {
+  order_id: number
+  picking_task_item_id?: number
+  original_product_id: number
+  substitute_product_id: number
+  quantity: number
+  reason?: string
+}) => apiClient.post('/warehouse/substitutions', data).then((r) => r.data as SubstitutionRequest)
+
+export const approveSubstitutionRequest = (id: number, note?: string) =>
+  apiClient.put(`/warehouse/substitutions/${id}/approve`, { note }).then((r) => r.data as SubstitutionRequest)
+
+export const rejectSubstitutionRequest = (id: number, note?: string) =>
+  apiClient.put(`/warehouse/substitutions/${id}/reject`, { note }).then((r) => r.data as SubstitutionRequest)
 
 // ---- Dashboard ----
 

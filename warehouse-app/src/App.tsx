@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -16,6 +16,7 @@ import StockOperations from './pages/StockOperations'
 import AuditLogs from './pages/AuditLogs'
 import Notifications from './pages/Notifications'
 import Batches from './pages/Batches'
+import Substitution from './pages/Substitution'
 
 function Protected({ children }: { children: React.ReactNode }) {
   return (
@@ -44,6 +45,7 @@ function App() {
           <Route path="/audit-logs" element={<Protected><AuditLogs /></Protected>} />
           <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
           <Route path="/batches" element={<Protected><Batches /></Protected>} />
+          <Route path="/substitutions" element={<Protected><Substitution /></Protected>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
@@ -52,3 +54,5 @@ function App() {
 }
 
 export default App
+
+

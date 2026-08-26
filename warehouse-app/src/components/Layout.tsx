@@ -12,6 +12,7 @@ const navItems = [
   { to: '/receiving', label: 'Receiving' },
   { to: '/batches', label: 'Batch & Expiry' },
   { to: '/exceptions', label: 'Exceptions' },
+  { to: '/substitutions', label: 'Substitution' },
   { to: '/performance', label: 'Performance' },
   { to: '/staff', label: 'Staff' },
   { to: '/notifications', label: 'Notifications' },
@@ -63,3 +64,4 @@ export default function Layout({ children }: { children: ReactNode }) {
     </div>
   )
 }
+

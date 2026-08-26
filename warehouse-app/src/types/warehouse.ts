@@ -2,6 +2,7 @@
   id: number
   name: string
   phone: string
+  role: string
   warehouse_id: number
   is_active?: boolean
   warehouse?: Warehouse
@@ -22,6 +23,33 @@ export interface Product {
   id: number
   name: string
   price: number
+}
+
+export interface SubstitutionRequest {
+  id: number
+  order_id: number
+  picking_task_item_id?: number | null
+  original_product_id: number
+  original_product?: Product
+  substitute_product_id: number
+  substitute_product?: Product
+  quantity: number
+  reason?: string
+  warehouse_id: number
+  requested_by_id: number
+  status: 'pending' | 'approved' | 'rejected'
+  decided_by_id?: number | null
+  decision_note?: string
+  decided_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SubstitutionRequestsResponse {
+  substitution_requests: SubstitutionRequest[]
+  total?: number
+  page?: number
+  limit?: number
 }
 
 export interface StockTransfer {
@@ -530,3 +558,4 @@ export interface WarehouseNotificationsResponse {
   total: number
   total_pages: number
 }
+
