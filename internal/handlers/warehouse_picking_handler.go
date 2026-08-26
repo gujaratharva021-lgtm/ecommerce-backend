@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "errors"
@@ -10,6 +10,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 "gorm.io/gorm"
 "gorm.io/gorm/clause"
 )
@@ -224,6 +225,8 @@ staffID := c.MustGet("staff_id").(uint)
 
 var task models.PickingTask
 var packTask models.PackingTask
+var order models.Order
+var refundAmount float64
 statusCode := http.StatusInternalServerError
 
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -242,6 +245,78 @@ for _, item := range task.Items {
 if item.Status == models.PickItemPending {
 statusCode = http.StatusBadRequest
 return errors.New("Cannot complete picking - not all items have been marked")
+}
+}
+
+if err := tx.Preload("Items").First(&order, task.OrderID).Error; err != nil {
+return err
+}
+
+// Reconcile short/unavailable picks: release the unpicked inventory back
+// to stock, deduct the shortfall from the order's amounts, and total up
+// the refund owed to the customer's wallet.
+orderItemsByID := make(map[uint]models.OrderItem, len(order.Items))
+for _, oi := range order.Items {
+orderItemsByID[oi.ID] = oi
+}
+
+for _, item := range task.Items {
+if item.Status != models.PickItemShort && item.Status != models.PickItemUnavailable {
+continue
+}
+shortQty := item.QuantityNeeded - item.QuantityPicked
+if shortQty <= 0 {
+continue
+}
+orderItem, ok := orderItemsByID[item.OrderItemID]
+if !ok {
+continue
+}
+
+var inventory models.Inventory
+q := tx.Where("product_id = ? AND warehouse_id = ?", item.ProductID, warehouseID)
+if err := q.Order("id").First(&inventory).Error; err == nil {
+previousQty := inventory.Stock
+inventory.Stock += shortQty
+inventory.InStock = true
+if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+movement := models.StockMovement{
+ProductID:    item.ProductID,
+WarehouseID:  warehouseID,
+PreviousQty:  previousQty,
+Change:       shortQty,
+NewQty:       inventory.Stock,
+MovementType: models.MovementReturn,
+Reason:       "Short/unavailable pick",
+ReferenceID:  &order.ID,
+}
+if err := tx.Create(&movement).Error; err != nil {
+return err
+}
+}
+
+lineShortfall := orderItem.Price * float64(shortQty)
+order.ItemsAmount -= lineShortfall
+order.TotalAmount -= lineShortfall
+refundAmount += lineShortfall
+}
+
+if refundAmount > 0 {
+if order.ItemsAmount < 0 {
+order.ItemsAmount = 0
+}
+if order.TotalAmount < 0 {
+order.TotalAmount = 0
+}
+if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).
+Updates(map[string]interface{}{"items_amount": order.ItemsAmount, "total_amount": order.TotalAmount}).Error; err != nil {
+return err
+}
+refID := order.ID
+if err := utils.CreditWallet(tx, order.UserID, refundAmount, models.WalletReasonOrderRefund, "order", &refID, "Refund for short/unavailable items during picking"); err != nil {
+return err
 }
 }
 
@@ -273,5 +348,5 @@ staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
 "status=picking", "status=picked")
 
-c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask})
+c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask, "refund_amount": refundAmount})
 }

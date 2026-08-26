@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"errors"
@@ -61,11 +61,11 @@ func ValidateCoupon(db *gorm.DB, code string, orderAmount float64) (*models.Coup
 
 // ApplyCoupon records coupon usage against an order and increments used_count.
 // Call this inside the Checkout transaction (pass tx) right after the order
-// row is saved, only when a coupon was actually used for that order — this
+// row is saved, only when a coupon was actually used for that order â€” this
 // way a failed/rolled-back checkout never burns a coupon use.
 func ApplyCoupon(db *gorm.DB, coupon *models.Coupon, orderID uint, discount float64) error {
 	// Atomically increment used_count only if the limit hasn't been reached
-	// in the meantime — guards against two concurrent checkouts both passing
+	// in the meantime â€” guards against two concurrent checkouts both passing
 	// ValidateCoupon before either has committed (a plain read-then-write
 	// increment could let usage exceed usage_limit under concurrent load).
 	result := db.Model(&models.Coupon{}).
@@ -124,6 +124,11 @@ func CreateCoupon(c *gin.Context) {
 	}
 
 	expiry, err := time.Parse("2006-01-02", req.ExpiryDate)
+if err == nil {
+// Coupon should remain valid through the entire expiry day, not expire
+// at 00:00:00 UTC the moment that date begins.
+expiry = expiry.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid expiry_date, use YYYY-MM-DD"})
 		return
@@ -218,3 +223,4 @@ return
 
 c.JSON(http.StatusOK, gin.H{"success": true})
 }
+
