@@ -261,15 +261,29 @@ var creditNote *models.CreditNote
 				q = q.Where("warehouse_id = ?", *order.WarehouseID)
 			}
 			if err := q.Order("id").First(&inventory).Error; err == nil {
+previousQty := inventory.Stock
 				inventory.Stock += ri.Quantity
 				inventory.InStock = true
 				if err := tx.Save(&inventory).Error; err != nil {
 					return err
 				}
+movement := models.StockMovement{
+ProductID:    orderItem.ProductID,
+WarehouseID:  inventory.WarehouseID,
+PreviousQty:  previousQty,
+Change:       ri.Quantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementReturn,
+Reason:       "Return approved",
+ReferenceID:  &returnReq.ID,
+}
+if err := tx.Create(&movement).Error; err != nil {
+return err
+}
 			}
 		}
 
-		refID := order.ID
+		refID := returnReq.ID
 		if err := utils.CreditWallet(tx, returnReq.UserID, returnReq.RefundAmount, models.WalletReasonRefund, "return_request", &refID, "Refund for return request #"+id); err != nil {
 			return err
 		}
@@ -363,4 +377,5 @@ func RejectReturn(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"return_request": returnReq})
 }
+
 
