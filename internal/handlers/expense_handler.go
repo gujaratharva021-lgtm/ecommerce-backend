@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "log"
@@ -11,6 +11,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
+"gorm.io/gorm"
 )
 
 // ListExpenses godoc
@@ -58,7 +59,7 @@ return
 }
 
 var totalAmount float64
-database.DB.Model(&models.Expense{}).Select("COALESCE(SUM(amount),0)").Scan(&totalAmount)
+db.Session(&gorm.Session{}).Select("COALESCE(SUM(amount),0)").Scan(&totalAmount)
 
 c.JSON(http.StatusOK, gin.H{
 "expenses":     expenses,
