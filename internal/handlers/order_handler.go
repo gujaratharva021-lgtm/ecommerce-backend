@@ -411,6 +411,17 @@ return err
 }
 }
 
+// Reinstate the coupon (if any) so a single-use coupon isn't permanently
+// burned by a cancelled order. OrderCoupon itself is left in place as a
+// historical record of what was applied.
+var orderCoupon models.OrderCoupon
+if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == nil {
+if err := tx.Model(&models.Coupon{}).Where("id = ? AND used_count > 0", orderCoupon.CouponID).
+UpdateColumn("used_count", gorm.Expr("used_count - 1")).Error; err != nil {
+return err
+}
+}
+
 // Refund the online-gateway portion of the payment (if any) back to
 // the customer's wallet, since there is no live Razorpay refund
 // integration wired up yet. Only applies to orders that actually
