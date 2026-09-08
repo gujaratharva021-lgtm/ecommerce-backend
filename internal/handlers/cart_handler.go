@@ -161,11 +161,13 @@ func AddToCart(c *gin.Context) {
 		return tx.Create(&newItem).Error
 	})
 	if txErr != nil {
-		if txErr == services.ErrInsufficientStock {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add item to cart"})
-		}
+                if txErr == services.ErrInsufficientStock {
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+                } else if txErr == services.ErrNotAvailableAtWarehouse {
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available in your area yet"})
+                } else {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add item to cart"})
+                }
 		return
 	}
 	resp, err := buildCartResponse(cart)
@@ -227,11 +229,13 @@ func UpdateCartItem(c *gin.Context) {
 		return tx.Save(&item).Error
 	})
 	if txErr != nil {
-		if txErr == services.ErrInsufficientStock {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
-		}
+                if txErr == services.ErrInsufficientStock {
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})
+                } else if txErr == services.ErrNotAvailableAtWarehouse {
+                        c.JSON(http.StatusBadRequest, gin.H{"error": "This product is not available in your area yet"})
+                } else {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart item"})
+                }
 		return
 	}
 

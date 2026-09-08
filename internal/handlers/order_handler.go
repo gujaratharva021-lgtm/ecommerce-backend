@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -146,7 +146,11 @@ Price:     ci.Product.Price,
 })
 }
 
-deliveryCharge := services.CalculateDeliveryCharge(address.Lat, address.Lng)
+serviceability := services.CalculateServiceability(address.Pincode, address.Lat, address.Lng)
+if paymentMethod == models.PaymentMethodCOD && !serviceability.CODAvailable {
+return errors.New("Cash on Delivery is not available for this address")
+}
+deliveryCharge := serviceability.DeliveryCharge
 if itemsAmount >= freeDeliveryThreshold {
 deliveryCharge = 0
 }
@@ -329,7 +333,8 @@ func GetCheckoutEstimate(c *gin.Context) {
         itemsAmount += ci.Product.Price * float64(ci.Quantity)
     }
 
-    deliveryCharge := services.CalculateDeliveryCharge(address.Lat, address.Lng)
+    serviceability := services.CalculateServiceability(address.Pincode, address.Lat, address.Lng)
+    deliveryCharge := serviceability.DeliveryCharge
     if itemsAmount >= freeDeliveryThreshold {
         deliveryCharge = 0
     }
@@ -342,6 +347,10 @@ func GetCheckoutEstimate(c *gin.Context) {
         "delivery_charge": deliveryCharge,
         "platform_fee":    platformFee,
         "estimated_total": estimatedTotal,
+        "cod_available":   serviceability.CODAvailable,
+        "estimated_days":  serviceability.EstimatedDays,
+        "serviceable":     serviceability.Serviceable,
+        "zone_id":         serviceability.ZoneID,
     })
 }
 

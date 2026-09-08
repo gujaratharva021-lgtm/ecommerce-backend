@@ -128,7 +128,12 @@ func TestUpdateDeliveryStatus_ValidTransitionSucceeds(t *testing.T) {
 
 	// ACCEPTED -> PICKED_UP is the first step a partner may take through
 	// this endpoint (ASSIGNED -> ACCEPTED already happened via /accept).
-	w := doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "picked_up"})
+	
+doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "going_to_store"})
+	
+doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "arrived_at_store"})
+	
+w := doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "picked_up"})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for ACCEPTED->PICKED_UP, got %d: %s", w.Code, w.Body.String())
 	}
@@ -150,7 +155,7 @@ func TestUpdateDeliveryStatus_ValidTransitionSucceeds(t *testing.T) {
 		t.Fatalf("expected a delivery OTP to be generated")
 	}
 
-	w = doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "arrived"})
+	w = doRequest(r, http.MethodPut, fmt.Sprintf("/api/v1/delivery/orders/%d/delivery-status", order.ID), token, gin.H{"status": "arrived_at_customer"})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 transitioning to arrived, got %d: %s", w.Code, w.Body.String())
 	}

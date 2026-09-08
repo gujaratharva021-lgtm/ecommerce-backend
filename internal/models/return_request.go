@@ -11,9 +11,9 @@ ReturnStatusRejected = "rejected"
 
 // ReturnRequest is a customer-initiated request to return one or more items
 // from a delivered order. Approval restores stock for the returned items,
-// refunds the calculated amount to the customer's wallet, and — only if
+// refunds the calculated amount to the customer's wallet, and â€” only if
 // every item on the order has now been returned across all approved
-// requests — marks the order "returned".
+// requests â€” marks the order "returned".
 type ReturnRequest struct {
 ID           uint                `gorm:"primaryKey" json:"id"`
 OrderID      uint                `gorm:"not null;index" json:"order_id"`
@@ -24,6 +24,7 @@ Status       string              `gorm:"default:pending" json:"status"`
 RefundAmount float64             `gorm:"not null;default:0" json:"refund_amount"`
 Items        []ReturnRequestItem `gorm:"foreignKey:ReturnRequestID" json:"items,omitempty"`
 ProcessedBy  *uint               `json:"processed_by,omitempty"`
+RejectionReason *string         `json:"rejection_reason,omitempty"`
 CreatedAt    time.Time           `json:"created_at"`
 UpdatedAt    time.Time           `json:"updated_at"`
 }

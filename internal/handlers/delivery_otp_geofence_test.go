@@ -47,14 +47,20 @@ func deliveryStatusURL(orderID uint) string {
 // HTTP response never includes it (see TestDeliveryOTP_NeverExposedInAPIResponses).
 func advanceToArrivedWithOTP(t *testing.T, r *gin.Engine, partner models.DeliveryPartner, order models.Order, token string) string {
 	t.Helper()
-	if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "picked_up"}); w.Code != http.StatusOK {
-		t.Fatalf("setup: picked_up failed: %d %s", w.Code, w.Body.String())
+	if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "going_to_store"}); w.Code != http.StatusOK {
+t.Fatalf("setup: going_to_store failed: %d %s", w.Code, w.Body.String())
+}
+if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "arrived_at_store"}); w.Code != http.StatusOK {
+t.Fatalf("setup: arrived_at_store failed: %d %s", w.Code, w.Body.String())
+}
+if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "picked_up"}); w.Code != http.StatusOK {
+t.Fatalf("setup: picked_up failed: %d %s", w.Code, w.Body.String())
 	}
 	_, otpCode, err := services.UpdateDeliveryStatus(order.ID, partner.ID, models.DeliveryStatusOutForDelivery, "")
 	if err != nil || otpCode == "" {
 		t.Fatalf("setup: out_for_delivery failed: %v (otp=%q)", err, otpCode)
 	}
-	if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "arrived"}); w.Code != http.StatusOK {
+	if w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "arrived_at_customer"}); w.Code != http.StatusOK {
 		t.Fatalf("setup: arrived failed: %d %s", w.Code, w.Body.String())
 	}
 	return otpCode
@@ -171,7 +177,12 @@ func TestDeliveryOTP_NeverExposedInAPIResponses(t *testing.T) {
 	r := newStatusGPSTestRouter()
 	_, order, token := acceptedOrderForStatusTest(t, r)
 
-	doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "picked_up"})
+	
+doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "going_to_store"})
+	
+doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "arrived_at_store"})
+	
+doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "picked_up"})
 	w := doRequest(r, http.MethodPut, deliveryStatusURL(order.ID), token, gin.H{"status": "out_for_delivery"})
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for out_for_delivery, got %d: %s", w.Code, w.Body.String())

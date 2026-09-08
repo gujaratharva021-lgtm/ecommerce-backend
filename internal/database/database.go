@@ -1,4 +1,4 @@
-﻿package database
+package database
 import (
 	"log"
 	"time"
@@ -103,8 +103,10 @@ func AutoMigrate() {
             &models.DebitNote{},
             &models.VendorBankChangeRequest{},
             &models.PendingJournalEntry{},
+		&models.MismatchDismissal{},
             &models.RiderCODDeposit{},
             &models.RiderPayout{},
+&models.DeliveryNotification{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -137,6 +139,39 @@ log.Fatalf("Failed to add platform_fee column to invoices: %v", err)
 }
 if err := DB.Exec(`ALTER TABLE delivery_partners ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
 log.Fatalf("Failed to add is_online column to delivery_partners: %v", err)
+}
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS subcategories (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category_id BIGINT NOT NULL REFERENCES categories(id),
+    image_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
+)`).Error; err != nil {
+log.Fatalf("Failed to create subcategories table: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_id BIGINT REFERENCES subcategories(id)`).Error; err != nil {
+log.Fatalf("Failed to add subcategory_id column to products: %v", err)
+}
+
+if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS temperature_zone VARCHAR(20) NOT NULL DEFAULT 'ambient'`).Error; err != nil {
+log.Fatalf("Failed to add temperature_zone column to products: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS seal_number VARCHAR(255)`).Error; err != nil {
+log.Fatalf("Failed to add seal_number column to packing_tasks: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS qc_ambient_ok BOOLEAN`).Error; err != nil {
+log.Fatalf("Failed to add qc_ambient_ok column to packing_tasks: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS qc_chilled_ok BOOLEAN`).Error; err != nil {
+log.Fatalf("Failed to add qc_chilled_ok column to packing_tasks: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS qc_frozen_ok BOOLEAN`).Error; err != nil {
+log.Fatalf("Failed to add qc_frozen_ok column to packing_tasks: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS qc_notes TEXT`).Error; err != nil {
+log.Fatalf("Failed to add qc_notes column to packing_tasks: %v", err)
 }
 if err := DB.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 id BIGSERIAL PRIMARY KEY,
@@ -492,5 +527,4 @@ log.Fatalf("Failed to ensure invoice columns exist: %v", err)
 }
 }
 }
-
 

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -110,6 +110,62 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await _advanceDeliveryStatus('delivered', otp: otp);
   }
 
+  Future<void> _markDeliveryFailed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark delivery as failed?'),
+        content: const Text('Use this only if the customer refused, was unavailable, or delivery genuinely could not be completed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, mark failed', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _advanceDeliveryStatus('failed_delivery');
+  }
+
+  Future<void> _resolveFailedDelivery(String action) async {
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(action == 'retry' ? 'Retry delivery' : 'Return to store'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(hintText: 'Reason (required)'),
+          maxLines: 2,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
+            child: Text(action == 'retry' ? 'Retry' : 'Return'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || reason.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await ApiService.resolveFailedDelivery(_orderId, action, reason);
+      _applyOrderUpdate(data['order']);
+      setState(() => _loading = false);
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
   Future<void> _acceptAssignment() async {
     setState(() {
       _loading = true;
@@ -167,6 +223,99 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _loading = false;
       });
     }
+  }
+
+    static const List<Map<String, String>> _stepDefs = [
+    {'key': 'going_to_store', 'label': 'Going to Store'},
+    {'key': 'arrived_at_store', 'label': 'Arrived at Store'},
+    {'key': 'picked_up', 'label': 'Picked Up'},
+    {'key': 'out_for_delivery', 'label': 'Out for Delivery'},
+    {'key': 'arrived_at_customer', 'label': 'Arrived at Customer'},
+    {'key': 'delivered', 'label': 'Delivered'},
+  ];
+
+  int _currentStepIndex(String? deliveryStatus, String orderStatus) {
+    if (orderStatus == 'delivered') return _stepDefs.length - 1;
+    if (deliveryStatus == null) return -1;
+    // Legacy "arrived" maps to the same visual position as
+    // "arrived_at_customer" - both mean the courier is at the customer.
+    final effective = deliveryStatus == 'arrived' ? 'arrived_at_customer' : deliveryStatus;
+    return _stepDefs.indexWhere((s) => s['key'] == effective);
+  }
+
+  Widget _buildStepper(String? deliveryStatus, String orderStatus) {
+    final currentIndex = _currentStepIndex(deliveryStatus, orderStatus);
+    if (currentIndex < 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(_stepDefs.length, (stepIndex) {
+          final isDone = stepIndex < currentIndex;
+          final isCurrent = stepIndex == currentIndex;
+          final isLast = stepIndex == _stepDefs.length - 1;
+          final label = _stepDefs[stepIndex]['label']!;
+          final lineDone = stepIndex < currentIndex;
+
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDone || isCurrent ? const Color(0xFF5B2A9E) : Colors.white,
+                        border: Border.all(
+                          color: isDone || isCurrent ? const Color(0xFF5B2A9E) : const Color(0xFFE0DAF0),
+                          width: 2,
+                        ),
+                      ),
+                      child: isDone
+                          ? const Icon(Icons.check, size: 14, color: Colors.white)
+                          : isCurrent
+                              ? Center(
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                                  ),
+                                )
+                              : null,
+                    ),
+                    if (!isLast)
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          color: lineDone ? const Color(0xFF5B2A9E) : const Color(0xFFE0DAF0),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20, top: 3),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      color: isDone || isCurrent ? Colors.black87 : Colors.black45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
   }
 
   @override
@@ -336,6 +485,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 12),
             Text(_error!, style: const TextStyle(color: Colors.red)),
           ],
+          if (status == 'shipped' || status == 'delivered') _buildStepper(_order['delivery_status']?.toString(), status),
           const SizedBox(height: 20),
           if (canProgressOrder && status == 'handed_over')
             ElevatedButton(
@@ -349,6 +499,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Builder(builder: (context) {
               final deliveryStatus = _order['delivery_status'];
               switch (deliveryStatus) {
+                case 'going_to_store':
+                  return ElevatedButton(
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('arrived_at_store'),
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Arrived at Store'),
+                  );
+                case 'arrived_at_store':
+                  return ElevatedButton(
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('picked_up'),
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Confirm Pickup'),
+                  );
                 case 'picked_up':
                   return ElevatedButton(
                     onPressed: _loading ? null : () => _advanceDeliveryStatus('out_for_delivery'),
@@ -359,33 +525,104 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   );
                 case 'out_for_delivery':
                   return ElevatedButton(
-                    onPressed: _loading ? null : () => _advanceDeliveryStatus('arrived'),
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('arrived_at_customer'),
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
                     child: _loading
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Arrived at Location'),
                   );
-                case 'arrived':
-                  return ElevatedButton(
-                    onPressed: _loading ? null : _promptForOtpAndDeliver,
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16), backgroundColor: Colors.green),
-                    child: _loading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Enter OTP & Confirm Delivery'),
+                case 'arrived_at_customer':
+                  final isCOD = (_order['payment_method']?.toString().toLowerCase() ?? '') == 'cod';
+                  final amount = _order['total_amount'];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isCOD ? const Color(0xFFFFF4E5) : const Color(0xFFE1F5E6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: isCOD
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('CASH ON DELIVERY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const SizedBox(height: 6),
+                                  Text('Amount to Collect: \u20B9$amount'),
+                                ],
+                              )
+                            : Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text('Payment already received (\u20B9$amount)')),
+                                ],
+                              ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _loading ? null : _promptForOtpAndDeliver,
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16), backgroundColor: Colors.green),
+                        child: _loading
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Enter OTP & Confirm Delivery'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _loading ? null : _markDeliveryFailed,
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red, padding: const EdgeInsets.all(14)),
+                        child: const Text('Delivery Failed'),
+                      ),
+                    ],
+                  );
+                case 'failed_delivery':
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: const Color(0xFFFDEAEA), borderRadius: BorderRadius.circular(12)),
+                        child: const Text('This delivery could not be completed. Choose how to proceed.'),
+                      ),
+                      ElevatedButton(
+                        onPressed: _loading ? null : () => _resolveFailedDelivery('retry'),
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                        child: const Text('Retry Delivery'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _loading ? null : () => _resolveFailedDelivery('return'),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(14)),
+                        child: const Text('Return to Store'),
+                      ),
+                    ],
+                  );
+                case 'returned':
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('Returned to store', style: TextStyle(color: Colors.orange, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
                   );
                 default:
                   return ElevatedButton(
-                    onPressed: _loading ? null : () => _advanceDeliveryStatus('picked_up'),
+                    onPressed: _loading ? null : () => _advanceDeliveryStatus('going_to_store'),
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
                     child: _loading
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Mark Picked Up'),
+                        : const Text('Going to Store'),
                   );
               }
             })
           else if (status == 'delivered')
             const Center(
               child: Text('Delivered', style: TextStyle(color: Colors.green, fontSize: 18)),
+            )
+          else if (_order['delivery_status'] == 'returned')
+            const Center(
+              child: Text('Returned to store', style: TextStyle(color: Colors.orange, fontSize: 18)),
             ),
         ],
       ),

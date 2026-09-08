@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -54,4 +54,16 @@ StartedAt   *time.Time `json:"started_at,omitempty"`
 CompletedAt *time.Time `json:"completed_at,omitempty"`
 CreatedAt   time.Time  `json:"created_at"`
 UpdatedAt   time.Time  `json:"updated_at"`
+// SealNumber is entered by the packer once the package is physically
+// sealed, right before completion - proof the box wasn't opened between
+// packing and handover.
+SealNumber  string     `json:"seal_number,omitempty"`
+// QC*OK are nullable so "not applicable" (order has no items in that
+// zone) is distinguishable from "not yet checked". CompletePacking
+// enforces these must be true for any zone actually present in the
+// order's items before allowing completion.
+QCAmbientOK *bool      `json:"qc_ambient_ok,omitempty"`
+QCChilledOK *bool      `json:"qc_chilled_ok,omitempty"`
+QCFrozenOK  *bool      `json:"qc_frozen_ok,omitempty"`
+QCNotes     string     `json:"qc_notes,omitempty"`
 }

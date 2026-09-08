@@ -1,4 +1,4 @@
-import http from 'k6/http';
+﻿import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Counter } from 'k6/metrics';
 
@@ -7,7 +7,7 @@ import { Counter } from 'k6/metrics';
 // ---------------------------------------------------------------------------
 const BASE_URL = __ENV.BASE_URL || 'https://ecommerce-backend-dd4u.onrender.com/api/v1';
 const ADMIN_PHONE = __ENV.ADMIN_PHONE || '9999999999';
-const SESSION_POOL_SIZE = Number(__ENV.SESSION_POOL_SIZE || 8);
+const SESSION_POOL_SIZE = Number(__ENV.SESSION_POOL_SIZE || 10);
 
 // Coordinates near "Default Warehouse" (Mumbai, 19.1197, 72.8468, 10km radius)
 // so checkout's serviceability check passes.
@@ -18,12 +18,12 @@ const checkoutFailures = new Counter('checkout_failures');
 const otherFailures = new Counter('other_failures');
 
 export const options = {
-  setupTimeout: '5m',
+  setupTimeout: '30m',
   stages: [
-    { duration: '30s', target: 5 },
-    { duration: '1m', target: 5 },
-    { duration: '30s', target: 10 },
-    { duration: '1m', target: 10 },
+    { duration: '30s', target: 20 },
+    { duration: '1m', target: 50 },
+    { duration: '1m', target: 100 },
+    { duration: '2m', target: 100 },
     { duration: '30s', target: 0 },
   ],
   thresholds: {
@@ -194,10 +194,12 @@ export default function (data) {
 
   group('4. Coupon validate', function () {
     const code = data.couponCode || 'INVALIDCODE';
+    const params = jsonHeaders(token);
+    params.responseCallback = http.expectedStatuses(200, 400);
     const res = http.post(
       `${BASE_URL}/coupons/validate`,
       JSON.stringify({ code, order_amount: 500 }),
-      jsonHeaders(token)
+      params
     );
     if (data.couponCode) {
       check(res, { 'coupon validate 200 (real code)': (r) => r.status === 200 });
@@ -265,3 +267,7 @@ export default function (data) {
 
   sleep(1);
 }
+
+
+
+

@@ -382,6 +382,78 @@ return nil
 })
 }
 
+// PostExpenseAdjustmentLedgerEntry posts an adjusting double-entry line
+// when a paid expense's amount is edited after PostExpenseLedgerEntry has
+// already run for it, so the general ledger stays in sync with the
+// Expense record instead of going stale. deltaAmount is
+// newAmount-oldAmount: positive means the expense grew (post an extra
+// Debit Opex / Credit Bank for the increase), negative means it shrank
+// (post the reverse - Debit Bank / Credit Opex - for the decrease).
+// No-op if deltaAmount is zero.
+func PostExpenseAdjustmentLedgerEntry(expenseID uint, deltaAmount float64) error {
+if deltaAmount == 0 {
+return nil
+}
+
+var expense models.Expense
+if err := database.DB.First(&expense, expenseID).Error; err != nil {
+return fmt.Errorf("expense not found: %w", err)
+}
+
+var opex, bank models.Account
+if err := database.DB.Where("code = ?", "5003").First(&opex).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 5003 (Operating Expenses): %w", err)
+}
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+
+amount := deltaAmount
+increased := true
+if amount < 0 {
+amount = -amount
+increased = false
+}
+
+transactionRef := fmt.Sprintf("EXPENSEADJ-%d-%d", expenseID, time.Now().UnixNano())
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+opexEntry := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      opex.ID,
+Type:           "debit",
+Amount:         amount,
+Description:    fmt.Sprintf("Adjustment for expense: %s", expense.Category),
+ReferenceType:  "expense_adjustment",
+ReferenceID:    &expenseID,
+EntryDate:      now,
+}
+bankEntry := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      bank.ID,
+Type:           "credit",
+Amount:         amount,
+Description:    fmt.Sprintf("Adjustment for expense: %s", expense.Category),
+ReferenceType:  "expense_adjustment",
+ReferenceID:    &expenseID,
+EntryDate:      now,
+}
+if !increased {
+// Expense amount decreased - reverse the direction: Debit Bank, Credit Opex.
+opexEntry.Type = "credit"
+bankEntry.Type = "debit"
+}
+if err := tx.Create(&opexEntry).Error; err != nil {
+return fmt.Errorf("failed to create opex adjustment ledger entry: %w", err)
+}
+if err := tx.Create(&bankEntry).Error; err != nil {
+return fmt.Errorf("failed to create bank adjustment ledger entry: %w", err)
+}
+return nil
+})
+}
+
 // PostRefundLedgerEntry records the double-entry ledger lines for one
 // customer refund: Debit Customer Refund Payable, Credit Bank/Cash. Called
 // with only the newly-added refund delta (not the cumulative refunded

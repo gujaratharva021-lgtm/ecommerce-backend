@@ -17,6 +17,7 @@ WalletReasonCheckoutUse  = "checkout_use"
 WalletReasonAdminCredit  = "admin_credit"
 WalletReasonAdminDebit   = "admin_debit"
 WalletReasonOrderRefund  = "order_cancelled_refund"
+WalletReasonAddMoney     = "add_money"
 )
 
 // Wallet holds a user's spendable balance. One wallet per user, created
@@ -43,6 +44,11 @@ ReferenceID   *uint     `json:"reference_id,omitempty"`
 BalanceAfter  float64   `gorm:"not null" json:"balance_after"`
 Note          string    `json:"note,omitempty"`
 CreatedAt     time.Time `json:"created_at"`
+}
+
+// AddMoneyRequest is the body for POST /wallet/add-money
+type AddMoneyRequest struct {
+Amount float64 `json:"amount" binding:"required,gt=0"`
 }
 
 // AdminWalletCreditRequest is the body for POST /admin/wallet/credit/:user_id

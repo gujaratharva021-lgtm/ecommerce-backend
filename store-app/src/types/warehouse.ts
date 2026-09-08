@@ -1,4 +1,4 @@
-﻿export interface WarehouseStaff {
+export interface WarehouseStaff {
   id: number
   name: string
   phone: string
@@ -23,6 +23,7 @@ export interface Product {
   id: number
   name: string
   price: number
+  temperature_zone?: 'ambient' | 'chilled' | 'frozen'
 }
 
 export interface StockTransfer {
@@ -155,6 +156,11 @@ export interface PackingTask {
   completed_at?: string | null
   created_at: string
   updated_at: string
+  seal_number?: string
+  qc_ambient_ok?: boolean | null
+  qc_chilled_ok?: boolean | null
+  qc_frozen_ok?: boolean | null
+  qc_notes?: string
 }
 
 export interface PackingTaskResponse {

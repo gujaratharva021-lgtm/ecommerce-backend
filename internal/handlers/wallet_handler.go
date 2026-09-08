@@ -46,6 +46,33 @@ Transactions: transactions,
 })
 }
 
+// AddMoneyToWallet godoc
+// POST /api/v1/wallet/add-money (protected)
+// Credits the logged-in user's own wallet. No real payment gateway is
+// wired up yet, so this trusts the client-supplied amount directly - same
+// as the client-side behavior it replaces.
+func AddMoneyToWallet(c *gin.Context) {
+userID := c.MustGet("user_id").(uint)
+
+var req models.AddMoneyRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+var wallet models.Wallet
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+return utils.CreditWallet(tx, userID, req.Amount, models.WalletReasonAddMoney, "add_money", nil, "Added via app")
+})
+if txErr != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add money"})
+return
+}
+
+database.DB.Where("user_id = ?", userID).First(&wallet)
+c.JSON(http.StatusOK, gin.H{"wallet": wallet})
+}
+
 // ---------------------------------------------------------------------------
 // Wallet - admin side
 // ---------------------------------------------------------------------------

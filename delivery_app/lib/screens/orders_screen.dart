@@ -1,8 +1,7 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/location_service.dart';
-import 'login_screen.dart';
+import 'notifications_screen.dart';
 import 'order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -15,25 +14,19 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   List<dynamic> _orders = [];
-  Map<String, dynamic>? _earnings;
   bool _loading = true;
   String? _error;
-  String _filter = 'all';
-  bool? _isOnline;
-  bool _togglingOnline = false;
-
+  String _filter = 'active';
   final Set<int> _actingOrderIds = {};
 
   static const Color primaryPurple = Color(0xFF5B2A9E);
   static const Color pageBg = Color(0xFFF7F1FB);
-  static const Color bannerBg = Color(0xFFEDE6F7);
   static const Color cardBg = Color(0xFFF3EDFA);
 
   @override
   void initState() {
     super.initState();
     _loadAll();
-    _loadAvailability();
   }
 
   Future<void> _loadAll() async {
@@ -43,15 +36,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
     try {
       final orders = await ApiService.getMyDeliveries();
-      Map<String, dynamic>? earnings;
-      try {
-        earnings = await ApiService.getEarnings();
-      } catch (_) {
-        earnings = null;
-      }
       setState(() {
         _orders = orders;
-        _earnings = earnings;
         _loading = false;
       });
     } catch (e) {
@@ -59,32 +45,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _error = 'Failed to load orders';
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _loadAvailability() async {
-    try {
-      final data = await ApiService.getAvailability();
-      if (mounted) setState(() => _isOnline = data['is_online'] == true);
-    } catch (_) {
-      // Silently ignore - badge just wont show a definite state yet.
-    }
-  }
-
-  Future<void> _toggleOnline() async {
-    final next = !(_isOnline ?? false);
-    setState(() => _togglingOnline = true);
-    try {
-      final data = await ApiService.updateAvailability(next);
-      if (mounted) setState(() => _isOnline = data['is_online'] == true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _togglingOnline = false);
     }
   }
 
@@ -125,7 +85,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
     );
     if (confirmed != true) return;
-
     setState(() => _actingOrderIds.add(orderId));
     try {
       await ApiService.rejectAssignment(orderId, reason: reasonController.text);
@@ -141,39 +100,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Yes', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await ApiService.clearToken();
-      LocationService.stopTracking();
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
-    }
-  }
-
   List<dynamic> get _filteredOrders {
     if (_filter == 'active') {
-      return _orders.where((o) => (o['status'] ?? '') != 'delivered').toList();
+      return _orders.where((o) => (o['status'] ?? '') != 'delivered' && (o['status'] ?? '') != 'cancelled').toList();
     }
     if (_filter == 'completed') {
       return _orders.where((o) => (o['status'] ?? '') == 'delivered').toList();
@@ -205,17 +134,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  Color _iconBoxColor(String status) {
-    return status == 'delivered' ? const Color(0xFFE1F5E6) : const Color(0xFFE7DEF6);
-  }
-
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good Morning, Partner!';
-    if (h < 17) return 'Good Afternoon, Partner!';
-    return 'Good Evening, Partner!';
-  }
-
   String? _formatTime(dynamic raw) {
     if (raw == null) return null;
     try {
@@ -232,419 +150,190 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  void _openDetail(dynamic order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(order: order)),
+    ).then((_) => _loadAll());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final orders = _filteredOrders;
     return Scaffold(
       backgroundColor: pageBg,
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(child: Text(_error!))
-                : RefreshIndicator(
-                    onRefresh: _loadAll,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.menu, color: Colors.black87),
-                              onPressed: _confirmLogout,
-                              tooltip: 'Logout',
-                            ),
-                            const Text(
-                              'My Deliveries',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.notifications_none, color: Colors.black87),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('No new notifications')),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: bannerBg,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _greeting(),
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryPurple,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Stay safe, deliver smiles.',
-                                style: TextStyle(fontSize: 13, color: Colors.black54),
-                              ),
-                              const SizedBox(height: 14),
-                              GestureDetector(
-                                onTap: _togglingOnline ? null : _toggleOnline,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.circle,
-                                        color: _isOnline == true ? const Color(0xFF22C55E) : Colors.grey,
-                                        size: 10,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _isOnline == true ? 'Online' : 'Offline',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                      ),
-                                      if (_togglingOnline) ...[
-                                        const SizedBox(width: 6),
-                                        const SizedBox(
-                                          height: 10,
-                                          width: 10,
-                                          child: CircularProgressIndicator(strokeWidth: 1.5),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _FilterChip(
-                              label: 'All Orders',
-                              selected: _filter == 'all',
-                              onTap: () => setState(() => _filter = 'all'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: 'Active',
-                              selected: _filter == 'active',
-                              onTap: () => setState(() => _filter = 'active'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: 'Completed',
-                              selected: _filter == 'completed',
-                              onTap: () => setState(() => _filter = 'completed'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        if (_filteredOrders.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40),
-                            child: Center(child: Text('No orders here')),
-                          )
-                        else
-                          ...List.generate(_filteredOrders.length, (index) {
-                            final order = _filteredOrders[index];
-                            final status = (order['status'] ?? '').toString();
-                            final orderId = order['order_id'] as int;
-                            final assignmentStatus = order['assignment_status'];
-                            final isPendingResponse = assignmentStatus == 'assigned';
-                            final isActing = _actingOrderIds.contains(orderId);
-                            final city = order['address']?['city'];
-                            final state = order['address']?['state'];
-                            final location = [city, state].where((e) => e != null && e.toString().isNotEmpty).join(', ');
-                            final time = _formatTime(order['created_at'] ?? order['updated_at']);
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isPendingResponse ? Colors.orange.shade200 : cardBg,
-                                  width: isPendingResponse ? 1.6 : 1.2,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(16),
-                                      onTap: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (_) => OrderDetailScreen(order: order)),
-                                        );
-                                        _loadAll();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(14),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              width: 44,
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: _iconBoxColor(status),
-                                                borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'My Deliveries',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none, color: Colors.black87),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  _filterChip('New', 'new'),
+                  const SizedBox(width: 8),
+                  _filterChip('Active', 'active'),
+                  const SizedBox(width: 8),
+                  _filterChip('Completed', 'completed'),
+                  const SizedBox(width: 8),
+                  _filterChip('All', 'all'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(child: Text(_error!))
+                      : orders.isEmpty
+                          ? const Center(child: Text('No deliveries here', style: TextStyle(color: Colors.black45)))
+                          : RefreshIndicator(
+                              onRefresh: _loadAll,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                itemCount: orders.length,
+                                itemBuilder: (context, index) {
+                                  final o = orders[index];
+                                  final orderId = o['order_id'] ?? o['id'];
+                                  final status = (o['status'] ?? '').toString();
+                                  final isAssignedPending = status == 'confirmed' &&
+                                      (o['delivery_status'] == null || o['delivery_status'] == 'assigned');
+                                  final isActing = _actingOrderIds.contains(orderId);
+
+                                  return GestureDetector(
+                                    onTap: () => _openDetail(o),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(16)),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Icon(_statusIcon(status), size: 18, color: _statusColor(status)),
                                               ),
-                                              child: Icon(_statusIcon(status), color: primaryPurple, size: 22),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text('Order #$orderId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                                    if (_formatTime(o['created_at']) != null)
                                                       Text(
-                                                        'Order #$orderId',
-                                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                                                        _formatTime(o['created_at'])!,
+                                                        style: const TextStyle(fontSize: 11, color: Colors.black45),
                                                       ),
-                                                      if (isPendingResponse)
-                                                        _CountdownBadge(expiresAt: order['assignment_expires_at']?.toString())
-                                                      else
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                          decoration: BoxDecoration(
-                                                            color: _statusColor(status),
-                                                            borderRadius: BorderRadius.circular(20),
-                                                          ),
-                                                          child: Text(
-                                                            status.isEmpty
-                                                              ? ''
-                                                              : status.split('_').map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join(' '),
-                                                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  if (location.isNotEmpty)
-                                                    Text(location, style: const TextStyle(fontSize: 13, color: Colors.black54)),
-                                                  const SizedBox(height: 2),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(
-                                                        '\u20B9${order['total_amount']} \u2022 ${order['payment_method']?.toString().toUpperCase() ?? ''}',
-                                                        style: const TextStyle(fontSize: 13, color: Colors.black54),
-                                                      ),
-                                                      Row(
-                                                        children: [
-                                                          if (time != null)
-                                                            Text(time, style: const TextStyle(fontSize: 12, color: Colors.black45)),
-                                                          const SizedBox(width: 4),
-                                                          const Icon(Icons.chevron_right, size: 18, color: Colors.black38),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: _statusColor(status).withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  status.toUpperCase(),
+                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _statusColor(status)),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (o['total_amount'] != null) ...[
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '₹${o['total_amount']} · ${(o['payment_method'] ?? '').toString().toUpperCase()}',
+                                              style: const TextStyle(fontSize: 13, color: Colors.black54),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (isPendingResponse)
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: OutlinedButton(
-                                              onPressed: isActing ? null : () => _rejectOrder(orderId),
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: Colors.red,
-                                                side: const BorderSide(color: Colors.red),
-                                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                              ),
-                                              child: const Text('Reject'),
+                                          if (isAssignedPending) ...[
+                                            const SizedBox(height: 10),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: OutlinedButton(
+                                                    onPressed: isActing ? null : () => _rejectOrder(orderId),
+                                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                                    child: const Text('Reject'),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: ElevatedButton(
+                                                    onPressed: isActing ? null : () => _acceptOrder(orderId),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: primaryPurple,
+                                                      foregroundColor: Colors.white,
+                                                    ),
+                                                    child: isActing
+                                                        ? const SizedBox(
+                                                            height: 16,
+                                                            width: 16,
+                                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                                          )
+                                                        : const Text('Accept'),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: ElevatedButton(
-                                              onPressed: isActing ? null : () => _acceptOrder(orderId),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.green,
-                                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                              ),
-                                              child: isActing
-                                                  ? const SizedBox(
-                                                      height: 16,
-                                                      width: 16,
-                                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                                    )
-                                                  : const Text('Accept'),
-                                            ),
-                                          ),
+                                          ],
                                         ],
                                       ),
                                     ),
-                                ],
+                                  );
+                                },
                               ),
-                            );
-                          }),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                          decoration: BoxDecoration(
-                            color: bannerBg,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("Today's Deliveries", style: TextStyle(fontSize: 12, color: primaryPurple, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_earnings?['today_deliveries'] ?? 0}',
-                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("Today's Earnings", style: TextStyle(fontSize: 12, color: primaryPurple, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '\u20B9${_earnings?['today_earnings'] ?? 0}',
-                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
-
-  static const Color primaryPurple = Color(0xFF5B2A9E);
-  static const Color chipUnselectedBg = Color(0xFFE9E1F5);
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+  Widget _filterChip(String label, String value) {
+    final selected = _filter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _filter = value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? primaryPurple : chipUnselectedBg,
+          color: selected ? primaryPurple : Colors.white,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : Colors.black54),
         ),
       ),
     );
   }
 }
-
-class _CountdownBadge extends StatefulWidget {
-  final String? expiresAt;
-  const _CountdownBadge({required this.expiresAt});
-
-  @override
-  State<_CountdownBadge> createState() => _CountdownBadgeState();
-}
-
-class _CountdownBadgeState extends State<_CountdownBadge> {
-  Timer? _timer;
-  Duration? _remaining;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-  }
-
-  void _tick() {
-    if (widget.expiresAt == null) {
-      if (mounted) setState(() => _remaining = null);
-      return;
-    }
-    try {
-      final expiry = DateTime.parse(widget.expiresAt!).toLocal();
-      final diff = expiry.difference(DateTime.now());
-      if (mounted) setState(() => _remaining = diff.isNegative ? Duration.zero : diff);
-    } catch (_) {
-      if (mounted) setState(() => _remaining = null);
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    String label = 'Pending';
-    if (_remaining != null) {
-      final m = _remaining!.inMinutes;
-      final s = _remaining!.inSeconds % 60;
-      label = _remaining! == Duration.zero ? 'Expiring' : '${m}m ${s.toString().padLeft(2, '0')}s';
-    }
-    final urgent = _remaining != null && _remaining!.inSeconds < 30;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: urgent ? const Color(0xFFFDEAEA) : const Color(0xFFFFF4E5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: urgent ? Colors.red : Colors.orange.shade800,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-

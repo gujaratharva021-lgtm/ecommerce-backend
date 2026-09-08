@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 "errors"
@@ -109,6 +109,18 @@ func CompletePacking(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
 orderID := c.Param("id")
+type CompletePackingRequest struct {
+SealNumber  string `json:"seal_number" binding:"required"`
+QCAmbientOK *bool  `json:"qc_ambient_ok"`
+QCChilledOK *bool  `json:"qc_chilled_ok"`
+QCFrozenOK  *bool  `json:"qc_frozen_ok"`
+QCNotes     string `json:"qc_notes"`
+}
+var req CompletePackingRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
 
 var task models.PackingTask
 statusCode := http.StatusInternalServerError
@@ -130,6 +142,44 @@ return errors.New("Packing must be started before it can be completed")
 }
 
 now := time.Now()
+// Enforce seal number + QC checks before allowing completion. Only the
+// temperature zones actually present among this order's picked items are
+// required - an ambient-only order doesn't need a chilled QC check.
+if req.SealNumber == "" {
+statusCode = http.StatusBadRequest
+return errors.New("seal number is required to complete packing")
+}
+
+var pickedZones []string
+tx.Table("picking_task_items").
+Select("DISTINCT products.temperature_zone").
+Joins("JOIN products ON products.id = picking_task_items.product_id").
+Joins("JOIN picking_tasks ON picking_tasks.id = picking_task_items.picking_task_id").
+Where("picking_tasks.order_id = ?", orderID).
+Pluck("products.temperature_zone", &pickedZones)
+
+zoneRequired := map[string]bool{}
+for _, z := range pickedZones {
+zoneRequired[z] = true
+}
+if zoneRequired["ambient"] && (req.QCAmbientOK == nil || !*req.QCAmbientOK) {
+statusCode = http.StatusBadRequest
+return errors.New("QC check for ambient items is required before completing packing")
+}
+if zoneRequired["chilled"] && (req.QCChilledOK == nil || !*req.QCChilledOK) {
+statusCode = http.StatusBadRequest
+return errors.New("QC check for chilled items is required before completing packing")
+}
+if zoneRequired["frozen"] && (req.QCFrozenOK == nil || !*req.QCFrozenOK) {
+statusCode = http.StatusBadRequest
+return errors.New("QC check for frozen items is required before completing packing")
+}
+
+task.SealNumber = req.SealNumber
+task.QCAmbientOK = req.QCAmbientOK
+task.QCChilledOK = req.QCChilledOK
+task.QCFrozenOK = req.QCFrozenOK
+task.QCNotes = req.QCNotes
 task.Status = "completed"
 task.CompletedAt = &now
 if err := tx.Save(&task).Error; err != nil {

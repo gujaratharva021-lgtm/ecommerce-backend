@@ -1,6 +1,7 @@
-﻿package handlers
+package handlers
 
 import (
+"fmt"
 "net/http"
 "time"
 
@@ -39,6 +40,13 @@ if err := database.DB.Create(&deposit).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record COD deposit"})
 return
 }
+services.CreateDeliveryNotification(
+deposit.DeliveryPartnerID,
+"COD settlement verified",
+fmt.Sprintf("Your cash deposit of Rs.%.2f has been verified.", deposit.Amount),
+"cod_settlement_verified",
+nil,
+)
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "create_rider_cod_deposit", "rider_cod_deposit", "", "pending")
 c.JSON(http.StatusCreated, deposit)

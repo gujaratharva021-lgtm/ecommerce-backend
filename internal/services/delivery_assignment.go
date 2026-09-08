@@ -1,4 +1,4 @@
-﻿package services
+package services
 
 import (
     "errors"
@@ -238,9 +238,11 @@ func AutoAssignDeliveryPartner(orderID uint) {
             Updates(map[string]interface{}{
                 "delivery_partner_id":            bestPartner.ID,
                 "delivery_assignment_status":     assignedStatus,
+                "delivery_status":                models.DeliveryStatusAssigned,
                 "delivery_rejection_reason":      nil,
                 "delivery_assignment_expires_at": time.Now().Add(AssignmentTimeout()),
                 "delivery_attempted_partner_ids": fmt.Sprint(bestPartner.ID),
+                "assigned_at":                    time.Now(),
             })
         if result.Error != nil {
             return fmt.Errorf("failed to assign partner %d to order %d: %w", bestPartner.ID, order.ID, result.Error)
@@ -268,5 +270,19 @@ func AutoAssignDeliveryPartner(orderID uint) {
         "New delivery assigned",
         fmt.Sprintf("Order #%d has been assigned to you", orderID),
     )
+CreateDeliveryNotification(
+assignedPartnerID,
+"New delivery assigned",
+fmt.Sprintf("Order #%d has been assigned to you", orderID),
+"new_assignment",
+&orderID,
+)
+CreateDeliveryNotification(
+assignedPartnerID,
+"New delivery assigned",
+fmt.Sprintf("Order #%d has been assigned to you", orderID),
+"new_assignment",
+&orderID,
+)
 }
 

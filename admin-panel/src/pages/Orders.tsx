@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import { listOrders, updateOrderStatus, assignDeliveryPartner, listDeliveryPartners } from '../api/admin'
 import type { Order, DeliveryPartner } from '../types/admin'
@@ -131,6 +131,7 @@ export default function Orders() {
                   <th className="px-4 py-3 font-medium">Products</th>
                   <th className="px-4 py-3 font-medium">Total</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Payment</th>
                   <th className="px-4 py-3 font-medium">Update</th>
                   <th className="px-4 py-3 font-medium">Assign Delivery</th>
                 </tr>
@@ -146,7 +147,7 @@ export default function Orders() {
                           {o.items.map((it) => (
                             <div key={it.id} className="text-slate-300">
                               {it.product?.name ?? `Product #${it.product_id}`}
-                              <span className="text-slate-500"> Ãƒâ€” {it.quantity}</span>
+                              <span className="text-slate-500"> × {it.quantity}</span>
                             </div>
                           ))}
                         </div>
@@ -154,7 +155,7 @@ export default function Orders() {
                         <span className="text-xs text-slate-500">No items</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">â‚¹{o.total_amount}</td>
+                    <td className="px-4 py-3">₹{o.total_amount}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-md text-xs font-medium ${
@@ -162,6 +163,11 @@ export default function Orders() {
                         }`}
                       >
                         {o.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-md ${o.payment_status === "paid" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                        {o.payment_status ?? "-"} ({o.payment_method ?? "-"})
                       </span>
                     </td>
                     <td className="px-4 py-3">

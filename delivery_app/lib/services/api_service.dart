@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://ecommerce-backend-dd4u.onrender.com/api/v1';
+  static const String baseUrl = 'https://32-196-3-31.sslip.io/api/v1';
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -153,6 +153,78 @@ class ApiService {
     final res = await http.get(Uri.parse('$baseUrl/delivery/earnings'), headers: await _headers());
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load earnings');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> getCODSummary() async {
+    final res = await http.get(Uri.parse('$baseUrl/delivery/cod-summary'), headers: await _headers());
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load COD summary');
+    return data;
+  }
+
+  static Future<List<dynamic>> getCODSettlements() async {
+    final res = await http.get(Uri.parse('$baseUrl/delivery/cod-settlements'), headers: await _headers());
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load settlement history');
+    return data['settlements'] ?? [];
+  }
+
+  static Future<Map<String, dynamic>> getNotifications({bool unreadOnly = false}) async {
+    var url = '$baseUrl/delivery/notifications';
+    if (unreadOnly) url += '?unread_only=true';
+    final res = await http.get(Uri.parse(url), headers: await _headers());
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load notifications');
+    return data;
+  }
+
+  static Future<void> markNotificationRead(int notificationId) async {
+    await http.put(
+      Uri.parse('$baseUrl/delivery/notifications/$notificationId/read'),
+      headers: await _headers(),
+    );
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await http.put(
+      Uri.parse('$baseUrl/delivery/notifications/read-all'),
+      headers: await _headers(),
+    );
+  }
+
+  static Future<Map<String, dynamic>> resolveFailedDelivery(
+    int orderId,
+    String action,
+    String reason,
+  ) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/orders/$orderId/resolve-failed'),
+      headers: await _headers(),
+      body: jsonEncode({'action': action, 'reason': reason}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to resolve delivery');
+    return data;
+  }
+
+
+
+  static Future<Map<String, dynamic>> getProfile() async {
+    final res = await http.get(Uri.parse('$baseUrl/delivery/profile'), headers: await _headers());
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load profile');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> fields) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/delivery/profile'),
+      headers: await _headers(),
+      body: jsonEncode(fields),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to update profile');
     return data;
   }
 }

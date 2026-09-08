@@ -1,4 +1,4 @@
-﻿package routes
+package routes
 
 import (
     "time"
@@ -27,6 +27,7 @@ func SetupRoutes(router *gin.Engine) {
             auth.POST("/verify-otp", middleware.RateLimit(10, time.Minute), handlers.VerifyOTP)
             auth.GET("/me", middleware.AuthMiddleware(), handlers.Me)
             auth.PUT("/me", middleware.AuthMiddleware(), handlers.UpdateProfile)
+auth.DELETE("/me", middleware.AuthMiddleware(), handlers.DeleteAccount)
         }
 
         // ---- Product routes (public) ----
@@ -45,6 +46,10 @@ func SetupRoutes(router *gin.Engine) {
         categories := api.Group("/categories")
         {
             categories.GET("", handlers.GetCategories)
+            subcategories := api.Group("/subcategories")
+            {
+                subcategories.GET("", handlers.GetSubcategories)
+            }
         }
 
         api.POST("/device-token", handlers.RegisterDeviceToken)
@@ -57,7 +62,14 @@ func SetupRoutes(router *gin.Engine) {
 
         // ---- Wallet routes (protected) ----
         api.GET("/wallet", middleware.AuthMiddleware(), handlers.GetWallet)
+api.POST("/wallet/add-money", middleware.AuthMiddleware(), handlers.AddMoneyToWallet)
         api.GET("/returns", middleware.AuthMiddleware(), handlers.GetMyReturns)
+
+        // ---- Support ticket routes (protected, customer-facing) ----
+        api.POST("/support/tickets", middleware.AuthMiddleware(), handlers.CreateTicket)
+        api.GET("/support/tickets", middleware.AuthMiddleware(), handlers.GetMyTickets)
+        api.GET("/support/tickets/:id/messages", middleware.AuthMiddleware(), handlers.GetTicketMessages)
+        api.POST("/support/tickets/:id/messages", middleware.AuthMiddleware(), handlers.ReplyToTicket)
 
         delivery := api.Group("/delivery")
         {
@@ -76,7 +88,13 @@ func SetupRoutes(router *gin.Engine) {
             delivery.PUT("/orders/:id/accept", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.AcceptAssignment)
             delivery.PUT("/orders/:id/reject", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.RejectAssignment)
             delivery.PUT("/orders/:id/delivery-status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateDeliveryStatus)
+delivery.PUT("/orders/:id/resolve-failed", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.ResolveFailedDelivery)
             delivery.GET("/earnings", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyEarnings)
+delivery.GET("/cod-summary", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyCODSummary)
+delivery.GET("/cod-settlements", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyCODSettlements)
+delivery.GET("/notifications", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyDeliveryNotifications)
+delivery.PUT("/notifications/:id/read", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.MarkDeliveryNotificationRead)
+delivery.PUT("/notifications/read-all", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.MarkAllDeliveryNotificationsRead)
         }
 
         warehouse := api.Group("/warehouse")
@@ -114,33 +132,33 @@ func SetupRoutes(router *gin.Engine) {
                 warehouseAuthed.GET("/exceptions/:id", handlers.GetWarehouseException)
                 warehouseAuthed.PUT("/exceptions/:id", handlers.UpdateWarehouseException)
                 warehouseAuthed.GET("/staff/performance/me", handlers.GetMyPerformance)
-                warehouseAuthed.GET("/staff/performance", handlers.GetWarehouseStaffPerformance)
-                warehouseAuthed.GET("/staff", handlers.GetWarehouseStaffOverview)
+                warehouseAuthed.GET("/staff/performance", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseStaffPerformance)
+                warehouseAuthed.GET("/staff", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseStaffOverview)
                 warehouseAuthed.GET("/zones", handlers.GetWarehouseZones)
-                warehouseAuthed.POST("/zones", handlers.CreateWarehouseZone)
-                warehouseAuthed.DELETE("/zones/:zoneId", handlers.DeleteZone)
+                warehouseAuthed.POST("/zones", middleware.InventoryManagerOnly(), handlers.CreateWarehouseZone)
+                warehouseAuthed.DELETE("/zones/:zoneId", middleware.InventoryManagerOnly(), handlers.DeleteZone)
                 warehouseAuthed.GET("/zones/:zoneId/racks", handlers.GetZoneRacks)
-                warehouseAuthed.POST("/zones/:zoneId/racks", handlers.CreateRack)
-                warehouseAuthed.DELETE("/racks/:rackId", handlers.DeleteRack)
+                warehouseAuthed.POST("/zones/:zoneId/racks", middleware.InventoryManagerOnly(), handlers.CreateRack)
+                warehouseAuthed.DELETE("/racks/:rackId", middleware.InventoryManagerOnly(), handlers.DeleteRack)
                 warehouseAuthed.GET("/racks/:rackId/bins", handlers.GetRackBins)
-                warehouseAuthed.POST("/racks/:rackId/bins", handlers.CreateBin)
-                warehouseAuthed.DELETE("/bins/:binId", handlers.DeleteBin)
+                warehouseAuthed.POST("/racks/:rackId/bins", middleware.InventoryManagerOnly(), handlers.CreateBin)
+                warehouseAuthed.DELETE("/bins/:binId", middleware.InventoryManagerOnly(), handlers.DeleteBin)
                 warehouseAuthed.GET("/inventory", handlers.GetWarehouseInventory)
                 warehouseAuthed.GET("/inventory/:productId", handlers.GetProductInventory)
-                warehouseAuthed.POST("/inventory/:productId/adjust", handlers.AdjustStock)
+                warehouseAuthed.POST("/inventory/:productId/adjust", middleware.InventoryManagerOnly(), handlers.AdjustStock)
                 warehouseAuthed.GET("/stock-movements", handlers.GetStockMovements)
-                warehouseAuthed.POST("/receiving", handlers.CreateReceiving)
+                warehouseAuthed.POST("/receiving", middleware.InventoryManagerOnly(), handlers.CreateReceiving)
                 warehouseAuthed.GET("/receiving", handlers.GetWarehouseReceivings)
                 warehouseAuthed.GET("/receiving/:id", handlers.GetReceiving)
-                warehouseAuthed.PUT("/receiving/:id/receive", handlers.MarkReceiving)
-                warehouseAuthed.PUT("/receiving/:id/qc", handlers.QCReceiving)
-                warehouseAuthed.PUT("/receiving/:id/putaway", handlers.PutAwayReceiving)
-                warehouseAuthed.POST("/batches", handlers.CreateBatch)
+                warehouseAuthed.PUT("/receiving/:id/receive", middleware.InventoryManagerOnly(), handlers.MarkReceiving)
+                warehouseAuthed.PUT("/receiving/:id/qc", middleware.InventoryManagerOnly(), handlers.QCReceiving)
+                warehouseAuthed.PUT("/receiving/:id/putaway", middleware.InventoryManagerOnly(), handlers.PutAwayReceiving)
+                warehouseAuthed.POST("/batches", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.CreateBatch)
                 warehouseAuthed.GET("/batches", handlers.GetWarehouseBatches)
                 warehouseAuthed.GET("/batches/expiring", handlers.GetExpiringBatches)
-                warehouseAuthed.PUT("/batches/:id/quantity", handlers.AdjustBatchQuantity)
-                warehouseAuthed.DELETE("/batches/:id", handlers.DeleteBatch)
-                warehouseAuthed.GET("/audit-logs", handlers.GetWarehouseAuditLogs)
+                warehouseAuthed.PUT("/batches/:id/quantity", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.AdjustBatchQuantity)
+                warehouseAuthed.DELETE("/batches/:id", middleware.RequireWarehouseRole(middleware.RoleInventoryOps...), handlers.DeleteBatch)
+                warehouseAuthed.GET("/audit-logs", middleware.RequireWarehouseRole(middleware.RoleManagement...), handlers.GetWarehouseAuditLogs)
                 warehouseAuthed.GET("/notifications", handlers.GetWarehouseNotifications)
                 warehouseAuthed.PUT("/notifications/:id/read", handlers.MarkNotificationRead)
                 warehouseAuthed.PUT("/notifications/read-all", handlers.MarkAllNotificationsRead)
@@ -215,12 +233,44 @@ orders.GET("/:id/invoice/pdf", handlers.GetMyOrderInvoicePDF)
         // ---- Admin routes (protected, admin role only) ----
         admin := api.Group("/admin")
         admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
+admin.GET("/control-tower", handlers.GetControlTowerOverview)
+admin.PUT("/control-tower/platform-pause", handlers.UpdatePlatformPause)
+admin.PUT("/control-tower/city-status", handlers.UpdateCityStoreStatus)
+admin.GET("/control-tower/operations", handlers.GetLiveOperations)
+admin.GET("/control-tower/settings", handlers.GetControlTowerSettings)
+admin.PUT("/control-tower/settings/cod", handlers.UpdateCODEnabled)
+admin.GET("/delivery/unassigned-orders", handlers.GetUnassignedOrders)
+admin.GET("/delivery/active", handlers.GetActiveDeliveries)
+admin.GET("/delivery/rider-workload", handlers.GetRiderWorkload)
+admin.GET("/delivery/failed", handlers.GetFailedDeliveries)
+
+adminProcurement := admin.Group("/procurement")
+{
+adminProcurement.GET("/purchase-orders", handlers.ListPurchaseOrders)
+adminProcurement.GET("/purchase-orders/:id", handlers.GetPurchaseOrder)
+adminProcurement.POST("/purchase-orders", handlers.CreatePurchaseOrder)
+adminProcurement.PUT("/purchase-orders/:id/status", handlers.UpdatePurchaseOrderStatus)
+adminProcurement.POST("/purchase-orders/:id/receive", handlers.ReceivePurchaseOrderItems)
+adminProcurement.GET("/replenishment", handlers.GetReplenishmentSuggestions)
+}
+admin.PUT("/products/:id/reorder-level", handlers.UpdateProductReorderLevel)
+
+adminSuppliers := admin.Group("/procurement/suppliers")
+{
+adminSuppliers.GET("", handlers.ListVendors)
+adminSuppliers.POST("", handlers.CreateVendor)
+adminSuppliers.PUT("/:id", handlers.UpdateVendor)
+adminSuppliers.DELETE("/:id", handlers.DeleteVendor)
+}
         {
             adminFinance := admin.Group("/finance")
             adminFinance.Use(middleware.FinanceOnly())
             {
 adminFinance.GET("/dashboard", handlers.FinanceDashboard)
                 adminFinance.GET("/revenue", handlers.GetRevenueSummary)
+				adminFinance.GET("/mismatch-center", handlers.ListMismatches)
+				adminFinance.POST("/mismatch-center/dismiss", handlers.DismissMismatch)
+				adminFinance.POST("/mismatch-center/undismiss", handlers.UndismissMismatch)
                 adminFinance.GET("/profit-loss", handlers.GetProfitLoss)
                 adminFinance.GET("/gst", handlers.GetGSTSummary)
                 adminFinance.GET("/mis", handlers.GetWeeklyMIS)
@@ -322,6 +372,13 @@ adminFinance.POST("/expenses/:id/pay", handlers.PayExpense)
                 adminCategories.POST("", handlers.CreateCategory)
                 adminCategories.PUT("/:id", handlers.UpdateCategory)
                 adminCategories.DELETE("/:id", handlers.DeleteCategory)
+
+                adminSubcategories := admin.Group("/subcategories")
+                {
+                    adminSubcategories.POST("", handlers.CreateSubcategory)
+                    adminSubcategories.PUT("/:id", handlers.UpdateSubcategory)
+                    adminSubcategories.DELETE("/:id", handlers.DeleteSubcategory)
+                }
             }
 
             adminProducts := admin.Group("/products")
@@ -357,6 +414,7 @@ adminFinance.POST("/expenses/:id/pay", handlers.PayExpense)
             {
                 adminAnalytics.GET("/summary", handlers.GetAnalyticsSummary)
                 adminAnalytics.GET("/products", handlers.GetProductPerformance)
+                adminAnalytics.GET("/picker-performance", handlers.GetAdminPickerPerformance)
                 adminAnalytics.GET("/dashboard", handlers.GetDashboardOverview)
             }
 
@@ -457,6 +515,7 @@ adminDeliveryPartners.GET("/:id/location", handlers.GetDeliveryPartnerLocation)
                     adminSupportTickets.GET("/:id/messages", handlers.GetTicketMessagesAdmin)
                     adminSupportTickets.POST("/:id/messages", handlers.AdminReplyToTicket)
                     adminSupportTickets.PUT("/:id/status", handlers.UpdateTicketStatus)
+adminSupportTickets.PUT("/:id", handlers.UpdateTicket)
                 }
 
                 adminPayments := admin.Group("/payments")
@@ -487,6 +546,7 @@ adminReports.GET("/rider-payable", handlers.GetRiderPayableReport)
 adminReports.GET("/gateway-settlement", handlers.GetGatewaySettlementReport)
 adminReports.GET("/cash-flow", handlers.GetCashFlowReport)
 adminReports.GET("/balance-sheet", handlers.GetBalanceSheet)
+adminReports.GET("/operations", handlers.GetOperationsReport)
                 }
             }
         }

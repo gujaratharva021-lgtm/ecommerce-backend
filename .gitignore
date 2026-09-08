@@ -59,3 +59,25 @@ manual-entry.json
 approval-update.json
 products_cost_price.csv
 *-test.xlsx
+
+# Local scratch files (not part of source)
+application
+application_new
+application_new.zip
+app_new
+backfill_sale_ledger_linux
+backfill_output.txt
+check_stock.py
+check_stock2.py
+check_stock3.py
+debugtest.js
+loadtest.js
+k6/aws-health-test.js
+k6/loadtest.js
+k6/console_output.txt
+output.txt
+new_domain.conf
+*.pdf
+assign742.json
+assign743.json
+unassigned_orders.json

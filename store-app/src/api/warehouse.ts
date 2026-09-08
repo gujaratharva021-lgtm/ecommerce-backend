@@ -1,4 +1,4 @@
-﻿import apiClient from './client'
+import apiClient from './client'
 import type {
   StockTransfer,
   OrdersResponse,
@@ -95,9 +95,18 @@ export const getPackingTask = (orderId: number) =>
 export const startPacking = (orderId: number) =>
   apiClient.put(`/warehouse/packing/${orderId}/start`).then((r) => r.data as PackingTask)
 
-export const completePacking = (orderId: number) =>
+export const completePacking = (
+  orderId: number,
+  payload: {
+    seal_number: string
+    qc_ambient_ok?: boolean
+    qc_chilled_ok?: boolean
+    qc_frozen_ok?: boolean
+    qc_notes?: string
+  },
+) =>
   apiClient
-    .put(`/warehouse/packing/${orderId}/complete`)
+    .put(`/warehouse/packing/${orderId}/complete`, payload)
     .then((r) => r.data as { success: boolean; packing_task: PackingTask; order_status: string })
 
 

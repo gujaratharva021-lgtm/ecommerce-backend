@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"errors"
@@ -194,7 +194,16 @@ func AssignDeliveryPartner(c *gin.Context) {
 			return errAssignPartnerOffline
 		}
 
-		newStatus := models.DeliveryAssignmentStatusAssigned
+		                // AssignedAt is set once, on the very first successful
+                // assignment - later re-assignments (e.g. after a rejection)
+                // must not overwrite the original confirmed-to-assigned
+                // duration used for operations analytics.
+                assignedAtValue := order.AssignedAt
+                if assignedAtValue == nil {
+                        now := time.Now()
+                        assignedAtValue = &now
+                }
+newStatus := models.DeliveryAssignmentStatusAssigned
 		expiresAt := time.Now().Add(services.AssignmentTimeout())
 		order.DeliveryPartnerID = &req.DeliveryPartnerID
 		order.DeliveryAssignmentStatus = &newStatus
@@ -207,6 +216,7 @@ func AssignDeliveryPartner(c *gin.Context) {
 			"delivery_assignment_expires_at": expiresAt,
 			"delivery_attempted_partner_ids": fmt.Sprint(req.DeliveryPartnerID),
 			"delivery_status":                models.DeliveryStatusAssigned,
+                    "assigned_at":                    assignedAtValue,
 		}).Error; err != nil {
 			return fmt.Errorf("failed to assign delivery partner: %w", err)
 		}
@@ -241,6 +251,13 @@ func AssignDeliveryPartner(c *gin.Context) {
 		"New delivery assigned",
 		fmt.Sprintf("Order #%d has been assigned to you", order.ID),
 	)
+services.CreateDeliveryNotification(
+req.DeliveryPartnerID,
+"New delivery assigned",
+fmt.Sprintf("Order #%d has been assigned to you", order.ID),
+"new_assignment",
+&order.ID,
+)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Delivery partner assigned", "order": order})
 }
@@ -458,6 +475,38 @@ func UpdateDeliveryStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Delivery status updated", "order": toAssignedOrderSummary(*order)})
 }
 
+// ResolveFailedDelivery godoc
+// PUT /api/v1/delivery/orders/:id/resolve-failed (delivery partner only)
+// Explicitly resolves an order stuck in FAILED_DELIVERY - either "retry"
+// (back out for delivery, with a fresh OTP) or "return" (terminal, back to
+// the store). Always requires a reason, recorded for admin/ops visibility.
+func ResolveFailedDelivery(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+orderID64, convErr := strconv.ParseUint(c.Param("id"), 10, 64)
+if convErr != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+return
+}
+var req models.ResolveFailedDeliveryRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+order, _, err := services.ResolveFailedDelivery(uint(orderID64), partnerID, req.Action, req.Reason)
+if err != nil {
+switch {
+case errors.Is(err, services.ErrDeliveryStatusOrderNotOwned):
+c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+case errors.Is(err, services.ErrDeliveryStatusInvalidTransition):
+c.JSON(http.StatusBadRequest, gin.H{"error": "Order is not in a failed-delivery state, or the requested action is invalid"})
+default:
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve delivery"})
+}
+return
+}
+c.JSON(http.StatusOK, gin.H{"message": "Delivery resolved", "order": toAssignedOrderSummary(*order)})
+}
+
 // UpdateDeliveryOrderStatus godoc
 // PUT /api/v1/delivery/orders/:id/status (delivery partner only)
 // Lets the assigned partner move an order from confirmed -> shipped
@@ -528,6 +577,8 @@ func ConfirmDelivery(c *gin.Context) {
 	}
 
 	order.Status = models.OrderStatusDelivered
+        deliveredAt := time.Now()
+        order.DeliveredAt = &deliveredAt
 	if order.PaymentMethod == models.PaymentMethodCOD {
 		order.PaymentStatus = models.OrderPaymentStatusPaid
 	}

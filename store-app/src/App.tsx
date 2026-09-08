@@ -1,9 +1,13 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Locations from './pages/Locations'
+import Batches from './pages/Batches'
+import StockMovements from './pages/StockMovements'
+import AuditLogs from './pages/AuditLogs'
 import Orders from './pages/Orders'
 import Picking from './pages/Picking'
 import Packing from './pages/Packing'
@@ -29,6 +33,10 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/locations" element={<Protected><Locations /></Protected>} />
+          <Route path="/batches" element={<Protected><Batches /></Protected>} />
+          <Route path="/stock-movements" element={<Protected><StockMovements /></Protected>} />
+          <Route path="/audit-logs" element={<Protected><AuditLogs /></Protected>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
           <Route path="/picking/:orderId" element={<Protected><Picking /></Protected>} />
           <Route path="/packing/:orderId" element={<Protected><Packing /></Protected>} />
@@ -46,5 +54,9 @@ function App() {
 }
 
 export default App
+
+
+
+
 
 

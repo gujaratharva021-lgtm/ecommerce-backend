@@ -5,6 +5,14 @@ import type { PackingTaskResponse } from '../types/warehouse'
 import StatusBadge from '../components/StatusBadge'
 import { getErrorMessage } from '../utils/errors'
 
+type Zone = 'ambient' | 'chilled' | 'frozen'
+
+const ZONE_LABELS: Record<Zone, string> = {
+  ambient: 'Ambient',
+  chilled: 'Chilled',
+  frozen: 'Frozen',
+}
+
 export default function Packing() {
   const { orderId } = useParams()
   const navigate = useNavigate()
@@ -13,6 +21,12 @@ export default function Packing() {
   const [error, setError] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
   const [isCompleting, setIsCompleting] = useState(false)
+
+  const [sealNumber, setSealNumber] = useState('')
+  const [qcAmbient, setQcAmbient] = useState(false)
+  const [qcChilled, setQcChilled] = useState(false)
+  const [qcFrozen, setQcFrozen] = useState(false)
+  const [qcNotes, setQcNotes] = useState('')
 
   const load = useCallback(async () => {
     if (!orderId) return
@@ -50,10 +64,18 @@ export default function Packing() {
     setIsCompleting(true)
     setError(null)
     try {
-      await completePacking(Number(orderId))
+      await completePacking(Number(orderId), {
+        seal_number: sealNumber.trim(),
+        qc_ambient_ok: requiredZones.has('ambient') ? qcAmbient : undefined,
+        qc_chilled_ok: requiredZones.has('chilled') ? qcChilled : undefined,
+        qc_frozen_ok: requiredZones.has('frozen') ? qcFrozen : undefined,
+        qc_notes: qcNotes.trim() || undefined,
+      })
       await load()
     } catch (err) {
-      // Double-pack prevention surfaces here as a 409/400 from the backend.
+      // Missing seal, missing QC for a required zone, or double-pack
+      // prevention all surface here as a 400/409/422 from the backend -
+      // getErrorMessage pulls the backend's exact reason through.
       setError(getErrorMessage(err, 'Failed to complete packing.'))
     } finally {
       setIsCompleting(false)
@@ -74,6 +96,19 @@ export default function Packing() {
 
   const { packing_task: task, picked_items: items } = data
   const exceptions = items.filter((i) => i.status === 'unavailable' || i.status === 'short')
+
+  // Which temperature zones are actually present among this order's items.
+  // Only these get a QC checkbox - an ambient-only order never shows
+  // chilled/frozen checks. Falls back to 'ambient' when a product hasn't
+  // been classified yet, so nothing silently skips QC.
+  const requiredZones = new Set<Zone>(
+    items.map((i) => (i.product?.temperature_zone ?? 'ambient') as Zone),
+  )
+
+  const canComplete = sealNumber.trim().length > 0 &&
+    (!requiredZones.has('ambient') || qcAmbient) &&
+    (!requiredZones.has('chilled') || qcChilled) &&
+    (!requiredZones.has('frozen') || qcFrozen)
 
   return (
     <div className="p-6 max-w-3xl">
@@ -130,18 +165,70 @@ export default function Packing() {
       )}
 
       {task.status === 'in_progress' && (
-        <button
-          onClick={handleComplete}
-          disabled={isCompleting}
-          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          {isCompleting ? 'Completing...' : 'Complete Packing'}
-        </button>
+        <div className="border border-slate-800 rounded-xl bg-slate-900 p-5 space-y-4">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Temperature Zones</p>
+          <div className="space-y-2">
+            {(['ambient', 'chilled', 'frozen'] as Zone[]).map((zone) => {
+              const required = requiredZones.has(zone)
+              const checked = zone === 'ambient' ? qcAmbient : zone === 'chilled' ? qcChilled : qcFrozen
+              const setChecked = zone === 'ambient' ? setQcAmbient : zone === 'chilled' ? setQcChilled : setQcFrozen
+              return (
+                <label
+                  key={zone}
+                  className={`flex items-center gap-2 text-sm ${required ? 'text-slate-200' : 'text-slate-600'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!required}
+                    onChange={(e) => setChecked(e.target.checked)}
+                    className="accent-emerald-500"
+                  />
+                  {ZONE_LABELS[zone]} QC Passed
+                  {!required && <span className="text-xs text-slate-600">&mdash; not required</span>}
+                </label>
+              )
+            })}
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-slate-500 mb-1">Seal Number</label>
+            <input
+              type="text"
+              value={sealNumber}
+              onChange={(e) => setSealNumber(e.target.value)}
+              placeholder={`SEAL-2026-${String(task.order_id).padStart(6, '0')}`}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-slate-500 mb-1">QC Notes</label>
+            <textarea
+              value={qcNotes}
+              onChange={(e) => setQcNotes(e.target.value)}
+              rows={2}
+              placeholder="Optional - damage, mismatch, or other notes"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <button
+            onClick={handleComplete}
+            disabled={isCompleting || !canComplete}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {isCompleting ? 'Completing...' : 'Complete Packing'}
+          </button>
+        </div>
       )}
 
       {task.status === 'completed' && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-emerald-300">Order is ready for dispatch.</span>
+        <div className="space-y-2">
+          <span className="text-sm text-emerald-300 block">Order is ready for dispatch.</span>
+          {task.seal_number && (
+            <p className="text-xs text-slate-400">Seal: <span className="text-slate-200">{task.seal_number}</span></p>
+          )}
           <button
             onClick={() => navigate('/orders?status=ready_for_dispatch')}
             className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors"
