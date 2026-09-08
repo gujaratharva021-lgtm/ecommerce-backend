@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "net/http"
@@ -7,6 +7,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetWarehouseDashboard godoc
@@ -24,9 +25,11 @@ database.DB.Model(&models.Order{}).Where("warehouse_id = ? AND status = ?", ware
 database.DB.Model(&models.Order{}).Where("warehouse_id = ? AND status = ? AND created_at >= ?", warehouseID, models.OrderStatusDelivered, todayStart).Count(&completed)
 database.DB.Model(&models.Order{}).Where("warehouse_id = ? AND status = ? AND created_at >= ?", warehouseID, models.OrderStatusCancelled, todayStart).Count(&cancelled)
 
-var lowStock, outOfStock int64
-database.DB.Model(&models.Inventory{}).Where("warehouse_id = ? AND stock > 0 AND stock < ?", warehouseID, lowStockThreshold).Count(&lowStock)
-database.DB.Model(&models.Inventory{}).Where("warehouse_id = ? AND stock <= 0", warehouseID).Count(&outOfStock)
+lowStock, outOfStock, err := services.CountLowAndOutOfStock(warehouseID)
+if err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute stock status"})
+return
+}
 
 var pendingTransfers int64
 database.DB.Model(&models.StockTransfer{}).

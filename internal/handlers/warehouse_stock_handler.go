@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -81,13 +81,16 @@ return
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "stock_adjustment", "inventory", productID,
 fmt.Sprintf("stock=%d", previousQty), fmt.Sprintf("stock=%d reason=%s", req.NewQuantity, req.Reason))
 
+var warehouseForThreshold models.Warehouse
+database.DB.First(&warehouseForThreshold, warehouseID)
+threshold := services.ResolveLowStockThresholdFor(inv, warehouseForThreshold)
 if inv.Stock <= 0 {
 services.NotifyWarehouse(warehouseID, models.WhNotifyOutOfStock,
 "Product out of stock", fmt.Sprintf("Product #%d is now out of stock at your warehouse.", productIDUint64),
 nil, ptrUint(uint(productIDUint64)))
-} else if inv.Stock < lowStockThreshold {
+} else if inv.Stock < threshold {
 services.NotifyWarehouse(warehouseID, models.WhNotifyLowStock,
-"Low stock warning", fmt.Sprintf("Product #%d is running low (%d left).", productIDUint64, inv.Stock),
+"Low stock warning", fmt.Sprintf("Product #%d is running low (%d left, threshold %d).", productIDUint64, inv.Stock, threshold),
 nil, ptrUint(uint(productIDUint64)))
 }
 

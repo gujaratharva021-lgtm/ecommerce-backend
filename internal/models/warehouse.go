@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import (
 "time"
@@ -22,6 +22,10 @@ IsActive        bool           `gorm:"default:true" json:"is_active"`
 WarehouseType   string         `gorm:"default:dark_store" json:"warehouse_type"`
 Status          string         `gorm:"default:open" json:"status"`
 Capacity        int            `gorm:"default:0" json:"capacity"`
+// LowStockThreshold is this warehouse default low-stock cutoff, used
+// as the fallback when a specific Inventory row has no override. Nil
+// means the global default of 10 applies - see resolveLowStockThreshold.
+LowStockThreshold *int         `json:"low_stock_threshold,omitempty"`
 OpeningTime     *string        `json:"opening_time,omitempty"`
 ClosingTime     *string        `json:"closing_time,omitempty"`
 CreatedAt       time.Time      `json:"created_at"`

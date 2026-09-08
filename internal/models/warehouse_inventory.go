@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 // WarehouseInventoryQuery is the query for GET /warehouse/inventory (warehouse staff only).
 type WarehouseInventoryQuery struct {
@@ -35,6 +35,10 @@ ZoneName       string  `json:"zone_name,omitempty"`
 ExpiredQty     int     `json:"expired_qty"`
 LastDamagedAt  *string `json:"last_damaged_at,omitempty"`
 LastDamagedQty int     `json:"last_damaged_qty,omitempty"`
+// Threshold is the resolved low-stock cutoff used to compute StockStatus
+// for this row (Inventory override -> Warehouse default -> global 10).
+// Varies per row, so it is not a single warehouse-wide value anymore.
+Threshold      int     `json:"threshold"`
 }
 
 // WarehouseInventoryResponse wraps the paginated result plus warehouse-wide
@@ -50,5 +54,4 @@ LowStockCount     int64                   `json:"low_stock_count"`
 OutOfStockCount   int64                   `json:"out_of_stock_count"`
 DamagedCount      int64                   `json:"damaged_count"`
 ExpiredCount      int64                   `json:"expired_count"`
-LowStockThreshold int                     `json:"low_stock_threshold"`
 }

@@ -291,6 +291,11 @@ if _, err := services.GenerateInvoiceIfNotExists(order.ID); err != nil {
 log.Printf("failed to generate invoice for COD order %d: %v", order.ID, err)
 }
 }
+if order.WarehouseID != nil {
+for _, item := range order.Items {
+go services.CheckAndNotifyLowStock(item.ProductID, *order.WarehouseID)
+}
+}
 }
 
 c.JSON(http.StatusCreated, order)

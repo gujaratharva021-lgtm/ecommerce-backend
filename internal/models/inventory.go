@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -15,6 +15,10 @@ BinID       *uint     `gorm:"index" json:"bin_id,omitempty"`
 Bin         *WarehouseBin `gorm:"foreignKey:BinID" json:"bin,omitempty"`
 Stock       int       `gorm:"default:0" json:"stock"`
 InStock     bool      `gorm:"default:true" json:"in_stock"`
+// LowStockThreshold overrides the fallback chain (this value, else the
+// warehouse default, else the global default of 10) for this specific
+// product at this specific warehouse. Nil means no override.
+LowStockThreshold *int `json:"low_stock_threshold,omitempty"`
 CreatedAt   time.Time `json:"created_at"`
 UpdatedAt   time.Time `json:"updated_at"`
 }

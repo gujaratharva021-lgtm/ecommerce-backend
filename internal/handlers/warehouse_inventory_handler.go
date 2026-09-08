@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "net/http"
@@ -7,6 +7,7 @@ import (
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 )
 
 // GetWarehouseInventory godoc
@@ -14,6 +15,15 @@ import (
 // Scoped to the caller's own warehouse. stock_status accepts in_stock/low/out
 // for live stock-count filtering, or damaged/expired for the derived views
 // (recent damaged-reason adjustments / unexpired-but-past-date batch rows).
+//
+// Low-stock/out-of-stock status is computed on AVAILABLE stock (physical
+// stock minus active cart reservations minus expired-batch quantity), not
+// raw Inventory.Stock, and the threshold is per product+warehouse via
+// services.ResolveLowStockThreshold (Inventory override -> Warehouse
+// default -> global default of 10). Because the threshold can differ per
+// row, in_stock/low/out filtering happens in application code after
+// loading the warehouse's inventory rows (capped at a few hundred rows per
+// warehouse in practice), rather than as a single SQL WHERE clause.
 func GetWarehouseInventory(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 
@@ -29,6 +39,12 @@ if query.Limit < 1 || query.Limit > 100 {
 query.Limit = 20
 }
 
+var warehouse models.Warehouse
+if err := database.DB.First(&warehouse, warehouseID).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load warehouse"})
+return
+}
+
 // Product IDs currently flagged damaged (adjustment reason=damaged in last 30 days)
 // or expired (a Batch past its expiry date that still has quantity) at this warehouse.
 damagedCutoff := time.Now().AddDate(0, 0, -30)
@@ -41,6 +57,15 @@ var expiredIDs []uint
 database.DB.Model(&models.Batch{}).
 Where("warehouse_id = ? AND expiry_date < ? AND quantity > 0", warehouseID, time.Now()).
 Distinct("product_id").Pluck("product_id", &expiredIDs)
+expiredSet := make(map[uint]bool, len(expiredIDs))
+for _, id := range expiredIDs {
+expiredSet[id] = true
+}
+
+damagedSet := make(map[uint]bool, len(damagedIDs))
+for _, id := range damagedIDs {
+damagedSet[id] = true
+}
 
 db := database.DB.Model(&models.Inventory{}).
 Joins("JOIN products ON products.id = inventories.product_id").
@@ -63,91 +88,88 @@ db = db.Joins("JOIN warehouse_bins ON warehouse_bins.id = inventories.bin_id").
 Joins("JOIN warehouse_racks ON warehouse_racks.id = warehouse_bins.rack_id").
 Where("warehouse_racks.zone_id = ?", query.ZoneID)
 }
-
-switch query.StockStatus {
-case "out":
-db = db.Where("inventories.stock <= 0")
-case "low":
-db = db.Where("inventories.stock > 0 AND inventories.stock < ?", lowStockThreshold)
-case "in_stock":
-db = db.Where("inventories.stock >= ?", lowStockThreshold)
-case "damaged":
+if query.StockStatus == "damaged" {
 filterIDs := damagedIDs
 if len(filterIDs) == 0 {
 filterIDs = []uint{0}
 }
 db = db.Where("inventories.product_id IN ?", filterIDs)
-case "expired":
+} else if query.StockStatus == "expired" {
 filterIDs := expiredIDs
 if len(filterIDs) == 0 {
 filterIDs = []uint{0}
 }
 db = db.Where("inventories.product_id IN ?", filterIDs)
 }
+// in_stock/low/out are filtered after loading rows below, since the
+// threshold varies per row and available stock also isn't a plain
+// column - see the loop.
 
-var total int64
-if err := db.Count(&total).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count inventory"})
-return
-}
-
-offset := (query.Page - 1) * query.Limit
-var invs []models.Inventory
+var allInvs []models.Inventory
 if err := db.Select("inventories.*").Preload("Product").Preload("Product.Category").Preload("Bin.Rack.Zone").
-Order("inventories.stock ASC").Offset(offset).Limit(query.Limit).Find(&invs).Error; err != nil {
+Order("inventories.stock ASC").Find(&allInvs).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch inventory"})
 return
 }
 
-damagedSet := make(map[uint]bool, len(damagedIDs))
-for _, id := range damagedIDs {
-damagedSet[id] = true
-}
-expiredSet := make(map[uint]bool, len(expiredIDs))
-for _, id := range expiredIDs {
-expiredSet[id] = true
-}
-
-rows := make([]models.WarehouseInventoryRow, 0, len(invs))
-for _, inv := range invs {
+var inStockCount, lowStockCount, outOfStockCount int64
+rows := make([]models.WarehouseInventoryRow, 0, len(allInvs))
+for _, inv := range allInvs {
 var reserved int
 database.DB.Model(&models.CartReservation{}).
 Where("product_id = ? AND warehouse_id = ? AND expires_at > ?", inv.ProductID, inv.WarehouseID, time.Now()).
 Select("COALESCE(SUM(quantity), 0)").Scan(&reserved)
 
+expiredQty := 0
+if expiredSet[inv.ProductID] {
+database.DB.Model(&models.Batch{}).
+Where("product_id = ? AND warehouse_id = ? AND expiry_date < ? AND quantity > 0", inv.ProductID, warehouseID, time.Now()).
+Select("COALESCE(SUM(quantity), 0)").Scan(&expiredQty)
+}
+
+available := inv.Stock - reserved - expiredQty
+if available < 0 {
+available = 0
+}
+threshold := services.ResolveLowStockThresholdFor(inv, warehouse)
+
 status := "in_stock"
-if inv.Stock <= 0 {
+if available <= 0 {
 status = "out"
-} else if inv.Stock < lowStockThreshold {
+outOfStockCount++
+} else if available < threshold {
 status = "low"
+lowStockCount++
+} else {
+inStockCount++
+}
+
+if query.StockStatus != "" && (query.StockStatus == "in_stock" || query.StockStatus == "low" || query.StockStatus == "out") {
+if query.StockStatus != status {
+continue
+}
 }
 
 row := models.WarehouseInventoryRow{
-ProductID:   inv.ProductID,
-ProductName: inv.Product.Name,
-Barcode:     inv.Product.Barcode,
-ImageURL:    inv.Product.ImageURL,
-CategoryID:  inv.Product.CategoryID,
+ProductID:    inv.ProductID,
+ProductName:  inv.Product.Name,
+Barcode:      inv.Product.Barcode,
+ImageURL:     inv.Product.ImageURL,
+CategoryID:   inv.Product.CategoryID,
 CategoryName: inv.Product.Category.Name,
-Stock:       inv.Stock,
-Reserved:    reserved,
-Available:   inv.Stock - reserved,
-InStock:     inv.InStock,
-StockStatus: status,
-BinID:       inv.BinID,
+Stock:        inv.Stock,
+Reserved:     reserved,
+Available:    available,
+InStock:      inv.InStock,
+StockStatus:  status,
+BinID:        inv.BinID,
+ExpiredQty:   expiredQty,
+Threshold:    threshold,
 }
 if inv.Bin != nil {
 row.BinName = inv.Bin.Name
 row.RackName = inv.Bin.Rack.Name
 row.ZoneName = inv.Bin.Rack.Zone.Name
-}
-
-if expiredSet[inv.ProductID] {
-var expiredQty int
-database.DB.Model(&models.Batch{}).
-Where("product_id = ? AND warehouse_id = ? AND expiry_date < ? AND quantity > 0", inv.ProductID, warehouseID, time.Now()).
-Select("COALESCE(SUM(quantity), 0)").Scan(&expiredQty)
-row.ExpiredQty = expiredQty
 }
 
 if damagedSet[inv.ProductID] {
@@ -167,23 +189,27 @@ row.LastDamagedQty = qty
 rows = append(rows, row)
 }
 
-// Warehouse-wide summary counts (not just this page).
-var inStockCount, lowStockCount, outOfStockCount int64
-database.DB.Model(&models.Inventory{}).Where("warehouse_id = ? AND stock >= ?", warehouseID, lowStockThreshold).Count(&inStockCount)
-database.DB.Model(&models.Inventory{}).Where("warehouse_id = ? AND stock > 0 AND stock < ?", warehouseID, lowStockThreshold).Count(&lowStockCount)
-database.DB.Model(&models.Inventory{}).Where("warehouse_id = ? AND stock <= 0", warehouseID).Count(&outOfStockCount)
+total := int64(len(rows))
+offset := (query.Page - 1) * query.Limit
+end := offset + query.Limit
+if offset > len(rows) {
+offset = len(rows)
+}
+if end > len(rows) {
+end = len(rows)
+}
+pagedRows := rows[offset:end]
 
 c.JSON(http.StatusOK, models.WarehouseInventoryResponse{
-Rows:              rows,
-Page:              query.Page,
-Limit:             query.Limit,
-Total:             total,
-TotalPages:        int((total + int64(query.Limit) - 1) / int64(query.Limit)),
-InStockCount:      inStockCount,
-LowStockCount:     lowStockCount,
-OutOfStockCount:   outOfStockCount,
-DamagedCount:      int64(len(damagedIDs)),
-ExpiredCount:      int64(len(expiredIDs)),
-LowStockThreshold: lowStockThreshold,
+Rows:            pagedRows,
+Page:            query.Page,
+Limit:           query.Limit,
+Total:           total,
+TotalPages:      int((total + int64(query.Limit) - 1) / int64(query.Limit)),
+InStockCount:    inStockCount,
+LowStockCount:   lowStockCount,
+OutOfStockCount: outOfStockCount,
+DamagedCount:    int64(len(damagedIDs)),
+ExpiredCount:    int64(len(expiredIDs)),
 })
 }

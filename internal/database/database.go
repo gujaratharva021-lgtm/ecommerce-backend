@@ -191,6 +191,12 @@ log.Fatalf("Failed to add damaged_quantity column to stock_transfers: %v", err)
 if err := DB.Exec(`ALTER TABLE stock_transfers ADD COLUMN IF NOT EXISTS received_bin_id BIGINT REFERENCES warehouse_bins(id)`).Error; err != nil {
 log.Fatalf("Failed to add received_bin_id column to stock_transfers: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE warehouses ADD COLUMN IF NOT EXISTS low_stock_threshold BIGINT`).Error; err != nil {
+log.Fatalf("Failed to add low_stock_threshold column to warehouses: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE inventories ADD COLUMN IF NOT EXISTS low_stock_threshold BIGINT`).Error; err != nil {
+log.Fatalf("Failed to add low_stock_threshold column to inventories: %v", err)
+}
 if err := DB.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 id BIGSERIAL PRIMARY KEY,
 amount DOUBLE PRECISION NOT NULL,
