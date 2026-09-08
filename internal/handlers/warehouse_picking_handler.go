@@ -388,3 +388,90 @@ services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "comple
 
 c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask, "refund_amount": refundAmount})
 }
+
+
+// ReassignPicking godoc
+// PUT /api/v1/warehouse/picking/:id/reassign (InventoryManagerOnly)
+// Lets a manager move a stuck/abandoned picking task to a different picker
+// (e.g. the original picker went unavailable mid-shift), or release it
+// back to the unassigned pool entirely. Already-picked/unavailable/short
+// items are untouched - only PickerID and Status change.
+//
+// new_picker_id set -> reassign directly to that picker, task stays
+// in_progress (no need to force it back through StartPicking).
+// new_picker_id nil/0 -> unassign: picker_id cleared, status reset to
+// pending, so any eligible picker can claim it via the normal
+// StartPicking flow.
+func ReassignPicking(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+staffID := c.MustGet("staff_id").(uint)
+orderID := c.Param("id")
+
+var req models.ReassignPickingRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+var task models.PickingTask
+var oldPickerID *uint
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+First(&task).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Picking task not found for your warehouse")
+}
+if task.Status == "completed" {
+statusCode = http.StatusBadRequest
+return errors.New("Cannot reassign - picking already completed for this order")
+}
+
+oldPickerID = task.PickerID
+
+if req.NewPickerID == nil || *req.NewPickerID == 0 {
+task.PickerID = nil
+task.Status = "pending"
+return tx.Save(&task).Error
+}
+
+var newPicker models.WarehouseStaff
+if err := tx.First(&newPicker, *req.NewPickerID).Error; err != nil {
+statusCode = http.StatusBadRequest
+return errors.New("New picker not found")
+}
+if newPicker.WarehouseID != warehouseID {
+statusCode = http.StatusBadRequest
+return errors.New("New picker does not belong to your warehouse")
+}
+if !newPicker.IsActive {
+statusCode = http.StatusBadRequest
+return errors.New("New picker is not active")
+}
+
+task.PickerID = req.NewPickerID
+task.Status = "in_progress"
+return tx.Save(&task).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
+
+staffName, _ := c.Get("staff_name")
+oldPickerStr := "unassigned"
+if oldPickerID != nil {
+oldPickerStr = fmt.Sprintf("picker=%d", *oldPickerID)
+}
+newPickerStr := "unassigned"
+if task.PickerID != nil {
+newPickerStr = fmt.Sprintf("picker=%d", *task.PickerID)
+}
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "reassign_picking", "picking_task", orderID,
+oldPickerStr, newPickerStr)
+
+c.JSON(http.StatusOK, task)
+}

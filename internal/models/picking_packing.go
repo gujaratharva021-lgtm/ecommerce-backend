@@ -67,3 +67,14 @@ QCChilledOK *bool      `json:"qc_chilled_ok,omitempty"`
 QCFrozenOK  *bool      `json:"qc_frozen_ok,omitempty"`
 QCNotes     string     `json:"qc_notes,omitempty"`
 }
+
+
+// ReassignPickingRequest is the body for PUT /warehouse/picking/:id/reassign
+// (InventoryManagerOnly). NewPickerID nil/0 unassigns the task entirely
+// (picker_id cleared, status reset to pending) so any eligible picker can
+// claim it via the normal StartPicking flow. A non-nil value reassigns
+// directly to that picker and keeps the task in_progress - already-picked
+// items are untouched either way, only PickerID/Status change.
+type ReassignPickingRequest struct {
+NewPickerID *uint `json:"new_picker_id"`
+}

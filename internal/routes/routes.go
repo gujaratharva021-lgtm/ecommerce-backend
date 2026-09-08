@@ -125,6 +125,7 @@ delivery.PUT("/notifications/read-all", middleware.AuthMiddleware(), middleware.
                 warehouseAuthed.PUT("/picking/items/:itemId", handlers.MarkPickItem)
                 warehouseAuthed.PUT("/picking/items/:itemId/scan", handlers.ScanPickItem)
                 warehouseAuthed.PUT("/picking/:id/complete", handlers.CompletePicking)
+                warehouseAuthed.PUT("/picking/:id/reassign", middleware.InventoryManagerOnly(), handlers.ReassignPicking)
                 warehouseAuthed.GET("/packing/:id", handlers.GetPackingTask)
                 warehouseAuthed.PUT("/packing/:id/start", handlers.StartPacking)
                 warehouseAuthed.PUT("/packing/:id/complete", handlers.CompletePacking)
