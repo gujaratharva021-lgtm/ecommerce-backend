@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -117,6 +117,11 @@ type PickItemRequest struct {
 Status         string `json:"status" binding:"required,oneof=picked unavailable short"`
 QuantityPicked int    `json:"quantity_picked"`
 Reason         string `json:"reason"`
+// ScannedBarcode is required when marking status=picked for a product
+// that has a barcode set. The backend is the authoritative check here -
+// ScanPickItem (the separate scan-feedback endpoint) is convenience/UX
+// only and its client-reported match must never be trusted on its own.
+ScannedBarcode string `json:"scanned_barcode"`
 }
 
 // MarkPickItem godoc
@@ -142,7 +147,7 @@ var previousStatus string
 statusCode := http.StatusInternalServerError
 
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&item, itemID).Error; err != nil {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Product").First(&item, itemID).Error; err != nil {
 statusCode = http.StatusNotFound
 return errors.New("Picking item not found")
 }
@@ -157,6 +162,16 @@ previousStatus = item.Status
 
 switch req.Status {
 case models.PickItemPicked:
+if item.Product.Barcode != "" {
+if req.ScannedBarcode == "" {
+statusCode = http.StatusBadRequest
+return errors.New("scanned_barcode is required to pick this item")
+}
+if req.ScannedBarcode != item.Product.Barcode {
+statusCode = http.StatusBadRequest
+return errors.New("wrong SKU: scanned barcode does not match this item's product")
+}
+}
 item.QuantityPicked = item.QuantityNeeded
 case models.PickItemShort:
 if req.QuantityPicked <= 0 || req.QuantityPicked >= item.QuantityNeeded {
