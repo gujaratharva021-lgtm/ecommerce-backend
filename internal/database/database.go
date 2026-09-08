@@ -173,6 +173,15 @@ log.Fatalf("Failed to add qc_frozen_ok column to packing_tasks: %v", err)
 if err := DB.Exec(`ALTER TABLE packing_tasks ADD COLUMN IF NOT EXISTS qc_notes TEXT`).Error; err != nil {
 log.Fatalf("Failed to add qc_notes column to packing_tasks: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE receivings ADD COLUMN IF NOT EXISTS batch_number TEXT`).Error; err != nil {
+log.Fatalf("Failed to add batch_number column to receivings: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE receivings ADD COLUMN IF NOT EXISTS manufacture_date TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add manufacture_date column to receivings: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE receivings ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add expiry_date column to receivings: %v", err)
+}
 if err := DB.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 id BIGSERIAL PRIMARY KEY,
 amount DOUBLE PRECISION NOT NULL,

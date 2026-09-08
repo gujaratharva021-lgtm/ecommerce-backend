@@ -1,4 +1,4 @@
-﻿package models
+package models
 
 import "time"
 
@@ -35,6 +35,9 @@ QCByStaffID       *uint      `json:"qc_by_staff_id,omitempty"`
 PutAwayByStaffID  *uint      `json:"put_away_by_staff_id,omitempty"`
 Notes             string     `json:"notes,omitempty"`
 RejectionReason   string     `json:"rejection_reason,omitempty"`
+BatchNumber       string     `json:"batch_number,omitempty"`
+ManufactureDate   *time.Time `json:"manufacture_date,omitempty"`
+ExpiryDate        *time.Time `json:"expiry_date,omitempty"`
 ReceivedAt        *time.Time `json:"received_at,omitempty"`
 QCAt              *time.Time `json:"qc_at,omitempty"`
 PutAwayAt         *time.Time `json:"put_away_at,omitempty"`
@@ -49,6 +52,9 @@ ReferenceNumber  string `json:"reference_number"`
 ProductID        uint   `json:"product_id" binding:"required"`
 ExpectedQuantity int    `json:"expected_quantity" binding:"required,gt=0"`
 Notes            string `json:"notes"`
+BatchNumber      string `json:"batch_number"`
+ManufactureDate  *time.Time `json:"manufacture_date"`
+ExpiryDate       *time.Time `json:"expiry_date"`
 }
 
 // MarkReceivedRequest is the body for PUT /warehouse/receiving/:id/receive

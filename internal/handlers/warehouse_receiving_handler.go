@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -42,6 +42,9 @@ ExpectedQuantity: req.ExpectedQuantity,
 Status:           models.ReceivingStatusPending,
 CreatedByStaffID: staffID,
 Notes:            req.Notes,
+BatchNumber:      req.BatchNumber,
+ManufactureDate:  req.ManufactureDate,
+ExpiryDate:       req.ExpiryDate,
 }
 if err := database.DB.Create(&rec).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create receiving record"})
@@ -314,6 +317,53 @@ Notes:        fmt.Sprintf("Receiving #%d from %s", rec.ID, rec.SupplierName),
 }
 if err := tx.Create(&movement).Error; err != nil {
 return err
+}
+
+// Damaged units never entered sellable stock, so they don't touch
+// Inventory.Stock - but they must still be auditable. Write a
+// zero-Change StockMovement so damaged-at-receiving quantity shows up
+// in the same "damaged" reporting view as post-putaway damage
+// adjustments (GetWarehouseInventory keys off StockMovement.Reason).
+if rec.DamagedQuantity > 0 {
+damagedMovement := models.StockMovement{
+ProductID:    rec.ProductID,
+WarehouseID:  warehouseID,
+PreviousQty:  inv.Stock,
+Change:       0,
+NewQty:       inv.Stock,
+MovementType: models.MovementDamaged,
+Reason:       models.AdjustReasonDamaged,
+StaffID:      &staffID,
+ReferenceID:  &rec.ID,
+Notes:        fmt.Sprintf("%d units damaged at receiving #%d from %s - never entered sellable stock", rec.DamagedQuantity, rec.ID, rec.SupplierName),
+}
+if err := tx.Create(&damagedMovement).Error; err != nil {
+return err
+}
+}
+
+// If an expiry date was given at receiving time, create the linked
+// Batch automatically instead of requiring a separate manual
+// POST /warehouse/batches call - keeps receiving and batch/expiry
+// tracking as one flow instead of two disconnected ones.
+if rec.ExpiryDate != nil {
+batch := models.Batch{
+ProductID:        rec.ProductID,
+WarehouseID:      warehouseID,
+BatchNumber:      rec.BatchNumber,
+ManufactureDate:  rec.ManufactureDate,
+ExpiryDate:       *rec.ExpiryDate,
+Quantity:         rec.AcceptedQuantity,
+BinID:            req.BinID,
+CreatedByStaffID: staffID,
+ReceivingID:      &rec.ID,
+}
+if batch.BatchNumber == "" {
+batch.BatchNumber = fmt.Sprintf("RCV-%d", rec.ID)
+}
+if err := tx.Create(&batch).Error; err != nil {
+return err
+}
 }
 
 now := time.Now()
