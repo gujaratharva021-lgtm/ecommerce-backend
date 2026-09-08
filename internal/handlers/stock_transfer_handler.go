@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -58,6 +58,7 @@ ProductID:       req.ProductID,
 FromWarehouseID: req.ToWarehouseID,
 ToWarehouseID:   staff.WarehouseID,
 Quantity:        req.Quantity,
+BatchID:         req.BatchID,
 Status:          models.StockTransferPending,
 RequestedBy:     staffID,
 }
@@ -138,6 +139,9 @@ func ReceiveStockTransfer(c *gin.Context) {
 staffID := c.MustGet("user_id").(uint)
 id := c.Param("id")
 
+var req models.ReceiveStockTransferRequest
+_ = c.ShouldBindJSON(&req)
+
 var staff models.WarehouseStaff
 if err := database.DB.First(&staff, staffID).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse staff not found"})
@@ -166,6 +170,12 @@ statusCode = http.StatusBadRequest
 return errors.New("only in-transit transfers can be received - it may have already been received")
 }
 
+if req.DamagedQuantity > transfer.Quantity {
+statusCode = http.StatusBadRequest
+return errors.New("damaged_quantity cannot exceed the transfer quantity")
+}
+receivableQty := transfer.Quantity - req.DamagedQuantity
+
 var inventory models.Inventory
 err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("product_id = ? AND warehouse_id = ?", transfer.ProductID, transfer.ToWarehouseID).
 First(&inventory).Error
@@ -176,8 +186,11 @@ WarehouseID: transfer.ToWarehouseID,
 }
 }
 previousQty := inventory.Stock
-inventory.Stock += transfer.Quantity
+inventory.Stock += receivableQty
 inventory.InStock = inventory.Stock > 0
+if req.BinID != nil {
+inventory.BinID = req.BinID
+}
 if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
@@ -186,7 +199,7 @@ movement := models.StockMovement{
 ProductID:    transfer.ProductID,
 WarehouseID:  transfer.ToWarehouseID,
 PreviousQty:  previousQty,
-Change:       transfer.Quantity,
+Change:       receivableQty,
 NewQty:       inventory.Stock,
 MovementType: models.MovementTransfer,
 StaffID:      &staffID,
@@ -197,7 +210,34 @@ if err := tx.Create(&movement).Error; err != nil {
 return err
 }
 
+// Transit-damage is tracked separately from the receive-quantity movement
+// above (zero Change, same pattern as receiving-time damage) so it never
+// touches sellable stock but is still auditable.
+if req.DamagedQuantity > 0 {
+damagedMovement := models.StockMovement{
+ProductID:    transfer.ProductID,
+WarehouseID:  transfer.ToWarehouseID,
+PreviousQty:  inventory.Stock,
+Change:       -req.DamagedQuantity,
+NewQty:       inventory.Stock,
+MovementType: models.MovementDamaged,
+Reason:       models.AdjustReasonDamaged,
+StaffID:      &staffID,
+ReferenceID:  &transfer.ID,
+Notes:        fmt.Sprintf("%d units damaged in transit on transfer #%d from warehouse #%d", req.DamagedQuantity, transfer.ID, transfer.FromWarehouseID),
+}
+if err := tx.Create(&damagedMovement).Error; err != nil {
+return err
+}
+}
+
+if err := services.CreateReceivedBatch(tx, transfer.BatchID, transfer.ProductID, transfer.ToWarehouseID, receivableQty, req.BinID, staffID); err != nil {
+return err
+}
+
 transfer.Status = models.StockTransferReceived
+transfer.DamagedQuantity = req.DamagedQuantity
+transfer.ReceivedBinID = req.BinID
 return tx.Save(&transfer).Error
 })
 
@@ -268,6 +308,13 @@ if inventory.Stock <= 0 {
 inventory.InStock = false
 }
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+if err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity); err != nil {
+if err == services.ErrBatchInsufficientQuantity {
+statusCode = http.StatusBadRequest
+}
 return err
 }
 
@@ -422,6 +469,13 @@ if inventory.Stock <= 0 {
 inventory.InStock = false
 }
 if err := tx.Save(&inventory).Error; err != nil {
+return err
+}
+
+if err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity); err != nil {
+if err == services.ErrBatchInsufficientQuantity {
+statusCode = http.StatusBadRequest
+}
 return err
 }
 
