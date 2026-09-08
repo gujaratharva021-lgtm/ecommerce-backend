@@ -108,8 +108,8 @@ delivery.PUT("/notifications/read-all", middleware.AuthMiddleware(), middleware.
                 warehouseStockTransfers.POST("", handlers.RequestStockTransfer)
                 warehouseStockTransfers.GET("", handlers.GetMyStockTransfers)
                 warehouseStockTransfers.PUT("/:id/receive", handlers.ReceiveStockTransfer)
-                warehouseStockTransfers.PUT("/:id/approve", handlers.ApproveStockTransferByWarehouseStaff)
-                warehouseStockTransfers.PUT("/:id/reject", handlers.RejectStockTransferByWarehouseStaff)
+                warehouseStockTransfers.PUT("/:id/approve", middleware.InventoryManagerOnly(), handlers.ApproveStockTransferByWarehouseStaff)
+                warehouseStockTransfers.PUT("/:id/reject", middleware.InventoryManagerOnly(), handlers.RejectStockTransferByWarehouseStaff)
             }
             warehouseAuthed := warehouse.Group("")
             warehouseAuthed.Use(middleware.AuthMiddleware(), middleware.WarehouseStaffOnly(), middleware.InjectWarehouseScope())
