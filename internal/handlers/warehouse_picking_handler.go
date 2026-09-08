@@ -147,15 +147,38 @@ var previousStatus string
 statusCode := http.StatusInternalServerError
 
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Product").First(&item, itemID).Error; err != nil {
+// First resolve which task this item belongs to (no lock needed yet -
+// PickingTaskID never changes after creation).
+if err := tx.First(&item, itemID).Error; err != nil {
 statusCode = http.StatusNotFound
 return errors.New("Picking item not found")
 }
 
-// Verify this item's picking task belongs to the caller's warehouse.
-if err := tx.Where("id = ? AND warehouse_id = ?", item.PickingTaskID, warehouseID).First(&task).Error; err != nil {
+// Lock the parent task BEFORE the item, matching the lock order used by
+// StartPicking/CompletePicking, so concurrent requests can never
+// deadlock against each other. A completed task is fully finalized -
+// no item under it may be modified afterwards (packing may already be
+// in progress against the picked quantities).
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("id = ? AND warehouse_id = ?", item.PickingTaskID, warehouseID).First(&task).Error; err != nil {
 statusCode = http.StatusForbidden
 return errors.New("This item does not belong to your warehouse")
+}
+if task.Status == "completed" {
+statusCode = http.StatusBadRequest
+return errors.New("Picking task already completed - items can no longer be modified")
+}
+
+// Re-fetch the item under its own row lock now that we hold the task
+// lock, so two concurrent MarkPickItem calls for the same item can
+// never both pass the already-picked check below.
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Product").First(&item, itemID).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Picking item not found")
+}
+if item.Status != models.PickItemPending {
+statusCode = http.StatusBadRequest
+return fmt.Errorf("item already finalized with status %q - it cannot be marked again", item.Status)
 }
 
 previousStatus = item.Status
