@@ -120,6 +120,13 @@ return errors.New("this product is not available for purchase at your nearest wa
 if !inventory.InStock || inventory.Stock < ci.Quantity {
 return errors.New("insufficient stock for " + ci.Product.Name)
 }
+expiredQty, err := services.GetExpiredBatchQty(tx, ci.ProductID, nearestWarehouse.ID)
+if err != nil {
+return err
+}
+if inventory.Stock-expiredQty < ci.Quantity {
+return errors.New("insufficient non-expired stock for " + ci.Product.Name)
+}
 				previousQty := inventory.Stock
 
 inventory.Stock -= ci.Quantity

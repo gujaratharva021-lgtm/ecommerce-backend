@@ -65,7 +65,12 @@ func ReserveStock(tx *gorm.DB, userID, productID, warehouseID uint, quantity int
 		return err
 	}
 
-	available := inventory.Stock - int(reservedByOthers)
+	expiredQty, err := GetExpiredBatchQty(tx, productID, warehouseID)
+	if err != nil {
+		return err
+	}
+
+	available := inventory.Stock - int(reservedByOthers) - expiredQty
 	if quantity > available {
 		return ErrInsufficientStock
 	}
