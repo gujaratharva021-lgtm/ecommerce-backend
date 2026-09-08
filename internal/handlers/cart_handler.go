@@ -133,20 +133,13 @@ func AddToCart(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
 		return
 	}
-
+	if warehouse == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please add a delivery address before adding items to your cart"})
+		return
+	}
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		if warehouse != nil {
-			if err := services.ReserveStock(tx, userID, req.ProductID, warehouse.ID, newQuantity); err != nil {
-				return err
-			}
-		} else {
-			totalStock, err := database.GetTotalStock(req.ProductID)
-			if err != nil {
-				return err
-			}
-			if totalStock < newQuantity {
-				return services.ErrInsufficientStock
-			}
+		if err := services.ReserveStock(tx, userID, req.ProductID, warehouse.ID, newQuantity); err != nil {
+			return err
 		}
 
 		if hasExisting {
@@ -196,7 +189,7 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
-	// Ownership check Ã¢â‚¬â€ item's cart must belong to the requesting user
+	// Ownership check ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â item's cart must belong to the requesting user
 	var cart models.Cart
 	if err := database.DB.First(&cart, item.CartID).Error; err != nil || cart.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have access to this cart item"})
@@ -210,20 +203,13 @@ func UpdateCartItem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check delivery serviceability"})
 		return
 	}
-
+	if warehouse == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please add a delivery address before updating your cart"})
+		return
+	}
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		if warehouse != nil {
-			if err := services.ReserveStock(tx, userID, item.ProductID, warehouse.ID, req.Quantity); err != nil {
-				return err
-			}
-		} else {
-			totalStock, err := database.GetTotalStock(item.ProductID)
-			if err != nil {
-				return err
-			}
-			if totalStock < req.Quantity {
-				return services.ErrInsufficientStock
-			}
+		if err := services.ReserveStock(tx, userID, item.ProductID, warehouse.ID, req.Quantity); err != nil {
+			return err
 		}
 		item.Quantity = req.Quantity
 		return tx.Save(&item).Error
