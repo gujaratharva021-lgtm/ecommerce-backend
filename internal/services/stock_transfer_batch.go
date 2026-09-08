@@ -20,7 +20,7 @@ var ErrBatchInsufficientQuantity = errors.New("selected batch does not have enou
 // all (non-perishable / not batch-tracked), this is a no-op - batch
 // tracking is opt-in per Batch model semantics, so absence of batches is
 // not an error.
-func DeductFromBatchFEFO(tx *gorm.DB, productID, warehouseID uint, batchID *uint, qty int) error {
+func DeductFromBatchFEFO(tx *gorm.DB, productID, warehouseID uint, batchID *uint, qty int) (*uint, error) {
 var batch models.Batch
 
 q := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -36,20 +36,21 @@ if err := q.First(&batch).Error; err != nil {
 if err == gorm.ErrRecordNotFound {
 // No batch-tracked stock for this product at this warehouse -
 // treat as not batch-tracked and skip silently.
-return nil
+return nil, nil
 }
-return err
+return nil, err
 }
 
 if batch.Quantity < qty {
-return ErrBatchInsufficientQuantity
+return nil, ErrBatchInsufficientQuantity
 }
 
 batch.Quantity -= qty
 if err := tx.Save(&batch).Error; err != nil {
-return err
+return nil, err
 }
-return nil
+selectedID := batch.ID
+return &selectedID, nil
 }
 
 // CreateReceivedBatch creates a new Batch row at the destination warehouse

@@ -311,11 +311,15 @@ if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
 
-if err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity); err != nil {
+selectedBatchID, err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity)
+if err != nil {
 if err == services.ErrBatchInsufficientQuantity {
 statusCode = http.StatusBadRequest
 }
 return err
+}
+if selectedBatchID != nil {
+transfer.BatchID = selectedBatchID
 }
 
 movement := models.StockMovement{
@@ -472,11 +476,15 @@ if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
 
-if err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity); err != nil {
+selectedBatchID, err := services.DeductFromBatchFEFO(tx, transfer.ProductID, transfer.FromWarehouseID, transfer.BatchID, transfer.Quantity)
+if err != nil {
 if err == services.ErrBatchInsufficientQuantity {
 statusCode = http.StatusBadRequest
 }
 return err
+}
+if selectedBatchID != nil {
+transfer.BatchID = selectedBatchID
 }
 
 movement := models.StockMovement{
