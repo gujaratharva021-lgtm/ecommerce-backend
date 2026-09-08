@@ -182,6 +182,15 @@ log.Fatalf("Failed to add manufacture_date column to receivings: %v", err)
 if err := DB.Exec(`ALTER TABLE receivings ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMPTZ`).Error; err != nil {
 log.Fatalf("Failed to add expiry_date column to receivings: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE stock_transfers ADD COLUMN IF NOT EXISTS batch_id BIGINT REFERENCES batches(id)`).Error; err != nil {
+log.Fatalf("Failed to add batch_id column to stock_transfers: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE stock_transfers ADD COLUMN IF NOT EXISTS damaged_quantity BIGINT NOT NULL DEFAULT 0`).Error; err != nil {
+log.Fatalf("Failed to add damaged_quantity column to stock_transfers: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE stock_transfers ADD COLUMN IF NOT EXISTS received_bin_id BIGINT REFERENCES warehouse_bins(id)`).Error; err != nil {
+log.Fatalf("Failed to add received_bin_id column to stock_transfers: %v", err)
+}
 if err := DB.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 id BIGSERIAL PRIMARY KEY,
 amount DOUBLE PRECISION NOT NULL,
