@@ -329,7 +329,7 @@ damagedMovement := models.StockMovement{
 ProductID:    rec.ProductID,
 WarehouseID:  warehouseID,
 PreviousQty:  inv.Stock,
-Change:       0,
+Change:       -rec.DamagedQuantity,
 NewQty:       inv.Stock,
 MovementType: models.MovementDamaged,
 Reason:       models.AdjustReasonDamaged,
