@@ -81,3 +81,5 @@ new_domain.conf
 assign742.json
 assign743.json
 unassigned_orders.json
+
+*.bak*
