@@ -31,6 +31,7 @@ var (
 	ErrDeliveryGPSMissing             = errors.New("your current location is not available - please enable location and try again")
 	ErrDeliveryAddressLocationMissing = errors.New("this address has no saved delivery coordinates, so the delivery location cannot be verified")
 	ErrDeliveryOutsideGeofence        = errors.New("you are too far from the delivery address to mark this order delivered")
+ErrHandoverOutsideGeofence        = errors.New("rider is too far from the warehouse to confirm this handover")
 )
 
 // deliveryStatusTransitions defines the only allowed forward moves in the
@@ -85,7 +86,7 @@ const deliveryOTPDigits = 6
 //
 // The transition is only allowed along deliveryStatusTransitions, enforced
 // both by an explicit check and by a conditional UPDATE ...
-// WHERE COALESCE(delivery_status,ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â) = <the status just read>, so two
+// WHERE COALESCE(delivery_status,ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â) = <the status just read>, so two
 // concurrent updates for the same order (e.g. a double-tap) can only ever
 // have one winner.
 //
@@ -227,7 +228,7 @@ return ErrDeliveryGPSMissing
 distanceKm := haversineKm(*partner.CurrentLat, *partner.CurrentLng, warehouse.Lat, warehouse.Lng)
 distanceMeters := distanceKm * 1000
 if distanceMeters > config.AppConfig.DeliveryGeofenceRadiusMeters {
-return ErrDeliveryOutsideGeofence
+return ErrHandoverOutsideGeofence
 }
 return nil
 }
