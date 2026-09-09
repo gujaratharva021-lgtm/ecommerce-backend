@@ -66,9 +66,9 @@ available = 0
 return available
 }
 
-// classifyStockAlertState maps available stock against a threshold to one
+// ClassifyStockAlertState maps available stock against a threshold to one
 // of the three persisted alert states.
-func classifyStockAlertState(available, threshold int) string {
+func ClassifyStockAlertState(available, threshold int) string {
 if available <= 0 {
 return StockAlertStateOutOfStock
 }
@@ -101,7 +101,7 @@ return 0, 0, err
 for _, inv := range invs {
 available := computeAvailable(inv)
 threshold := ResolveLowStockThresholdFor(inv, warehouse)
-switch classifyStockAlertState(available, threshold) {
+switch ClassifyStockAlertState(available, threshold) {
 case StockAlertStateOutOfStock:
 outOfStock++
 case StockAlertStateLow:
@@ -155,7 +155,7 @@ return
 
 available := computeAvailable(inv)
 threshold := ResolveLowStockThresholdFor(inv, warehouse)
-newState := classifyStockAlertState(available, threshold)
+newState := ClassifyStockAlertState(available, threshold)
 
 oldState := inv.StockAlertState
 if oldState == "" {

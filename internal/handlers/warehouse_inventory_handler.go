@@ -133,14 +133,16 @@ available = 0
 }
 threshold := services.ResolveLowStockThresholdFor(inv, warehouse)
 
+alertState := services.ClassifyStockAlertState(available, threshold)
 status := "in_stock"
-if available <= 0 {
+switch alertState {
+case services.StockAlertStateOutOfStock:
 status = "out"
 outOfStockCount++
-} else if available < threshold {
+case services.StockAlertStateLow:
 status = "low"
 lowStockCount++
-} else {
+default:
 inStockCount++
 }
 
