@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"fmt"
@@ -195,6 +195,9 @@ if subInventory.Stock <= 0 {
 subInventory.InStock = false
 }
 if err := tx.Save(&subInventory).Error; err != nil {
+return err
+}
+if err := services.DeductFromBatchesFEFO(tx, sub.SubstituteProductID, warehouseID, sub.Quantity); err != nil {
 return err
 }
 subMovement := models.StockMovement{

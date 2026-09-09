@@ -136,6 +136,14 @@ inventory.InStock = false
 if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
+// Keep Batch tracking in sync with the sale so FEFO bookkeeping
+// (used by the warehouse Batches view and future pick tasks) doesn't
+// drift from the authoritative Inventory.Stock figure just deducted
+// above. Best-effort: never blocks or fails the sale - see
+// DeductFromBatchesFEFO doc comment.
+if err := services.DeductFromBatchesFEFO(tx, ci.ProductID, nearestWarehouse.ID, ci.Quantity); err != nil {
+return err
+}
 				pendingMovements = append(pendingMovements, models.StockMovement{
 					ProductID:    ci.ProductID,
 					WarehouseID:  nearestWarehouse.ID,

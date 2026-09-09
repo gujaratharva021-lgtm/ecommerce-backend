@@ -3,6 +3,7 @@ package services
 import (
 "errors"
 "fmt"
+"time"
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "gorm.io/gorm"
@@ -76,4 +77,52 @@ BinID:            binID,
 CreatedByStaffID: staffID,
 }
 return tx.Create(&newBatch).Error
+}
+
+// DeductFromBatchesFEFO consumes qty units across one or more batches for a
+// product/warehouse, in FEFO order (earliest expiry first), inside the
+// caller's transaction under row locks. Unlike DeductFromBatchFEFO (which
+// targets exactly one batch and errors if that batch alone can't cover qty
+// - fine for a transfer, where the requester explicitly picked a batch),
+// this is for order checkout: the customer doesn't pick a batch, and stock
+// legitimately spans multiple batches (e.g. two 5-unit batches covering an
+// 8-unit order).
+//
+// Only expired batches (see GetExpiredBatchQty) are excluded from
+// selection - checkout has already verified overall non-expired
+// availability before calling this. If Inventory.Stock is not fully
+// covered by batch rows (product only partially batch-tracked, or a
+// batch was deleted/consumed out of band), this deducts what it can find
+// and returns without error - Batch tracking is best-effort bookkeeping
+// on top of the authoritative Inventory.Stock figure, never a hard block
+// on a sale that Inventory.Stock has already approved.
+func DeductFromBatchesFEFO(tx *gorm.DB, productID, warehouseID uint, qty int) error {
+remaining := qty
+for remaining > 0 {
+var batch models.Batch
+err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("product_id = ? AND warehouse_id = ? AND quantity > 0 AND expiry_date >= ?",
+productID, warehouseID, time.Now()).
+Order("expiry_date ASC").
+First(&batch).Error
+if err != nil {
+if err == gorm.ErrRecordNotFound {
+// No more non-expired batch-tracked stock to draw from -
+// stop silently, per the best-effort semantics above.
+return nil
+}
+return err
+}
+
+take := batch.Quantity
+if take > remaining {
+take = remaining
+}
+batch.Quantity -= take
+if err := tx.Save(&batch).Error; err != nil {
+return err
+}
+remaining -= take
+}
+return nil
 }
