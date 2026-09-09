@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getWarehouseInventory } from '../api/warehouse'
 import type { WarehouseInventoryRow, WarehouseInventoryResponse } from '../types/warehouse'
 import { getErrorMessage } from '../utils/errors'
@@ -73,7 +73,7 @@ export default function Inventory() {
       </div>
       {data && (
         <p className="text-xs text-slate-500 mb-4">
-          Low-stock threshold: {data.low_stock_threshold} units &middot; {data.total} SKU{data.total === 1 ? '' : 's'} at your warehouse
+          {data.total} SKU{data.total === 1 ? '' : 's'} at your warehouse
         </p>
       )}
 
@@ -125,6 +125,7 @@ export default function Inventory() {
                 <th className="text-right px-4 py-2.5">Stock</th>
                 <th className="text-right px-4 py-2.5">Reserved</th>
                 <th className="text-right px-4 py-2.5">Available</th>
+                  <th className="text-right px-4 py-2.5">Threshold</th>
                 <th className="text-left px-4 py-2.5">Status</th>
                 <th className="text-left px-4 py-2.5">Flags</th>
               </tr>
@@ -143,6 +144,7 @@ export default function Inventory() {
                   <td className="px-4 py-3 text-right">{r.stock}</td>
                   <td className="px-4 py-3 text-right text-slate-400">{r.reserved}</td>
                   <td className="px-4 py-3 text-right font-medium">{r.available}</td>
+                    <td className="px-4 py-3 text-right text-slate-500 text-xs">{r.threshold}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`text-xs px-2 py-1 rounded-full ${
