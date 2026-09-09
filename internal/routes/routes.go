@@ -126,6 +126,7 @@ delivery.PUT("/notifications/read-all", middleware.AuthMiddleware(), middleware.
                 warehouseAuthed.PUT("/picking/items/:itemId/scan", handlers.ScanPickItem)
                 warehouseAuthed.PUT("/picking/:id/complete", handlers.CompletePicking)
                 warehouseAuthed.PUT("/picking/:id/reassign", middleware.InventoryManagerOnly(), handlers.ReassignPicking)
+                warehouseAuthed.POST("/orders/:id/cancel", middleware.InventoryManagerOnly(), handlers.WarehouseCancelOrder)
                 warehouseAuthed.GET("/packing/:id", handlers.GetPackingTask)
                 warehouseAuthed.PUT("/packing/:id/start", handlers.StartPacking)
                 warehouseAuthed.PUT("/packing/:id/complete", handlers.CompletePacking)
@@ -397,6 +398,7 @@ adminFinance.POST("/expenses/:id/pay", handlers.PayExpense)
             {
                 adminOrders.GET("", handlers.GetAllOrders) // ?status=&page=&limit=
                 adminOrders.PUT("/:id/status", handlers.UpdateOrderStatus)
+                adminOrders.POST("/:id/cancel", handlers.AdminCancelOrder)
                 adminOrders.GET("/:id/tracking", handlers.GetOrderTrackingAdmin)
             }
 

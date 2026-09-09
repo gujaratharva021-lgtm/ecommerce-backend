@@ -197,6 +197,18 @@ log.Fatalf("Failed to add low_stock_threshold column to warehouses: %v", err)
 if err := DB.Exec(`ALTER TABLE inventories ADD COLUMN IF NOT EXISTS low_stock_threshold BIGINT`).Error; err != nil {
 log.Fatalf("Failed to add low_stock_threshold column to inventories: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).Error; err != nil {
+log.Fatalf("Failed to add cancellation_reason column to orders: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancelled_by_type VARCHAR(20)`).Error; err != nil {
+log.Fatalf("Failed to add cancelled_by_type column to orders: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancelled_by_id BIGINT`).Error; err != nil {
+log.Fatalf("Failed to add cancelled_by_id column to orders: %v", err)
+}
+if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`).Error; err != nil {
+log.Fatalf("Failed to add cancelled_at column to orders: %v", err)
+}
 if err := DB.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 id BIGSERIAL PRIMARY KEY,
 amount DOUBLE PRECISION NOT NULL,
