@@ -74,13 +74,20 @@ Where("id = ? AND warehouse_id = ?", orderID, warehouseID).First(&order).Error; 
 statusCode = http.StatusNotFound
 return errors.New("Order not found for your warehouse")
 }
-if order.Status != models.OrderStatusPicked {
+// Order.Status is "picked" on the very first StartPacking call for this
+// order, and stays "packing" afterwards even if the task was reassigned
+// and reset to pending (ReassignPacking never touches Order.Status) - so
+// both are valid entry states here, and only the first one needs the
+// transition.
+if order.Status != models.OrderStatusPicked && order.Status != models.OrderStatusPacking {
 statusCode = http.StatusBadRequest
 return errors.New("only picked orders can be packed, current status: " + order.Status)
 }
+if order.Status == models.OrderStatusPicked {
 if err := tx.Model(&models.Order{}).Where("id = ?", orderID).
 Update("status", models.OrderStatusPacking).Error; err != nil {
 return err
+}
 }
 }
 
