@@ -1,4 +1,4 @@
-﻿package services
+package services
 
 import (
 	"errors"
@@ -206,6 +206,32 @@ func verifyDeliveryOTP(tx *gorm.DB, order *models.Order, otp string) error {
 // address. Missing or stale rider GPS, and an address with no saved
 // coordinates, are both handled as explicit rejections rather than being
 // silently skipped.
+// VerifyWarehouseHandoverGeofence checks the delivery partner's last-known
+// GPS location is within config.DeliveryGeofenceRadiusMeters of the given
+// warehouse, so a handover can only be confirmed when the rider is
+// physically there to receive the package - mirrors verifyDeliveryGeofence
+// (which does the same check against the customer's address at the
+// DELIVERED step) rather than trusting a body param the warehouse staff
+// could submit for any assigned partner regardless of their real location.
+func VerifyWarehouseHandoverGeofence(partnerID uint, warehouse models.Warehouse) error {
+var partner models.DeliveryPartner
+if err := database.DB.First(&partner, partnerID).Error; err != nil {
+return ErrDeliveryGPSMissing
+}
+if partner.CurrentLat == nil || partner.CurrentLng == nil || partner.LastLocationUpdate == nil {
+return ErrDeliveryGPSMissing
+}
+if time.Since(*partner.LastLocationUpdate) > staleLocationWindow {
+return ErrDeliveryGPSMissing
+}
+distanceKm := haversineKm(*partner.CurrentLat, *partner.CurrentLng, warehouse.Lat, warehouse.Lng)
+distanceMeters := distanceKm * 1000
+if distanceMeters > config.AppConfig.DeliveryGeofenceRadiusMeters {
+return ErrDeliveryOutsideGeofence
+}
+return nil
+}
+
 func verifyDeliveryGeofence(tx *gorm.DB, order *models.Order, partnerID uint) error {
 	var partner models.DeliveryPartner
 	if err := tx.First(&partner, partnerID).Error; err != nil {

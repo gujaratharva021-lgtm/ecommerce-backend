@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -39,6 +39,19 @@ return
 var order models.Order
 if err := database.DB.Where("warehouse_id = ?", warehouseID).First(&order, orderID).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Order not found for your warehouse"})
+return
+}
+
+var warehouse models.Warehouse
+if err := database.DB.First(&warehouse, warehouseID).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load warehouse"})
+return
+}
+// Confirm the rider is actually physically at the warehouse before
+// allowing the handover - otherwise any staff member who knows the
+// delivery_partner_id could confirm a handover with nobody there.
+if err := services.VerifyWarehouseHandoverGeofence(req.DeliveryPartnerID, warehouse); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 return
 }
 
