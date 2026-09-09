@@ -1,4 +1,4 @@
-﻿package services
+package services
 
 import (
     "fmt"
@@ -39,7 +39,11 @@ func TestMain(m *testing.M) {
         os.Exit(0)
     }
 
-    if err := db.AutoMigrate(&models.User{}, &models.Address{}, &models.DeliveryPartner{}, &models.Order{}, &models.DeliveryZone{}); err != nil {
+    if err := db.AutoMigrate(&models.User{}, &models.Address{}, &models.DeliveryPartner{}, &models.Order{}, &models.DeliveryZone{},
+        // Added for stock_transfer_batch_test.go (FEFO batch-deduction tests) -
+        // Category is migrated before Product since Product.CategoryID
+        // references it.
+        &models.Category{}, &models.Product{}, &models.Warehouse{}, &models.Inventory{}, &models.Batch{}); err != nil {
         fmt.Printf("[delivery_assignment_test] skipping package: migration failed: %v\n", err)
         os.Exit(0)
     }
