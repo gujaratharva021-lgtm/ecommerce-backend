@@ -129,6 +129,7 @@ delivery.PUT("/notifications/read-all", middleware.AuthMiddleware(), middleware.
                 warehouseAuthed.GET("/packing/:id", handlers.GetPackingTask)
                 warehouseAuthed.PUT("/packing/:id/start", handlers.StartPacking)
                 warehouseAuthed.PUT("/packing/:id/complete", handlers.CompletePacking)
+                warehouseAuthed.PUT("/packing/:id/reassign", middleware.InventoryManagerOnly(), handlers.ReassignPacking)
                 warehouseAuthed.GET("/exceptions", handlers.GetWarehouseExceptions)
                 warehouseAuthed.GET("/exceptions/:id", handlers.GetWarehouseException)
                 warehouseAuthed.PUT("/exceptions/:id", handlers.UpdateWarehouseException)

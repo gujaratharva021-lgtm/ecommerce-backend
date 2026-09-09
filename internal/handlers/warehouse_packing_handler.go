@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "errors"
@@ -140,6 +140,10 @@ if task.Status != "in_progress" {
 statusCode = http.StatusBadRequest
 return errors.New("Packing must be started before it can be completed")
 }
+if task.PackerID == nil || *task.PackerID != staffID {
+statusCode = http.StatusForbidden
+return errors.New("Only the assigned packer can complete this packing task")
+}
 
 now := time.Now()
 // Enforce seal number + QC checks before allowing completion. Only the
@@ -215,4 +219,85 @@ services.NotifyWarehouse(warehouseID, models.WhNotifyHandoverRequired,
 "Packing complete - this order is ready to hand over to a delivery partner.", &task.OrderID, nil)
 
 c.JSON(http.StatusOK, gin.H{"success": true, "packing_task": task, "order_status": models.OrderStatusReadyForDispatch})
+}
+
+
+// ReassignPacking godoc
+// PUT /api/v1/warehouse/packing/:id/reassign (InventoryManagerOnly)
+// Mirrors ReassignPicking: lets a manager move a stuck/abandoned packing
+// task to a different packer, or release it back to the unassigned pool.
+// QC checkboxes / seal number entered so far are untouched - only
+// PackerID and Status change.
+func ReassignPacking(c *gin.Context) {
+warehouseID := c.MustGet("warehouse_id").(uint)
+staffID := c.MustGet("staff_id").(uint)
+orderID := c.Param("id")
+
+var req models.ReassignPackingRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+var task models.PackingTask
+var oldPackerID *uint
+statusCode := http.StatusInternalServerError
+
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+Where("order_id = ? AND warehouse_id = ?", orderID, warehouseID).
+First(&task).Error; err != nil {
+statusCode = http.StatusNotFound
+return errors.New("Packing task not found for your warehouse")
+}
+if task.Status == "completed" {
+statusCode = http.StatusBadRequest
+return errors.New("Cannot reassign - packing already completed for this order")
+}
+
+oldPackerID = task.PackerID
+
+if req.NewPackerID == nil || *req.NewPackerID == 0 {
+task.PackerID = nil
+task.Status = "pending"
+return tx.Save(&task).Error
+}
+
+var newPacker models.WarehouseStaff
+if err := tx.First(&newPacker, *req.NewPackerID).Error; err != nil {
+statusCode = http.StatusBadRequest
+return errors.New("New packer not found")
+}
+if newPacker.WarehouseID != warehouseID {
+statusCode = http.StatusBadRequest
+return errors.New("New packer does not belong to your warehouse")
+}
+if !newPacker.IsActive {
+statusCode = http.StatusBadRequest
+return errors.New("New packer is not active")
+}
+
+task.PackerID = req.NewPackerID
+task.Status = "in_progress"
+return tx.Save(&task).Error
+})
+
+if txErr != nil {
+c.JSON(statusCode, gin.H{"error": txErr.Error()})
+return
+}
+
+staffName, _ := c.Get("staff_name")
+oldPackerStr := "unassigned"
+if oldPackerID != nil {
+oldPackerStr = fmt.Sprintf("packer=%d", *oldPackerID)
+}
+newPackerStr := "unassigned"
+if task.PackerID != nil {
+newPackerStr = fmt.Sprintf("packer=%d", *task.PackerID)
+}
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "reassign_packing", "packing_task", orderID,
+oldPackerStr, newPackerStr)
+
+c.JSON(http.StatusOK, task)
 }

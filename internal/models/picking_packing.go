@@ -78,3 +78,13 @@ QCNotes     string     `json:"qc_notes,omitempty"`
 type ReassignPickingRequest struct {
 NewPickerID *uint `json:"new_picker_id"`
 }
+
+// ReassignPackingRequest is the body for PUT /warehouse/packing/:id/reassign
+// (InventoryManagerOnly). Mirrors ReassignPickingRequest: NewPackerID
+// nil/0 unassigns the task (packer_id cleared, status reset to pending) so
+// any eligible packer can claim it via StartPacking; a non-nil value
+// reassigns directly and keeps the task in_progress. QC/seal state already
+// entered is untouched either way.
+type ReassignPackingRequest struct {
+NewPackerID *uint `json:"new_packer_id"`
+}
