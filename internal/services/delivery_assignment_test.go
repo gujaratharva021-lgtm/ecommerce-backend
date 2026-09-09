@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
         // references it.
         &models.Category{}, &models.Product{}, &models.Warehouse{}, &models.Inventory{}, &models.Batch{},
         // Added for reservation_test.go (concurrent-reservation regression test).
-        &models.CartReservation{}); err != nil {
+        &models.CartReservation{}, &models.WarehouseNotification{}); err != nil {
         fmt.Printf("[delivery_assignment_test] skipping package: migration failed: %v\n", err)
         os.Exit(0)
     }
