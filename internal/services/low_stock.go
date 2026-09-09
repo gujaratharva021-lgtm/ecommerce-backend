@@ -11,6 +11,15 @@ import (
 // Inventory row nor its Warehouse define an override.
 const DefaultLowStockThreshold = 10
 
+// Stock alert states persisted on Inventory.StockAlertState - see that
+// field's doc comment for why this is DB-authoritative rather than an
+// in-process flag.
+const (
+StockAlertStateNormal    = "normal"
+StockAlertStateLow       = "low"
+StockAlertStateOutOfStock = "out_of_stock"
+)
+
 // ResolveLowStockThreshold implements the fallback chain:
 // Inventory.LowStockThreshold (product+warehouse specific)
 //   -> Warehouse.LowStockThreshold (warehouse default)
@@ -35,12 +44,49 @@ func ResolveLowStockThresholdFor(inv models.Inventory, wh models.Warehouse) int 
 return ResolveLowStockThreshold(inv.LowStockThreshold, wh.LowStockThreshold)
 }
 
+// computeAvailable returns Inventory.Stock minus active cart reservations
+// minus expired-batch quantity for a product+warehouse, floored at 0.
+// Shared by CountLowAndOutOfStock and CheckAndNotifyLowStock so the two
+// views can never disagree on what "available" means.
+func computeAvailable(inv models.Inventory) int {
+var reserved int
+database.DB.Model(&models.CartReservation{}).
+Where("product_id = ? AND warehouse_id = ? AND expires_at > ?", inv.ProductID, inv.WarehouseID, time.Now()).
+Select("COALESCE(SUM(quantity), 0)").Scan(&reserved)
+
+var expiredQty int
+database.DB.Model(&models.Batch{}).
+Where("product_id = ? AND warehouse_id = ? AND expiry_date < ? AND quantity > 0", inv.ProductID, inv.WarehouseID, time.Now()).
+Select("COALESCE(SUM(quantity), 0)").Scan(&expiredQty)
+
+available := inv.Stock - reserved - expiredQty
+if available < 0 {
+available = 0
+}
+return available
+}
+
+// classifyStockAlertState maps available stock against a threshold to one
+// of the three persisted alert states.
+func classifyStockAlertState(available, threshold int) string {
+if available <= 0 {
+return StockAlertStateOutOfStock
+}
+if available <= threshold {
+return StockAlertStateLow
+}
+return StockAlertStateNormal
+}
+
 // CountLowAndOutOfStock computes low-stock and out-of-stock counts for a
 // warehouse using the per-row threshold fallback chain (Inventory override
 // -> Warehouse default -> global default), on AVAILABLE stock (physical
 // stock minus active cart reservations minus expired-batch quantity) - not
 // raw Inventory.Stock. Used by both the warehouse dashboard and the
 // warehouse inventory listing so the two views can never disagree.
+//
+// This is a pure read - it does not touch StockAlertState or send any
+// notifications. See CheckAndNotifyLowStock for the write/notify path.
 func CountLowAndOutOfStock(warehouseID uint) (lowStock int64, outOfStock int64, err error) {
 var warehouse models.Warehouse
 if err = database.DB.First(&warehouse, warehouseID).Error; err != nil {
@@ -53,25 +99,12 @@ return 0, 0, err
 }
 
 for _, inv := range invs {
-var reserved int
-database.DB.Model(&models.CartReservation{}).
-Where("product_id = ? AND warehouse_id = ? AND expires_at > ?", inv.ProductID, warehouseID, time.Now()).
-Select("COALESCE(SUM(quantity), 0)").Scan(&reserved)
-
-var expiredQty int
-database.DB.Model(&models.Batch{}).
-Where("product_id = ? AND warehouse_id = ? AND expiry_date < ? AND quantity > 0", inv.ProductID, warehouseID, time.Now()).
-Select("COALESCE(SUM(quantity), 0)").Scan(&expiredQty)
-
-available := inv.Stock - reserved - expiredQty
-if available < 0 {
-available = 0
-}
+available := computeAvailable(inv)
 threshold := ResolveLowStockThresholdFor(inv, warehouse)
-
-if available <= 0 {
+switch classifyStockAlertState(available, threshold) {
+case StockAlertStateOutOfStock:
 outOfStock++
-} else if available < threshold {
+case StockAlertStateLow:
 lowStock++
 }
 }
@@ -79,11 +112,37 @@ return lowStock, outOfStock, nil
 }
 
 // CheckAndNotifyLowStock evaluates a single product+warehouse's current
-// available stock against its resolved threshold and fires the
-// appropriate WhNotifyOutOfStock/WhNotifyLowStock alert if crossed. Meant
-// to be called post-transaction (e.g. after checkout commits), typically
-// via `go services.CheckAndNotifyLowStock(...)`, so a slow/failing
-// notification send never blocks or fails the triggering request.
+// available stock against its resolved threshold, and fires a warehouse
+// alert ONLY when that evaluation actually crosses into a new
+// Inventory.StockAlertState - never merely because the product is still
+// below threshold from a previous check. This is what prevents every
+// subsequent sale of an already-low product (or every subsequent manual
+// stock adjustment - see handlers.AdjustStock, which now also calls this
+// function instead of notifying directly) from re-firing the same alert.
+//
+// Transition table (old -> new: notify?):
+//
+//normal -> low            : yes (low_stock)
+//low -> low                : no
+//low -> out_of_stock      : yes (out_of_stock)
+//out_of_stock -> out_of_stock : no
+//low -> normal / out_of_stock -> normal : no (recovery is not alert-worthy)
+//normal -> low (again, after a restock cleared state back to normal)  : yes
+//
+// The state transition itself is the concurrency gate: the UPDATE is
+// conditioned on the row's CURRENT StockAlertState still matching what was
+// just read (`stock_alert_state = ?`), so if two goroutines/instances race
+// the same transition (e.g. two concurrent checkouts both taking a product
+// from normal to low), only the first UPDATE actually changes a row -
+// RowsAffected reports 0 for the loser, which is treated as "someone else
+// already handled this transition, don't notify again". This is safe
+// across multiple goroutines and multiple backend instances, unlike an
+// in-process flag or a read-then-write without a WHERE-matched UPDATE.
+//
+// Meant to be called post-transaction (e.g. after checkout commits or an
+// adjustment saves), typically via `go services.CheckAndNotifyLowStock(...)`,
+// so a slow/failing notification send never blocks or fails the triggering
+// request.
 func CheckAndNotifyLowStock(productID, warehouseID uint) {
 var inv models.Inventory
 if err := database.DB.Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).First(&inv).Error; err != nil {
@@ -94,28 +153,37 @@ if err := database.DB.First(&warehouse, warehouseID).Error; err != nil {
 return
 }
 
-var reserved int
-database.DB.Model(&models.CartReservation{}).
-Where("product_id = ? AND warehouse_id = ? AND expires_at > ?", productID, warehouseID, time.Now()).
-Select("COALESCE(SUM(quantity), 0)").Scan(&reserved)
-
-var expiredQty int
-database.DB.Model(&models.Batch{}).
-Where("product_id = ? AND warehouse_id = ? AND expiry_date < ? AND quantity > 0", productID, warehouseID, time.Now()).
-Select("COALESCE(SUM(quantity), 0)").Scan(&expiredQty)
-
-available := inv.Stock - reserved - expiredQty
-if available < 0 {
-available = 0
-}
+available := computeAvailable(inv)
 threshold := ResolveLowStockThresholdFor(inv, warehouse)
+newState := classifyStockAlertState(available, threshold)
 
-if available <= 0 {
+oldState := inv.StockAlertState
+if oldState == "" {
+oldState = StockAlertStateNormal
+}
+if newState == oldState {
+return
+}
+
+result := database.DB.Model(&models.Inventory{}).
+Where("id = ? AND stock_alert_state = ?", inv.ID, oldState).
+Update("stock_alert_state", newState)
+if result.Error != nil || result.RowsAffected == 0 {
+// Either a DB error, or we lost the race to another concurrent
+// caller that already made this same transition - either way,
+// don't notify.
+return
+}
+
+// Only low_stock and out_of_stock crossings are alert-worthy;
+// recovering to normal is deliberately silent (see doc comment above).
+switch newState {
+case StockAlertStateOutOfStock:
 NotifyWarehouse(warehouseID, models.WhNotifyOutOfStock,
 "Product out of stock",
 "Product is now out of stock at your warehouse.",
 nil, &productID)
-} else if available < threshold {
+case StockAlertStateLow:
 NotifyWarehouse(warehouseID, models.WhNotifyLowStock,
 "Low stock warning",
 "Product is running low on available stock.",

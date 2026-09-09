@@ -74,11 +74,31 @@ func GetProducts(c *gin.Context) {
 		db = db.Where("price <= ?", query.MaxPrice)
 	}
 
-// Filter by stock availability (correlated subquery avoids duplicate rows from a JOIN)
-	if query.InStock != nil {
-db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = ?)", *query.InStock)
+// Resolve the caller's nearest warehouse up front (if they supplied
+// location) - both the in_stock filter below and the NearestStock/
+// NearestInStock annotation later need it, and resolving it once avoids
+// a duplicate FindNearestWarehouse call and keeps both uses consistent.
+var nearestWarehouseForFilter *models.Warehouse
+if query.Lat != nil && query.Lng != nil {
+nearestWarehouseForFilter, _, _ = FindNearestWarehouse(*query.Lat, *query.Lng)
+}
 
-	}
+// Filter by stock availability (correlated subquery avoids duplicate rows from a JOIN).
+// When the caller supplied their location and it resolved to a serviceable
+// warehouse, scope the filter to THAT warehouse specifically - a product
+// that is in_stock at some other warehouse but out of stock at the one
+// that would actually fulfil this customer's order must not pass an
+// in_stock=true filter, even though it would still show up (correctly)
+// via NearestStock/NearestInStock in the response body. Falls back to the
+// old any-warehouse check when no location was given, since there's no
+// specific warehouse to scope to in that case.
+if query.InStock != nil {
+if nearestWarehouseForFilter != nil {
+db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.warehouse_id = ? AND inventories.in_stock = ?)", nearestWarehouseForFilter.ID, *query.InStock)
+} else {
+db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = ?)", *query.InStock)
+}
+}
 
 	// Count total before pagination
 	var total int64
@@ -117,10 +137,9 @@ db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = 
     // warehouse that would actually serve them (same logic checkout uses),
     // rather than "in stock somewhere" which is misleading when the
     // nearest warehouse is empty but a distant one still has stock.
-    if query.Lat != nil && query.Lng != nil {
-        nearestWarehouse, _, err := FindNearestWarehouse(*query.Lat, *query.Lng)
-        if err == nil && nearestWarehouse != nil {
-            for i := range products {
+    if nearestWarehouseForFilter != nil {
+        nearestWarehouse := nearestWarehouseForFilter
+        for i := range products {
                 stock := 0
                 inStock := false
                 for _, inv := range products[i].Inventories {
@@ -133,7 +152,6 @@ db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = 
                 products[i].NearestStock = &stock
                 products[i].NearestInStock = &inStock
             }
-        }
     }
 
     response := models.ProductListResponse{

@@ -197,6 +197,9 @@ log.Fatalf("Failed to add low_stock_threshold column to warehouses: %v", err)
 if err := DB.Exec(`ALTER TABLE inventories ADD COLUMN IF NOT EXISTS low_stock_threshold BIGINT`).Error; err != nil {
 log.Fatalf("Failed to add low_stock_threshold column to inventories: %v", err)
 }
+if err := DB.Exec(`ALTER TABLE inventories ADD COLUMN IF NOT EXISTS stock_alert_state VARCHAR(20) NOT NULL DEFAULT 'normal'`).Error; err != nil {
+log.Fatalf("Failed to add stock_alert_state column to inventories: %v", err)
+}
 if err := DB.Exec(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).Error; err != nil {
 log.Fatalf("Failed to add cancellation_reason column to orders: %v", err)
 }

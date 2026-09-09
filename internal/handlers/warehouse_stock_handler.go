@@ -81,23 +81,16 @@ return
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "stock_adjustment", "inventory", productID,
 fmt.Sprintf("stock=%d", previousQty), fmt.Sprintf("stock=%d reason=%s", req.NewQuantity, req.Reason))
 
-var warehouseForThreshold models.Warehouse
-database.DB.First(&warehouseForThreshold, warehouseID)
-threshold := services.ResolveLowStockThresholdFor(inv, warehouseForThreshold)
-if inv.Stock <= 0 {
-services.NotifyWarehouse(warehouseID, models.WhNotifyOutOfStock,
-"Product out of stock", fmt.Sprintf("Product #%d is now out of stock at your warehouse.", productIDUint64),
-nil, ptrUint(uint(productIDUint64)))
-} else if inv.Stock < threshold {
-services.NotifyWarehouse(warehouseID, models.WhNotifyLowStock,
-"Low stock warning", fmt.Sprintf("Product #%d is running low (%d left, threshold %d).", productIDUint64, inv.Stock, threshold),
-nil, ptrUint(uint(productIDUint64)))
-}
+// Route through the same backend-authoritative state machine used by
+// checkout (services.CheckAndNotifyLowStock), instead of notifying
+// directly here - this is what stops repeated manual adjustments on an
+// already-low product from re-firing the same alert, and ensures
+// checkout, adjustment, and any future replenishment/cancellation path
+// all agree on a single source of truth for stock alert state.
+go services.CheckAndNotifyLowStock(uint(productIDUint64), warehouseID)
 
 c.JSON(http.StatusOK, inv)
 }
-
-func ptrUint(v uint) *uint { return &v }
 
 // GetStockMovements godoc
 // GET /api/v1/warehouse/stock-movements?product_id=&movement_type=&page=&limit= (warehouse staff only)
