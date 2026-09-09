@@ -149,6 +149,11 @@ statusCode = http.StatusBadRequest
 return errors.New("Only pending receiving records can be marked received, current status: " + rec.Status)
 }
 
+if req.DamagedQuantity < 0 || req.DamagedQuantity > req.ReceivedQuantity {
+statusCode = http.StatusBadRequest
+return errors.New("damaged_quantity must be between 0 and received_quantity")
+}
+
 now := time.Now()
 rec.ReceivedQuantity = req.ReceivedQuantity
 rec.DamagedQuantity = req.DamagedQuantity
@@ -204,9 +209,10 @@ statusCode = http.StatusBadRequest
 return errors.New("action must be either \"accept\" or \"reject\"")
 }
 
-if req.Action == "accept" && (req.AcceptedQuantity <= 0 || req.AcceptedQuantity > rec.ReceivedQuantity) {
+maxAcceptableQty := rec.ReceivedQuantity - rec.DamagedQuantity
+if req.Action == "accept" && (req.AcceptedQuantity <= 0 || req.AcceptedQuantity > maxAcceptableQty) {
 statusCode = http.StatusBadRequest
-return errors.New("accepted_quantity must be between 1 and received_quantity")
+return errors.New("accepted_quantity must be between 1 and received_quantity minus damaged_quantity")
 }
 if req.Action == "reject" && req.RejectionReason == "" {
 statusCode = http.StatusBadRequest
