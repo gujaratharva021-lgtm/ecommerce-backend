@@ -56,6 +56,8 @@ func TestMain(m *testing.M) {
 		&models.Address{},
 		&models.Order{},
 		&models.OrderItem{},
+		&models.Warehouse{},
+		&models.Inventory{},
 	); err != nil {
 		fmt.Printf("[delivery_profile_handler_test] skipping package: migration failed: %v\n", err)
 		os.Exit(0)
