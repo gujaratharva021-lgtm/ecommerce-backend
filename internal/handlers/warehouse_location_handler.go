@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "fmt"
@@ -143,7 +143,7 @@ c.JSON(http.StatusCreated, bin)
 // inventory row in the caller's warehouse.
 func AssignProductBin(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
-productID := c.Param("product_id")
+productID := c.Param("productId")
 
 var req models.AssignBinRequest
 if err := c.ShouldBindJSON(&req); err != nil {
@@ -180,7 +180,7 @@ c.JSON(http.StatusOK, inv)
 // current stock + location before an adjustment or bin (re)assignment.
 func GetProductInventory(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
-productID := c.Param("product_id")
+productID := c.Param("productId")
 
 var inv models.Inventory
 if err := database.DB.Where("product_id = ? AND warehouse_id = ?", productID, warehouseID).

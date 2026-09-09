@@ -24,7 +24,7 @@ func AdjustStock(c *gin.Context) {
 warehouseID := c.MustGet("warehouse_id").(uint)
 staffID := c.MustGet("staff_id").(uint)
 staffName, _ := c.Get("staff_name")
-productID := c.Param("product_id")
+productID := c.Param("productId")
 
 var req models.StockAdjustmentRequest
 if err := c.ShouldBindJSON(&req); err != nil {
