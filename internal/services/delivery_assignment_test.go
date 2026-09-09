@@ -43,7 +43,9 @@ func TestMain(m *testing.M) {
         // Added for stock_transfer_batch_test.go (FEFO batch-deduction tests) -
         // Category is migrated before Product since Product.CategoryID
         // references it.
-        &models.Category{}, &models.Product{}, &models.Warehouse{}, &models.Inventory{}, &models.Batch{}); err != nil {
+        &models.Category{}, &models.Product{}, &models.Warehouse{}, &models.Inventory{}, &models.Batch{},
+        // Added for reservation_test.go (concurrent-reservation regression test).
+        &models.CartReservation{}); err != nil {
         fmt.Printf("[delivery_assignment_test] skipping package: migration failed: %v\n", err)
         os.Exit(0)
     }
