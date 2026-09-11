@@ -240,11 +240,34 @@ return err
 }
 }
 
+// Discount ratio so a cheaper-substitute refund reflects what the
+// customer actually paid per unit, not the raw catalog price -
+// OrderItem.Price is always the undiscounted catalog price (set at
+// checkout), with any coupon discount applied only at invoice-generation
+// time via this same ratio. Without this, substituting an item on a
+// discounted order refunded the full catalog-price difference instead of
+// the discounted amount the customer actually paid, handing out an
+// unearned cash refund (Defect #05). Mirrors the identical fix already
+// applied to warehouse_picking_handler.go for short/unavailable picks.
+discountRatio := 1.0
+if order.ItemsAmount > 0 {
+var orderCoupon models.OrderCoupon
+couponDiscount := 0.0
+if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == nil {
+couponDiscount = orderCoupon.DiscountAmount
+}
+netItemsAmount := order.ItemsAmount - couponDiscount
+if netItemsAmount < 0 {
+netItemsAmount = 0
+}
+discountRatio = netItemsAmount / order.ItemsAmount
+}
+
 // Swap the order item onto the substitute product. If the substitute
 // is cheaper, refund the difference to the customer's wallet; if it's
 // pricier, absorb the difference rather than charging the customer
 // more than they agreed to pay.
-priceDiff := (orderItem.Price - substituteProduct.Price) * float64(sub.Quantity)
+priceDiff := (orderItem.Price - substituteProduct.Price) * float64(sub.Quantity) * discountRatio
 originalPrice := orderItem.Price
 if sub.Quantity >= orderItem.Quantity {
 // Full-line substitution: every unit on this order line is being
@@ -294,8 +317,35 @@ if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).
 Updates(map[string]interface{}{"items_amount": newItemsAmount, "total_amount": newTotalAmount}).Error; err != nil {
 return err
 }
+// Only credit the wallet for online (prepaid) orders - the customer
+// already paid the full amount upfront, so a cheaper substitute means
+// they're owed money back. For COD orders nothing has been paid yet;
+// reducing order.TotalAmount above already means they'll be charged
+// less at the door, so crediting the wallet here as well would hand
+// out free unearned spendable cash (mirrors the fix applied to
+// warehouse_picking_handler.go for short/unavailable picks).
+if order.PaymentMethod == models.PaymentMethodOnline {
 refID := order.ID
 if err := utils.CreditWallet(tx, order.UserID, refundAmount, models.WalletReasonOrderRefund, "order", &refID, "Refund for cheaper substitute item"); err != nil {
+return err
+}
+// Record this amount against the payment's RefundedAmount so a later
+// CancelOrder/CancelOrderInFulfillment (which computes refundAmount
+// := payment.Amount - payment.RefundedAmount) does not refund this
+// same substitution difference a second time (mirrors the fix
+// applied to warehouse_picking_handler.go for short/unavailable
+// picks on online orders).
+if err := tx.Model(&models.Payment{}).Where("order_id = ?", order.ID).
+Update("refunded_amount", gorm.Expr("refunded_amount + ?", refundAmount)).Error; err != nil {
+return err
+}
+}
+// If an invoice was already issued for this order before the
+// substitution happened, it must be amended via a GST credit note
+// (not silently rewritten) so the tax invoice and sales ledger stay
+// consistent with what was actually delivered (Bug#24). No-op if no
+// invoice exists yet.
+if _, err := services.GenerateCreditNoteForSubstitution(tx, order.ID, sub.OriginalProductID, refundAmount, "Item substitution - cheaper replacement", order.PaymentMethod); err != nil {
 return err
 }
 }

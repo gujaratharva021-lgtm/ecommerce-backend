@@ -20,7 +20,7 @@ now := time.Now()
 monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 
 var totalRevenue, cogs, totalExpenses float64
-revenueFilter := "(payment_method = 'online' AND payment_status = 'paid') OR (payment_method = 'cod' AND status = 'delivered')"
+revenueFilter := "(payment_method = 'online' AND payment_status = 'paid' AND status NOT IN ('cancelled','returned')) OR (payment_method = 'cod' AND status = 'delivered')"
 database.DB.Table("orders").
 Where("created_at >= ?", monthStart).
 Where(revenueFilter).
@@ -43,11 +43,17 @@ database.DB.Model(&models.VendorBill{}).
 Where("voided_at IS NULL").
 Select("COALESCE(SUM(amount + gst_amount - amount_paid),0)").Scan(&vendorPayable)
 
-// Accounts Receivable / gateway pending: online payments not yet paid.
+// Accounts Receivable / gateway pending: online payments genuinely still
+// awaiting collection. Defect #30 (LOW): this previously also summed
+// "failed" payments into receivables - a failed gateway attempt collected
+// nothing and never will without the customer retrying (which creates a
+// fresh payment row), so it is not money owed to the company and should
+// never inflate Accounts Receivable. Only "created" (payment initiated,
+// outcome not yet known) genuinely belongs here.
 var gatewayPending float64
 database.DB.Table("payments").
 Joins("JOIN orders ON orders.id = payments.order_id").
-Where("orders.payment_method = ? AND payments.status IN ?", "online", []string{"created", "failed"}).
+Where("orders.payment_method = ? AND payments.status = ?", "online", models.PaymentStatusCreated).
 Select("COALESCE(SUM(payments.amount),0)").Scan(&gatewayPending)
 
 // COD pending: delivered COD orders not yet marked paid.

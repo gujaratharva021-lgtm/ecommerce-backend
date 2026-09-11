@@ -284,6 +284,27 @@ func DeleteProduct(c *gin.Context) {
 		return
 	}
 
+	// Block deletion while this product is on any order that hasn't reached
+	// a terminal state yet (Defect #13) - Inventory has no soft-delete
+	// column, so the hard DELETE below permanently removes the row a
+	// warehouse picking/packing task for this exact order may still be
+	// reading mid-operation. Terminal states (delivered/returned/cancelled)
+	// are excluded since those orders no longer need this product's
+	// inventory record for anything.
+	var activeOrderCount int64
+	if err := database.DB.Model(&models.OrderItem{}).
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Where("order_items.product_id = ? AND orders.status NOT IN ?", product.ID,
+			[]string{models.OrderStatusDelivered, models.OrderStatusReturned, models.OrderStatusCancelled}).
+		Count(&activeOrderCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check for in-flight orders"})
+		return
+	}
+	if activeOrderCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This product is on one or more orders that are still in progress (not yet delivered, returned, or cancelled). Wait until those orders complete before deleting it."})
+		return
+	}
+
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("product_id = ?", product.ID).Delete(&models.Inventory{}).Error; err != nil {
 			return err
@@ -387,6 +408,7 @@ func GetAllOrders(c *gin.Context) {
 	if err := db.
 		Preload("Items.Product").
 		Preload("Address").
+		Preload("DeliveryPartner").
 		Order("created_at DESC").
 		Offset((page - 1) * limit).
 		Limit(limit).
@@ -442,28 +464,34 @@ func UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
-	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		if req.Status == models.OrderStatusCancelled {
-			for _, item := range order.Items {
-				var inventory models.Inventory
-				if err := tx.Where("product_id = ?", item.ProductID).Order("id").First(&inventory).Error; err == nil {
-					inventory.Stock += item.Quantity
-					inventory.InStock = true
-					if err := tx.Save(&inventory).Error; err != nil {
-						return err
-					}
-				}
-			}
+	// Cancellation is delegated to the shared CancelOrderInFulfillment
+	// service rather than handled inline here - the old inline logic
+	// restored stock to an arbitrary warehouse row (lowest product_id
+	// match, ignoring which warehouse actually fulfilled the order),
+	// skipped the StockMovement audit trail, never refunded the
+	// customer's wallet/gateway payment, never reinstated the coupon,
+	// and never cancelled in-flight picking/packing tasks or unassigned
+	// the delivery partner (Bug#18). CancelOrderInFulfillment already
+	// does all of this correctly and is the same path used by
+	// AdminCancelOrder/WarehouseCancelOrder.
+	if req.Status == models.OrderStatusCancelled {
+		reason := req.Reason
+		if reason == "" {
+			reason = "Cancelled by admin via order status update"
 		}
-		return tx.Model(&order).Update("status", req.Status).Error
-	})
-
-	if txErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
-		return
+		adminID := c.MustGet("user_id").(uint)
+		if err := services.CancelOrderInFulfillment(order.ID, "admin", adminID, "", reason); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		order.Status = models.OrderStatusCancelled
+	} else {
+		if err := database.DB.Model(&order).Update("status", req.Status).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+			return
+		}
+		order.Status = req.Status
 	}
-
-	order.Status = req.Status
     // If this status change just confirmed the order (e.g. admin verifying
     // an online payment), try to auto-assign the nearest available
     // delivery partner right away instead of waiting for warehouse

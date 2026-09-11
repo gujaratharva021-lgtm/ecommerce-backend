@@ -151,6 +151,45 @@ if err := DB.Exec(`CREATE TABLE IF NOT EXISTS subcategories (
 )`).Error; err != nil {
 log.Fatalf("Failed to create subcategories table: %v", err)
 }
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS wallet_topups (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    amount DOUBLE PRECISION NOT NULL,
+    razorpay_order_id VARCHAR(255) NOT NULL,
+    razorpay_payment_id VARCHAR(255) NOT NULL DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'created',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+)`).Error; err != nil {
+log.Fatalf("Failed to create wallet_topups table: %v", err)
+}
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_wallet_topups_user_id ON wallet_topups (user_id)`).Error; err != nil {
+log.Fatalf("Failed to create wallet_topups user_id index: %v", err)
+}
+if err := DB.Exec("CREATE SEQUENCE IF NOT EXISTS substitution_credit_note_number_seq START 1").Error; err != nil {
+log.Fatalf("Failed to ensure substitution credit note sequence exists: %v", err)
+}
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS substitution_credit_notes (
+    id BIGSERIAL PRIMARY KEY,
+    credit_note_number VARCHAR(50) UNIQUE NOT NULL,
+    invoice_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    taxable_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    cgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sgst_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    igst_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+)`).Error; err != nil {
+log.Fatalf("Failed to create substitution_credit_notes table: %v", err)
+}
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_substitution_credit_notes_order_id ON substitution_credit_notes (order_id)`).Error; err != nil {
+log.Fatalf("Failed to create substitution_credit_notes order_id index: %v", err)
+}
+if err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_substitution_credit_notes_invoice_id ON substitution_credit_notes (invoice_id)`).Error; err != nil {
+log.Fatalf("Failed to create substitution_credit_notes invoice_id index: %v", err)
+}
 if err := DB.Exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_id BIGINT REFERENCES subcategories(id)`).Error; err != nil {
 log.Fatalf("Failed to add subcategory_id column to products: %v", err)
 }
@@ -362,7 +401,7 @@ log.Fatalf("Failed to add void_reason column to bank_transactions: %v", err)
 if err := DB.Exec(`ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS voided_by_id BIGINT NULL REFERENCES users(id)`).Error; err != nil {
 log.Fatalf("Failed to add voided_by_id column to bank_transactions: %v", err)
 }
-if err := DB.Exec(`CREATE TABLE IF NOT EXISTS credit_notes (
+if err := DB.Exec(`CREATE TABLE IF NOT EXISTS substitution_credit_notes (
     id BIGSERIAL PRIMARY KEY,
     credit_note_number VARCHAR(50) UNIQUE NOT NULL,
     invoice_id BIGINT NOT NULL REFERENCES invoices(id),
@@ -380,8 +419,8 @@ if err := DB.Exec(`CREATE TABLE IF NOT EXISTS credit_notes (
     created_by_id BIGINT NULL REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_credit_notes_invoice_id ON credit_notes(invoice_id);
-CREATE INDEX IF NOT EXISTS idx_credit_notes_order_id ON credit_notes(order_id);
+CREATE INDEX IF NOT EXISTS idx_substitution_credit_notes_invoice_id ON substitution_credit_notes(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_substitution_credit_notes_order_id ON substitution_credit_notes(order_id);
 CREATE INDEX IF NOT EXISTS idx_credit_notes_return_request_id ON credit_notes(return_request_id);
 CREATE TABLE IF NOT EXISTS credit_note_items (
     id BIGSERIAL PRIMARY KEY,
@@ -522,6 +561,19 @@ seedDefaultSettings()
 seedChartOfAccounts()
 if err := DB.Exec(`ALTER TABLE ledger_entries ALTER COLUMN created_by_id DROP NOT NULL`).Error; err != nil {
 log.Fatalf("Failed to drop NOT NULL on ledger_entries.created_by_id: %v", err)
+}
+// Defect #12 DB-level backstop: even with UpdatePayroll/CreatePayroll now
+// locking the payroll row and running the ledger post inside that same
+// transaction, this partial unique index is a second line of defense -
+// if application-level locking is ever bypassed (a manual script, a
+// future code path that forgets to lock, etc.), the database itself
+// rejects a second "payroll" ledger entry for the same payroll record
+// instead of silently accepting a duplicate salary debit/credit.
+// Deliberately scoped to reference_type='payroll' only - excludes
+// 'payroll_adjustment', which legitimately posts multiple times per
+// payroll record whenever a paid record's amount is corrected.
+if err := DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_entries_unique_payroll_ref ON ledger_entries (reference_type, reference_id) WHERE reference_type = 'payroll'`).Error; err != nil {
+panic(err)
 }
 if err := DB.Exec(`ALTER TABLE addresses ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false`).Error; err != nil {
 log.Fatalf("Failed to add is_deleted column to addresses: %v", err)

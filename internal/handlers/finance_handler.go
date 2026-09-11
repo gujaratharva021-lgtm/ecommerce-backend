@@ -47,7 +47,7 @@ var t totals
 
 base := database.DB.Table("orders").
 Where("created_at >= ? AND created_at < ?", from, to).
-Where("(payment_method = 'online' AND payment_status = 'paid') OR (payment_method = 'cod' AND status = 'delivered')")
+Where("(payment_method = 'online' AND payment_status = 'paid' AND status NOT IN ('cancelled','returned')) OR (payment_method = 'cod' AND status = 'delivered')")
 
 base.
 Select("COALESCE(SUM(items_amount),0) as gross_sales, COALESCE(SUM(delivery_charge),0) as delivery_charge, COALESCE(SUM(platform_fee),0) as platform_fee, COUNT(*) as order_count").
@@ -59,7 +59,7 @@ var discountTotal float64
 database.DB.Table("order_coupons").
 Joins("JOIN orders ON orders.id = order_coupons.order_id").
 Where("orders.created_at >= ? AND orders.created_at < ?", from, to).
-Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid') OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
+Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid' AND orders.status NOT IN ('cancelled','returned')) OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
 Select("COALESCE(SUM(order_coupons.discount_amount),0)").
 Scan(&discountTotal)
 
@@ -77,7 +77,7 @@ database.DB.Table("orders").
 Select("orders.warehouse_id, COALESCE(warehouses.name, 'Unassigned') as name, COALESCE(SUM(orders.items_amount),0) as revenue, COUNT(*) as order_count").
 Joins("LEFT JOIN warehouses ON warehouses.id = orders.warehouse_id").
 Where("orders.created_at >= ? AND orders.created_at < ?", from, to).
-Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid') OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
+Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid' AND orders.status NOT IN ('cancelled','returned')) OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
 Group("orders.warehouse_id, warehouses.name").
 Order("revenue DESC").
 Scan(&byWarehouse)
@@ -95,7 +95,7 @@ Select("order_items.product_id, products.name as product_name, COALESCE(SUM(orde
 Joins("JOIN orders ON orders.id = order_items.order_id").
 Joins("LEFT JOIN products ON products.id = order_items.product_id").
 Where("orders.created_at >= ? AND orders.created_at < ?", from, to).
-Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid') OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
+Where("(orders.payment_method = 'online' AND orders.payment_status = 'paid' AND orders.status NOT IN ('cancelled','returned')) OR (orders.payment_method = 'cod' AND orders.status = 'delivered')").
 Group("order_items.product_id, products.name").
 Order("revenue DESC").
 Limit(20).

@@ -7,6 +7,7 @@ import (
 "strconv"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
@@ -20,7 +21,16 @@ import (
 
 // RequestStockTransfer godoc
 // POST /api/v1/warehouse/stock-transfers (warehouse staff only)
-// The requesting staff member's own warehouse is always the source.
+// The requesting staff member's own warehouse is always the DESTINATION -
+// this handler creates a request asking another (supplying) warehouse,
+// identified by req.ToWarehouseID, to send stock here. The comment
+// previously on this function claimed the opposite (source), which
+// contradicted both the actual field mapping below (FromWarehouseID:
+// req.ToWarehouseID) and the frontend copy in StockTransfers.tsx
+// ("Your warehouse will be the destination - stock moves FROM the
+// warehouse you select below") - confirmed against production data
+// during the Bug#22 audit: requester_warehouse always equals
+// to_warehouse_id. No functional change, comment-only correction.
 func RequestStockTransfer(c *gin.Context) {
 staffID := c.MustGet("user_id").(uint)
 
@@ -218,7 +228,12 @@ damagedMovement := models.StockMovement{
 ProductID:    transfer.ProductID,
 WarehouseID:  transfer.ToWarehouseID,
 PreviousQty:  inventory.Stock,
-Change:       -req.DamagedQuantity,
+// Change is 0, not -DamagedQuantity - same reasoning as the receiving-time
+// damage movement (see warehouse_receiving_handler.go): these units never
+// entered Inventory.Stock, so there's nothing for Stock to go down by
+// here. A nonzero Change broke the PreviousQty+Change==NewQty audit
+// invariant while falsely implying Stock was reduced (Bug#12).
+Change:       0,
 NewQty:       inventory.Stock,
 MovementType: models.MovementDamaged,
 Reason:       models.AdjustReasonDamaged,
@@ -249,6 +264,7 @@ return
 services.LogWarehouseAction(staff.WarehouseID, staffID, staff.Name, "receive_stock_transfer", "stock_transfer",
 fmt.Sprint(transfer.ID), "status=in_transit", "status=received")
 
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
@@ -354,6 +370,7 @@ services.NotifyWarehouse(transfer.FromWarehouseID, models.WhNotifyStockTransfer,
 fmt.Sprintf("Your transfer #%d to warehouse #%d was approved and is now in transit.", transfer.ID, transfer.ToWarehouseID),
 nil, &transfer.ProductID)
 
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
@@ -512,6 +529,7 @@ c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }
 
@@ -582,6 +600,15 @@ if err := tx.Save(&inventory).Error; err != nil {
 return err
 }
 
+// Aggregate Inventory.Stock is restored above, but the deduction at
+// approve time also came out of a specific Batch row (transfer.BatchID)
+// - that must be credited back too, or FEFO/batch-level pick lists will
+// keep showing this stock as unavailable even though the warehouse
+// total looks correct again (Bug#23).
+if err := services.RestoreToBatch(tx, transfer.BatchID, transfer.Quantity); err != nil {
+return err
+}
+
 movement := models.StockMovement{
 ProductID:    transfer.ProductID,
 WarehouseID:  transfer.FromWarehouseID,
@@ -605,5 +632,6 @@ c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 c.JSON(http.StatusOK, gin.H{"stock_transfer": transfer})
 }

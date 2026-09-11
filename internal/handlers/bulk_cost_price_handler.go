@@ -1,10 +1,12 @@
-﻿package handlers
+package handlers
 
 import (
+"fmt"
 "net/http"
 
 "github.com/gin-gonic/gin"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 )
 
 type bulkCostPriceItem struct {
@@ -37,6 +39,18 @@ failed = append(failed, map[string]interface{}{"id": item.ID, "error": "product 
 continue
 }
 updated++
+// Invalidate this product's cached detail entry (Defect #14) - without
+// this, GetProductByID kept serving the stale pre-update cost price and
+// margin figures from Redis until the key's TTL happened to expire,
+// same as every other product-mutating handler in this codebase already
+// does (see admin_handler.go's CreateProduct/UpdateProduct/DeleteProduct).
+_ = cache.Delete(c.Request.Context(), fmt.Sprintf("products:id:%d", item.ID))
+}
+
+// One list-cache invalidation for the whole batch is enough - no need to
+// repeat it per item inside the loop above.
+if updated > 0 {
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 }
 
 c.JSON(http.StatusOK, gin.H{

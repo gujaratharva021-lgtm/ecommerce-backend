@@ -8,6 +8,7 @@ import (
 "time"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
@@ -335,7 +336,14 @@ damagedMovement := models.StockMovement{
 ProductID:    rec.ProductID,
 WarehouseID:  warehouseID,
 PreviousQty:  inv.Stock,
-Change:       -rec.DamagedQuantity,
+// Change is 0, not -DamagedQuantity - these units never entered
+// Inventory.Stock in the first place (only AcceptedQuantity did,
+// above), so there's nothing here for Stock to go down by. A nonzero
+// Change here broke the PreviousQty+Change==NewQty audit invariant
+// while also falsely implying Inventory.Stock was reduced by an
+// amount it never actually held (Bug#12). The damaged count remains
+// fully auditable via Notes/MovementType/Reason below.
+Change:       0,
 NewQty:       inv.Stock,
 MovementType: models.MovementDamaged,
 Reason:       models.AdjustReasonDamaged,
@@ -389,6 +397,7 @@ staffName, _ := c.Get("staff_name")
 services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "receiving_put_away", "receiving", id,
 "status=accepted", "status=put_away")
 
+_ = cache.DeleteByPrefix(c.Request.Context(), "products:list:")
 c.JSON(http.StatusOK, rec)
 }
 

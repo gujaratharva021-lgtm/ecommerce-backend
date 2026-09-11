@@ -166,7 +166,7 @@ func AutoAssignDeliveryPartner(orderID uint) {
         var loads []loadRow
         if err := tx.Model(&models.Order{}).
             Select("delivery_partner_id, count(*) as cnt").
-            Where("delivery_partner_id IS NOT NULL AND status IN ?", []string{models.OrderStatusConfirmed, models.OrderStatusPicking, models.OrderStatusPicked, models.OrderStatusPacking, models.OrderStatusPacked, models.OrderStatusReadyForDispatch, models.OrderStatusHandedOver, models.OrderStatusShipped}).
+            Where("delivery_partner_id IS NOT NULL AND status IN ? AND updated_at > ?", []string{models.OrderStatusConfirmed, models.OrderStatusPicking, models.OrderStatusPicked, models.OrderStatusPacking, models.OrderStatusPacked, models.OrderStatusReadyForDispatch, models.OrderStatusHandedOver, models.OrderStatusShipped}, time.Now().Add(-12*time.Hour)).
             Group("delivery_partner_id").
             Scan(&loads).Error; err != nil {
             return fmt.Errorf("failed to load partner workloads: %w", err)
@@ -270,13 +270,6 @@ func AutoAssignDeliveryPartner(orderID uint) {
         "New delivery assigned",
         fmt.Sprintf("Order #%d has been assigned to you", orderID),
     )
-CreateDeliveryNotification(
-assignedPartnerID,
-"New delivery assigned",
-fmt.Sprintf("Order #%d has been assigned to you", orderID),
-"new_assignment",
-&orderID,
-)
 CreateDeliveryNotification(
 assignedPartnerID,
 "New delivery assigned",

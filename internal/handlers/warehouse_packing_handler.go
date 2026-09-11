@@ -161,12 +161,19 @@ statusCode = http.StatusBadRequest
 return errors.New("seal number is required to complete packing")
 }
 
+// Bug #16: filter to items that were actually picked
+// (quantity_picked > 0). Without this, a cold item that came back
+// completely short/unavailable during picking still counted as
+// "present" here, permanently demanding a chilled/frozen QC check the
+// packer can never satisfy - the box holds no chilled/frozen product to
+// check - deadlocking the packing step for the ambient items that WERE
+// picked.
 var pickedZones []string
 tx.Table("picking_task_items").
 Select("DISTINCT products.temperature_zone").
 Joins("JOIN products ON products.id = picking_task_items.product_id").
 Joins("JOIN picking_tasks ON picking_tasks.id = picking_task_items.picking_task_id").
-Where("picking_tasks.order_id = ?", orderID).
+Where("picking_tasks.order_id = ? AND picking_task_items.quantity_picked > 0", orderID).
 Pluck("products.temperature_zone", &pickedZones)
 
 zoneRequired := map[string]bool{}

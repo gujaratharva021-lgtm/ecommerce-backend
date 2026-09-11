@@ -165,9 +165,20 @@ if newState == oldState {
 return
 }
 
-result := database.DB.Model(&models.Inventory{}).
-Where("id = ? AND stock_alert_state = ?", inv.ID, oldState).
-Update("stock_alert_state", newState)
+// The WHERE clause must also match a NULL stock_alert_state whenever
+// oldState is "normal" (the in-memory default applied above) - a
+// freshly-inserted or freshly-migrated Inventory row has NULL here,
+// not the literal string "normal", and Postgres NULL = \'normal\'
+// never matches. Without this OR, the very first normal -> low/out_of_stock
+// transition on a brand-new row always lost the race-check below
+// (RowsAffected == 0) and silently swallowed the alert (Bug#25).
+query := database.DB.Model(&models.Inventory{}).Where("id = ?", inv.ID)
+if oldState == StockAlertStateNormal {
+query = query.Where("(stock_alert_state = ? OR stock_alert_state IS NULL)", oldState)
+} else {
+query = query.Where("stock_alert_state = ?", oldState)
+}
+result := query.Update("stock_alert_state", newState)
 if result.Error != nil || result.RowsAffected == 0 {
 // Either a DB error, or we lost the race to another concurrent
 // caller that already made this same transition - either way,

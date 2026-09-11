@@ -54,6 +54,25 @@ selectedID := batch.ID
 return &selectedID, nil
 }
 
+// RestoreToBatch credits quantity back onto the exact batch a stock
+// transfer was deducted from, for use when an in-transit transfer is
+// cancelled. Unlike DeductFromBatchFEFO (which selects a batch),
+// RestoreToBatch always targets the specific batchID the transfer
+// actually deducted from (transfer.BatchID, set at approve time) - the
+// stock is going back to the same batch it came from, not being
+// re-allocated by FEFO. No-op if batchID is nil (non-batch-tracked
+// product, matching the same convention used by CreateReceivedBatch)
+// (Bug#23: previously CancelStockTransfer restored Inventory.Stock but
+// never restored Batch.Quantity, leaving the aggregate count correct
+// while batch-level/FEFO tracking silently showed the stock as gone).
+func RestoreToBatch(tx *gorm.DB, batchID *uint, qty int) error {
+if batchID == nil {
+return nil
+}
+return tx.Model(&models.Batch{}).Where("id = ?", *batchID).
+UpdateColumn("quantity", gorm.Expr("quantity + ?", qty)).Error
+}
+
 // CreateReceivedBatch creates a new Batch row at the destination warehouse
 // carrying over the batch number and expiry date from the source batch, so
 // expiry tracking survives a stock transfer instead of being lost. Used by

@@ -62,7 +62,8 @@ auth.DELETE("/me", middleware.AuthMiddleware(), handlers.DeleteAccount)
 
         // ---- Wallet routes (protected) ----
         api.GET("/wallet", middleware.AuthMiddleware(), handlers.GetWallet)
-api.POST("/wallet/add-money", middleware.AuthMiddleware(), handlers.AddMoneyToWallet)
+api.POST("/wallet/add-money", middleware.AuthMiddleware(), handlers.InitiateWalletTopup)
+api.POST("/wallet/add-money/verify", middleware.AuthMiddleware(), handlers.VerifyWalletTopup)
         api.GET("/returns", middleware.AuthMiddleware(), handlers.GetMyReturns)
 
         // ---- Support ticket routes (protected, customer-facing) ----
@@ -88,6 +89,7 @@ api.POST("/wallet/add-money", middleware.AuthMiddleware(), handlers.AddMoneyToWa
             delivery.PUT("/orders/:id/accept", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.AcceptAssignment)
             delivery.PUT("/orders/:id/reject", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.RejectAssignment)
             delivery.PUT("/orders/:id/delivery-status", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UpdateDeliveryStatus)
+            delivery.PUT("/orders/:id/delivery-proof", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.UploadDeliveryProof)
 delivery.PUT("/orders/:id/resolve-failed", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.ResolveFailedDelivery)
             delivery.GET("/earnings", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyEarnings)
 delivery.GET("/cod-summary", middleware.AuthMiddleware(), middleware.DeliveryPartnerOnly(), handlers.GetMyCODSummary)
@@ -244,6 +246,7 @@ admin.GET("/control-tower/operations", handlers.GetLiveOperations)
 admin.GET("/control-tower/settings", handlers.GetControlTowerSettings)
 admin.PUT("/control-tower/settings/cod", handlers.UpdateCODEnabled)
 admin.GET("/delivery/unassigned-orders", handlers.GetUnassignedOrders)
+admin.GET("/delivery/stuck-orders", handlers.GetStuckOrders)
 admin.GET("/delivery/active", handlers.GetActiveDeliveries)
 admin.GET("/delivery/rider-workload", handlers.GetRiderWorkload)
 admin.GET("/delivery/failed", handlers.GetFailedDeliveries)

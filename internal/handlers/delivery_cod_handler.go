@@ -52,7 +52,16 @@ if summary.PendingSettlement < 0 {
 summary.PendingSettlement = 0
 }
 
-todayStart := time.Now().Truncate(24 * time.Hour)
+// time.Now().Truncate(24 * time.Hour) truncates based on elapsed duration
+// since the Unix epoch, which lands on UTC midnight - 5:30 AM IST. COD
+// collected between 12:00 AM and 5:30 AM IST was getting attributed to
+// the previous calendar day for this rider cash-reconciliation summary
+// (Defect #11). Compute the IST calendar-day boundary instead, then
+// convert back to UTC for the query, since timestamps are stored in UTC.
+istLocation := time.FixedZone("IST", 5*3600+30*60)
+nowIST := time.Now().In(istLocation)
+todayStartIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, istLocation)
+todayStart := todayStartIST.UTC()
 database.DB.Model(&models.Order{}).
 Where("delivery_partner_id = ? AND status = ? AND payment_method = ? AND updated_at >= ?", partnerID, models.OrderStatusDelivered, models.PaymentMethodCOD, todayStart).
 Select("COALESCE(SUM(total_amount), 0)").

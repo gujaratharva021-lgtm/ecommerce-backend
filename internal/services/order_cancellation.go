@@ -3,6 +3,7 @@ package services
 import (
 "errors"
 "fmt"
+"log"
 "time"
 
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
@@ -159,6 +160,20 @@ return tx.Model(&models.Order{}).Where("id = ?", order.ID).Updates(map[string]in
 
 if txErr != nil {
 return txErr
+}
+
+// Post the double-entry refund ledger lines now that the cancellation
+// transaction has committed - PostWalletRefundLedgerEntry opens its own
+// transaction internally, so it must run after (not inside) the one
+// above. Without this, CancelOrderInFulfillment credited the customer's
+// wallet and bumped payment.RefundedAmount but never wrote a matching
+// "refund" ledger entry, so every fulfillment-stage cancellation with a
+// gateway refund was permanently flagged as a critical mismatch by
+// detectRefundLedgerMismatch (Bug#11).
+if gatewayRefundAmount > 0 {
+if err := PostWalletRefundLedgerEntry(order.ID, gatewayRefundAmount); err != nil {
+log.Printf("failed to post refund ledger entry for order %d: %v", order.ID, err)
+}
 }
 
 if previouslyAssignedPartnerID != nil {

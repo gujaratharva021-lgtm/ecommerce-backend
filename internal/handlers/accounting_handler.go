@@ -1,6 +1,7 @@
 package handlers
 
 import (
+"math"
 "encoding/json"
 "fmt"
 "net/http"
@@ -420,6 +421,11 @@ c.JSON(http.StatusOK, gin.H{
 "accounts":     rows,
 "total_debit":  grandDebit,
 "total_credit": grandCredit,
-"is_balanced":  grandDebit == grandCredit,
+// Defect #28 (LOW): exact float equality (grandDebit == grandCredit) reports
+// a genuinely balanced ledger as unbalanced due to IEEE 754 floating-point
+// accumulation error across many ledger entries. A small epsilon tolerance
+// (1 paisa) treats sums within rounding distance of each other as balanced,
+// which is standard practice for financial float comparisons.
+"is_balanced": math.Abs(grandDebit-grandCredit) < 0.01,
 })
 }

@@ -93,10 +93,34 @@ nearestWarehouseForFilter, _, _ = FindNearestWarehouse(*query.Lat, *query.Lng)
 // old any-warehouse check when no location was given, since there's no
 // specific warehouse to scope to in that case.
 if query.InStock != nil {
+if *query.InStock {
+// in_stock=true: a product must have an EXPLICIT inventory row with
+// in_stock=true at the relevant scope to count as in-stock. No row at
+// all correctly means "not in stock" here - unchanged from before.
 if nearestWarehouseForFilter != nil {
-db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.warehouse_id = ? AND inventories.in_stock = ?)", nearestWarehouseForFilter.ID, *query.InStock)
+db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.warehouse_id = ? AND inventories.in_stock = true)", nearestWarehouseForFilter.ID)
 } else {
-db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = ?)", *query.InStock)
+db = db.Where("EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = true)")
+}
+} else {
+// in_stock=false (Defect #15): a product counts as out-of-stock if it
+// EITHER has an explicit inventory row with in_stock=false, OR has no
+// inventory row at all at the relevant scope. The old single EXISTS
+// check only matched the first case, silently dropping zero-inventory
+// products (e.g. a product that was never stocked, or whose only
+// inventory row was hard-deleted) from every ?in_stock=false query -
+// including the admin "out of stock" filter and any storefront
+// "notify me when back in stock" list built on top of it.
+if nearestWarehouseForFilter != nil {
+db = db.Where(
+"EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.warehouse_id = ? AND inventories.in_stock = false) "+
+"OR NOT EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.warehouse_id = ?)",
+nearestWarehouseForFilter.ID, nearestWarehouseForFilter.ID)
+} else {
+db = db.Where(
+"EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id AND inventories.in_stock = false) "+
+"OR NOT EXISTS (SELECT 1 FROM inventories WHERE inventories.product_id = products.id)")
+}
 }
 }
 

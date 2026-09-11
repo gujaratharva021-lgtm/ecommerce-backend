@@ -1,6 +1,8 @@
 package handlers
 
 import (
+"log"
+"strings"
 "fmt"
 "net/http"
 "time"
@@ -21,10 +23,18 @@ var validPOStatuses = map[string]bool{
 "partially_received": true, "received": true, "cancelled": true,
 }
 
-func generatePONumber() string {
-var count int64
-database.DB.Model(&models.PurchaseOrder{}).Count(&count)
-return fmt.Sprintf("PO-%06d", count+1)
+// generatePONumber pulls the next value from the po_number_seq Postgres
+// sequence (added in migration 000060) rather than COUNT(*)+1. A sequence
+// is atomic by construction - Postgres serializes concurrent nextval()
+// calls internally, so two simultaneous CreatePurchaseOrder requests can
+// never receive the same number, and deleting old PO rows can never cause
+// a number to be reused (Bug #13).
+func generatePONumber() (string, error) {
+var next int64
+if err := database.DB.Raw("SELECT nextval('po_number_seq')").Scan(&next).Error; err != nil {
+return "", fmt.Errorf("failed to generate PO number: %w", err)
+}
+return fmt.Sprintf("PO-%06d", next), nil
 }
 
 func ListPurchaseOrders(c *gin.Context) {
@@ -87,8 +97,24 @@ UnitPrice:       it.UnitPrice,
 total += it.UnitPrice * float64(it.QuantityOrdered)
 }
 
-po := models.PurchaseOrder{
-PONumber:     generatePONumber(),
+// Retry once on a unique-constraint violation as defense in depth: the
+// po_number_seq sequence above already makes a collision extremely
+// unlikely, but idx_po_number (the pre-existing unique index on
+// po_number, from migration 000051) is the actual last line of defense,
+// so honor it gracefully rather than surfacing a raw DB constraint error
+// to the caller if it's ever hit (e.g. a manually-inserted PO number
+// outside this code path).
+var po models.PurchaseOrder
+const maxAttempts = 3
+var createErr error
+for attempt := 0; attempt < maxAttempts; attempt++ {
+poNumber, err := generatePONumber()
+if err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+return
+}
+po = models.PurchaseOrder{
+PONumber:     poNumber,
 VendorID:     req.VendorID,
 WarehouseID:  req.WarehouseID,
 Status:       "draft",
@@ -98,8 +124,16 @@ TotalAmount:  total,
 CreatedByID:  adminID,
 Items:        items,
 }
-
-if err := database.DB.Create(&po).Error; err != nil {
+createErr = database.DB.Create(&po).Error
+if createErr == nil {
+break
+}
+if !strings.Contains(createErr.Error(), "duplicate key") && !strings.Contains(createErr.Error(), "idx_po_number") {
+break
+}
+log.Printf("PO number collision on attempt %d (po_number=%s), retrying: %v", attempt+1, poNumber, createErr)
+}
+if createErr != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase order"})
 return
 }

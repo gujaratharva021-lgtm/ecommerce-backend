@@ -1,6 +1,7 @@
 package handlers
 
 import (
+"errors"
 "fmt"
 "net/http"
 "time"
@@ -10,6 +11,8 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
+"gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // ---- Rider COD Deposits (SRS 12.9) ----
@@ -69,30 +72,52 @@ c.JSON(http.StatusOK, gin.H{"rider_cod_deposits": deposits})
 
 // VerifyRiderCODDeposit godoc
 // POST /api/v1/admin/finance/rider-cod-deposits/:id/verify
+var errDepositNotPending = errors.New("only pending deposits can be verified")
+
 func VerifyRiderCODDeposit(c *gin.Context) {
 id := c.Param("id")
+adminID := c.MustGet("user_id").(uint)
+
+// The status check, pending->verified transition, and ledger posting all
+// run inside one locked transaction (Bug #14). This closes two related
+// problems at once: (1) atomicity - if PostRiderCODDepositLedgerEntry
+// fails, the whole transaction rolls back, so the deposit is never left
+// stranded as "verified" with no matching ledger entry; and (2) the same
+// concurrent-double-verify race already fixed elsewhere this session
+// (Bug #10/#11/#12) - the row lock means two simultaneous verify calls
+// on the same deposit can't both pass the pending check and both post to
+// the ledger.
 var deposit models.RiderCODDeposit
-if err := database.DB.First(&deposit, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "COD deposit not found"})
-return
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&deposit, id).Error; err != nil {
+return err
 }
 if deposit.Status != "pending" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending deposits can be verified"})
-return
+return errDepositNotPending
 }
-adminID := c.MustGet("user_id").(uint)
 now := time.Now()
 deposit.Status = "verified"
 deposit.VerifiedByID = &adminID
 deposit.VerifiedAt = &now
-if err := database.DB.Save(&deposit).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify deposit"})
+if err := tx.Save(&deposit).Error; err != nil {
+return err
+}
+return services.PostRiderCODDepositLedgerEntry(tx, deposit.ID)
+})
+
+if txErr != nil {
+if txErr == errDepositNotPending {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending deposits can be verified"})
 return
 }
-if err := services.PostRiderCODDepositLedgerEntry(deposit.ID); err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Deposit verified but ledger posting failed: " + err.Error()})
+if txErr == gorm.ErrRecordNotFound {
+c.JSON(http.StatusNotFound, gin.H{"error": "COD deposit not found"})
 return
 }
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify deposit: " + txErr.Error()})
+return
+}
+
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "verify_rider_cod_deposit", "rider_cod_deposit", id, "verified")
 c.JSON(http.StatusOK, deposit)
@@ -183,28 +208,46 @@ c.JSON(http.StatusOK, gin.H{"rider_payouts": payouts})
 // Rider Payable) - the amount is now formally recognized as owed.
 func ApproveRiderPayout(c *gin.Context) {
 id := c.Param("id")
+adminID := c.MustGet("user_id").(uint)
+
+// Defect #12: status check, pending->approved transition, and ledger
+// accrual now run inside one locked transaction - without this, two
+// concurrent approve requests on the same payout could both read
+// Status == "pending" before either commits, both flip it to "approved",
+// and both accrue the rider's owed amount to the ledger a second time.
 var payout models.RiderPayout
-if err := database.DB.First(&payout, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Rider payout not found"})
-return
+var notFound bool
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, id).Error; err != nil {
+notFound = true
+return err
 }
 if payout.Status != "pending" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending payouts can be approved"})
-return
+return errors.New("Only pending payouts can be approved")
 }
-adminID := c.MustGet("user_id").(uint)
 now := time.Now()
 payout.Status = "approved"
 payout.ApprovedByID = &adminID
 payout.ApprovedAt = &now
-if err := database.DB.Save(&payout).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve rider payout"})
+if err := tx.Save(&payout).Error; err != nil {
+return err
+}
+return services.PostRiderPayoutAccrualLedgerEntry(tx, payout.ID)
+})
+
+if txErr != nil {
+if notFound {
+c.JSON(http.StatusNotFound, gin.H{"error": "Rider payout not found"})
 return
 }
-if err := services.PostRiderPayoutAccrualLedgerEntry(payout.ID); err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Payout approved but ledger posting failed: " + err.Error()})
+if txErr.Error() == "Only pending payouts can be approved" {
+c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
 return
 }
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Payout approval failed: " + txErr.Error()})
+return
+}
+
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "approve_rider_payout", "rider_payout", id, "pending->approved")
 c.JSON(http.StatusOK, payout)
@@ -216,26 +259,41 @@ c.JSON(http.StatusOK, payout)
 // actual money-out step.
 func PayRiderPayout(c *gin.Context) {
 id := c.Param("id")
+
+// Defect #12: same locked-transaction fix as ApproveRiderPayout above,
+// applied to the approved->paid transition and settlement ledger entry.
 var payout models.RiderPayout
-if err := database.DB.First(&payout, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Rider payout not found"})
-return
+var notFound bool
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payout, id).Error; err != nil {
+notFound = true
+return err
 }
 if payout.Status != "approved" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only approved payouts can be paid"})
-return
+return errors.New("Only approved payouts can be paid")
 }
 now := time.Now()
 payout.Status = "paid"
 payout.PaidAt = &now
-if err := database.DB.Save(&payout).Error; err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark payout paid"})
+if err := tx.Save(&payout).Error; err != nil {
+return err
+}
+return services.PostRiderPayoutSettlementLedgerEntry(tx, payout.ID)
+})
+
+if txErr != nil {
+if notFound {
+c.JSON(http.StatusNotFound, gin.H{"error": "Rider payout not found"})
 return
 }
-if err := services.PostRiderPayoutSettlementLedgerEntry(payout.ID); err != nil {
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Payout marked paid but ledger posting failed: " + err.Error()})
+if txErr.Error() == "Only approved payouts can be paid" {
+c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
 return
 }
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Payout payment failed: " + txErr.Error()})
+return
+}
+
 adminID := c.MustGet("user_id").(uint)
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "pay_rider_payout", "rider_payout", id, "approved->paid")

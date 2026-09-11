@@ -78,8 +78,14 @@ InStock:       inv.InStock,
 
 // Summary stats computed across ALL inventory (not just this page)
 summaryDB := database.DB.Model(&models.Inventory{})
+// Defect #29 (LOW): plain Count() here counts INVENTORY ROWS, i.e. one row
+// per (product, warehouse) pair - a product stocked at 3 warehouses was
+// counted 3 times, inflating the "Total SKUs" figure on the inventory
+// overview well beyond the actual number of distinct products in the
+// catalog. Distinct("product_id") counts each product once regardless of
+// how many warehouses carry it.
 var totalSKUs int64
-summaryDB.Count(&totalSKUs)
+summaryDB.Distinct("product_id").Count(&totalSKUs)
 
 var totalAvailable int64
 database.DB.Model(&models.Inventory{}).Select("COALESCE(SUM(stock), 0)").Scan(&totalAvailable)

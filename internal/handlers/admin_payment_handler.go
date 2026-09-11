@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "log"
@@ -12,6 +12,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
+"gorm.io/gorm"
 )
 
 // GetAdminPayments godoc
@@ -265,8 +266,29 @@ return
 // call actually increased the refunded amount.
 refundDelta := payment.RefundedAmount - previousRefundedAmount
 if refundDelta > 0 {
-if err := services.PostRefundLedgerEntry(order.ID, refundDelta, order.PaymentMethod); err != nil {
+// Defect #05: this refund actually lands in the customer's wallet (see
+// CreditWallet call right below - there is no live gateway refund-API
+// integration anywhere in this system), so the ledger entry must credit
+// Customer Wallet Liability (2005), not Bank/Cash. PostRefundLedgerEntry
+// credits Bank/Cash, which claimed money physically left the business
+// account when it never did - an artificial bank reconciliation
+// variance that would never resolve, since no real outflow backs it.
+if err := services.PostWalletRefundLedgerEntry(order.ID, refundDelta); err != nil {
 log.Printf("failed to post refund ledger entry for order %d: %v", order.ID, err)
+}
+// Every other refund path in this codebase (order cancellation, return
+// requests, short/unavailable picks, item substitution) credits the
+// customer's wallet with the refunded amount - there is no real
+// gateway refund-API integration anywhere in this system, so crediting
+// the wallet IS how a refund actually reaches the customer here. This
+// admin endpoint previously only posted the ledger entry and skipped
+// that step entirely: the books said "refunded" but the customer's
+// wallet balance never moved (Bug FINANCE-08 / admin-payment-refund).
+refID := order.ID
+if err := database.DB.Transaction(func(tx *gorm.DB) error {
+return utils.CreditWallet(tx, order.UserID, refundDelta, models.WalletReasonOrderRefund, "order", &refID, "Refund issued by admin via payment status update")
+}); err != nil {
+log.Printf("failed to credit wallet for admin-issued refund on order %d: %v", order.ID, err)
 }
 }
 

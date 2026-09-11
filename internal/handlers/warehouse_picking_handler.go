@@ -3,6 +3,7 @@ package handlers
 import (
 "errors"
 "fmt"
+"log"
 "net/http"
 "time"
 
@@ -90,6 +91,25 @@ if task.Status == "completed" {
 statusCode = http.StatusBadRequest
 return errors.New("Picking already completed for this order")
 }
+
+// Defect #07: the order itself may have been cancelled (by the customer,
+// or by admin/support) after this picking task was created but before any
+// staff member started picking it. Without this check, StartPicking had
+// no way to know that and would happily resurrect a dead order back into
+// an active in_progress picking state - a picker would then walk the
+// warehouse gathering items for an order that no longer exists as far as
+// the customer, refund, and inventory-restoration logic are concerned.
+// Locked together with the row lock above so a concurrent cancellation
+// can't slip in between this check and the Save below.
+var order models.Order
+if err := tx.Select("status").First(&order, task.OrderID).Error; err != nil {
+return fmt.Errorf("failed to load order for picking task: %w", err)
+}
+if order.Status == models.OrderStatusCancelled || order.Status == models.OrderStatusReturned {
+statusCode = http.StatusBadRequest
+return errors.New("This order has been cancelled and can no longer be picked")
+}
+
 if task.PickerID != nil && *task.PickerID != staffID {
 statusCode = http.StatusConflict
 return errors.New("This order is already being picked by another staff member")
@@ -265,6 +285,9 @@ var task models.PickingTask
 var packTask models.PackingTask
 var order models.Order
 var refundAmount float64
+var shortfallRefundToPost float64
+var shortfallRefundIsOnline bool
+var allItemsShort bool
 statusCode := http.StatusInternalServerError
 
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -288,6 +311,27 @@ return errors.New("Cannot complete picking - not all items have been marked")
 
 if err := tx.Preload("Items").First(&order, task.OrderID).Error; err != nil {
 return err
+}
+
+// Discount ratio so shortfall refunds reflect what the customer actually
+// paid per unit, not the raw catalog price - OrderItem.Price is always
+// the undiscounted catalog price (set at checkout, see Checkout), with
+// any coupon discount applied only at invoice-generation time via this
+// same ratio. Without this, a short/unavailable item on a discounted
+// order was refunded at full price, over-refunding by the discount
+// portion on every short pick on a discounted order.
+discountRatio := 1.0
+if order.ItemsAmount > 0 {
+var orderCoupon models.OrderCoupon
+couponDiscount := 0.0
+if err := tx.Where("order_id = ?", order.ID).First(&orderCoupon).Error; err == nil {
+couponDiscount = orderCoupon.DiscountAmount
+}
+netItemsAmount := order.ItemsAmount - couponDiscount
+if netItemsAmount < 0 {
+netItemsAmount = 0
+}
+discountRatio = netItemsAmount / order.ItemsAmount
 }
 
 // Reconcile short/unavailable picks: release the unpicked inventory back
@@ -335,10 +379,31 @@ return err
 }
 }
 
-lineShortfall := orderItem.Price * float64(shortQty)
+lineShortfall := orderItem.Price * float64(shortQty) * discountRatio
 order.ItemsAmount -= lineShortfall
 order.TotalAmount -= lineShortfall
 refundAmount += lineShortfall
+}
+
+// Bug #15: if every single item on the order came back short/unavailable
+// (nothing was actually picked), there is nothing to pack or ship - this
+// is handled below by cancelling the order and skipping PackingTask
+// creation entirely, instead of routing an empty box to a packer. Since
+// nothing will ever be delivered, the delivery charge must be refunded
+// too, not just the line items.
+totalPicked := 0
+for _, item := range task.Items {
+totalPicked += item.QuantityPicked
+}
+allItemsShort = totalPicked == 0
+
+if allItemsShort && order.DeliveryCharge > 0 {
+refundAmount += order.DeliveryCharge
+order.TotalAmount -= order.DeliveryCharge
+if order.TotalAmount < 0 {
+order.TotalAmount = 0
+}
+order.DeliveryCharge = 0
 }
 
 if refundAmount > 0 {
@@ -349,13 +414,33 @@ if order.TotalAmount < 0 {
 order.TotalAmount = 0
 }
 if err := tx.Model(&models.Order{}).Where("id = ?", order.ID).
-Updates(map[string]interface{}{"items_amount": order.ItemsAmount, "total_amount": order.TotalAmount}).Error; err != nil {
+Updates(map[string]interface{}{"items_amount": order.ItemsAmount, "total_amount": order.TotalAmount, "delivery_charge": order.DeliveryCharge}).Error; err != nil {
 return err
 }
+// Only credit the wallet for online (prepaid) orders - the customer
+// already paid the full amount upfront, so a short/unavailable item
+// means they're owed money back. For COD orders nothing has been paid
+// yet; reducing order.TotalAmount above already means they'll be
+// charged less at the door, so crediting the wallet here as well would
+// hand out free unearned spendable cash (Bug#3: free wallet money on
+// COD short/unavailable picks).
+if order.PaymentMethod == models.PaymentMethodOnline {
 refID := order.ID
 if err := utils.CreditWallet(tx, order.UserID, refundAmount, models.WalletReasonOrderRefund, "order", &refID, "Refund for short/unavailable items during picking"); err != nil {
 return err
 }
+// Record this amount against the payment's RefundedAmount so that a
+// later CancelOrder - which computes refundAmount := payment.Amount -
+// payment.RefundedAmount - does not refund this same short/unavailable
+// amount a second time (Bug#5: double refund when a partially-picked
+// online order is subsequently cancelled).
+if err := tx.Model(&models.Payment{}).Where("order_id = ?", order.ID).
+Update("refunded_amount", gorm.Expr("refunded_amount + ?", refundAmount)).Error; err != nil {
+return err
+}
+}
+shortfallRefundToPost = refundAmount
+shortfallRefundIsOnline = order.PaymentMethod == models.PaymentMethodOnline
 }
 
 now := time.Now()
@@ -363,6 +448,13 @@ task.Status = "completed"
 task.CompletedAt = &now
 if err := tx.Save(&task).Error; err != nil {
 return err
+}
+
+if allItemsShort {
+// Nothing was picked - skip packing entirely and cancel the order
+// instead of generating a PackingTask with zero items for a packer
+// to receive (Bug #15).
+return tx.Model(&models.Order{}).Where("id = ?", task.OrderID).Update("status", models.OrderStatusCancelled).Error
 }
 
 packTask = models.PackingTask{
@@ -382,11 +474,38 @@ c.JSON(statusCode, gin.H{"error": txErr.Error()})
 return
 }
 
-staffName, _ := c.Get("staff_name")
-services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
-"status=picking", "status=picked")
+// Post the wallet-refund ledger entry for any short/unavailable-pick
+// shortfall on an online (prepaid) order. Kept outside the main
+// transaction, same pattern as FINANCE-07's payroll posting and
+// PayExpense - non-fatal on error (logged, not surfaced to the picker)
+// since the wallet credit and payment.refunded_amount update already
+// committed above and are the source of truth; without this call the
+// mismatch-detection center's refund_ledger_mismatch check would flag
+// every short/unavailable pick on an online order as a discrepancy,
+// since RefundedAmount would be nonzero with no matching ledger entry
+// (Bug#11).
+if shortfallRefundIsOnline && shortfallRefundToPost > 0 {
+if err := services.PostWalletRefundLedgerEntry(order.ID, shortfallRefundToPost); err != nil {
+log.Printf("failed to post wallet refund ledger entry for order %d (short/unavailable pick): %v", order.ID, err)
+}
+}
 
-c.JSON(http.StatusOK, gin.H{"success": true, "picking_task": task, "packing_task": packTask, "refund_amount": refundAmount})
+staffName, _ := c.Get("staff_name")
+finalStatus := "picked"
+if allItemsShort {
+finalStatus = "cancelled"
+}
+services.LogWarehouseAction(warehouseID, staffID, fmt.Sprint(staffName), "complete_picking", "order", orderID,
+"status=picking", "status="+finalStatus)
+
+response := gin.H{"success": true, "picking_task": task, "refund_amount": refundAmount}
+if allItemsShort {
+response["order_cancelled"] = true
+response["message"] = "All items were out of stock - order has been cancelled and fully refunded"
+} else {
+response["packing_task"] = packTask
+}
+c.JSON(http.StatusOK, response)
 }
 
 

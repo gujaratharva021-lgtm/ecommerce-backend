@@ -20,11 +20,14 @@ var defaultChartOfAccounts = []models.Account{
 {Code: "2004", Name: "Customer Refund Payable", Type: "liability"},
 {Code: "2005", Name: "Customer Wallet Liability", Type: "liability"},
 {Code: "4001", Name: "Product Sales", Type: "revenue"},
+{Code: "4002", Name: "Delivery Fee Revenue", Type: "revenue"},
+{Code: "4003", Name: "Platform Fee Revenue", Type: "revenue"},
 {Code: "5001", Name: "COGS", Type: "expense"},
 {Code: "5002", Name: "Discount Given", Type: "expense"},
 {Code: "5003", Name: "Operating Expenses", Type: "expense"},
 {Code: "5004", Name: "Rider Delivery Expense", Type: "expense"},
 {Code: "5005", Name: "Gateway Fees", Type: "expense"},
+{Code: "5006", Name: "Salary Expense", Type: "expense"},
 }
 
 func seedChartOfAccounts() {

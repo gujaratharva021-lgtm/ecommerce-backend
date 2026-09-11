@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "net/http"
@@ -81,6 +81,13 @@ database.DB.Model(&otp).Update("verified", true)
 var staff models.WarehouseStaff
 if err := database.DB.Preload("Warehouse").Where("phone = ?", req.Phone).First(&staff).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Warehouse staff not found"})
+return
+}
+// Reject login for deactivated/terminated staff at the source (Defect #08) -
+// without this, a terminated employee who still knows a valid phone/OTP flow
+// could mint a brand new JWT and keep working the picking queue indefinitely.
+if !staff.IsActive {
+c.JSON(http.StatusForbidden, gin.H{"error": "This warehouse staff account is inactive"})
 return
 }
 

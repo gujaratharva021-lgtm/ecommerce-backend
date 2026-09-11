@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -551,6 +553,61 @@ func UpdateDeliveryOrderStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Order status updated", "order": order})
 }
 
+// UploadDeliveryProof godoc
+// PUT /api/v1/delivery/orders/:id/delivery-proof (delivery partner only)
+// Accepts a multipart/form-data "image" field, uploads it via the same
+// Cloudinary/local-disk path as UploadImage, and stores the resulting URL
+// on the order as delivery_proof_url. This is mandatory before
+// ConfirmDelivery will succeed - see the check there.
+func UploadDeliveryProof(c *gin.Context) {
+partnerID := c.MustGet("user_id").(uint)
+orderID := c.Param("id")
+
+var order models.Order
+if err := database.DB.Where("id = ? AND delivery_partner_id = ?", orderID, partnerID).First(&order).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Order not found or not assigned to you"})
+return
+}
+
+c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+file, err := c.FormFile("image")
+if err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": "No image file provided (expected form field 'image')"})
+return
+}
+
+ext := strings.ToLower(filepath.Ext(file.Filename))
+if !allowedImageExts[ext] {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file type. Allowed: jpg, jpeg, png, webp"})
+return
+}
+
+var proofURL string
+cfg := config.AppConfig
+if cfg != nil && cfg.CloudinaryCloudName != "" && cfg.CloudinaryAPIKey != "" && cfg.CloudinaryAPISecret != "" {
+url, err := uploadToCloudinary(file, cfg)
+if err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image: " + err.Error()})
+return
+}
+proofURL = url
+} else {
+filename := fmt.Sprintf("delivery-proof-%d%s", time.Now().UnixNano(), ext)
+savePath := filepath.Join("uploads", filename)
+if err := c.SaveUploadedFile(file, savePath); err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
+return
+}
+proofURL = cfg.PublicBaseURL + "/uploads/" + filename
+}
+
+if err := database.DB.Model(&models.Order{}).Where("id = ?", order.ID).Update("delivery_proof_url", proofURL).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save delivery proof"})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"delivery_proof_url": proofURL})
+}
 // ConfirmDelivery godoc
 // PUT /api/v1/delivery/orders/:id/deliver (delivery partner only)
 // Marks the order delivered. For COD orders this also marks payment as
@@ -565,18 +622,29 @@ func ConfirmDelivery(c *gin.Context) {
 		return
 	}
 
-	if order.Status != models.OrderStatusShipped {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Order must be shipped before it can be marked delivered"})
-		return
-	}
-
-	// Bypass fix: require secure OTP+geofence delivery-status flow to have already completed.
-	if order.DeliveryStatus == nil || *order.DeliveryStatus != models.DeliveryStatusDelivered {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Order must complete OTP and geofence verification via the delivery-status endpoint before it can be confirmed delivered"})
-		return
-	}
-
-	order.Status = models.OrderStatusDelivered
+	if order.Status == models.OrderStatusDelivered {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Order is already marked delivered"})
+        return
+    }
+    // Bypass fix: require secure geofence delivery-status flow to have already completed.
+    if order.DeliveryStatus == nil || *order.DeliveryStatus != models.DeliveryStatusDelivered {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Order must complete geofence verification via the delivery-status endpoint before it can be confirmed delivered"})
+        return
+    }
+    // Delivery proof photo (uploaded at ARRIVED_AT_CUSTOMER via the
+    // delivery-proof endpoint) is mandatory before delivery can be confirmed.
+    if order.DeliveryProofURL == nil || *order.DeliveryProofURL == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Delivery proof photo is required before confirming delivery"})
+        return
+    }
+    // The granular delivery_status chain (going_to_store -> ... -> delivered) is
+    // now the source of truth for pickup/shipment progress under the new flow,
+    // so promote order.Status to Shipped here if the older manual "mark as
+    // shipped" step was skipped, before finalizing as Delivered.
+    if order.Status != models.OrderStatusShipped {
+        order.Status = models.OrderStatusShipped
+    }
+    order.Status = models.OrderStatusDelivered
         deliveredAt := time.Now()
         order.DeliveredAt = &deliveredAt
 	if order.PaymentMethod == models.PaymentMethodCOD {

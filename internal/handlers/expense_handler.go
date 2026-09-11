@@ -1,6 +1,7 @@
-﻿package handlers
+package handlers
 
 import (
+"errors"
 "log"
 "net/http"
 "strconv"
@@ -12,6 +13,7 @@ import (
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
 "gorm.io/gorm"
+"gorm.io/gorm/clause"
 )
 
 // ListExpenses godoc
@@ -138,6 +140,23 @@ return
 previousAmount := expense.Amount
 previousStatus := expense.ApprovalStatus
 
+// If an already-approved (but not yet paid) expense has its amount
+// changed, the approval that was given no longer means anything - it
+// was granted for the OLD amount. Silently keeping ApprovalStatus as
+// "approved" would let PayExpense pay out the new amount with zero
+// re-review, bypassing the entire point of maker-checker (Bug #07:
+// approved expenses could be mutated post-approval with no re-check).
+// Reset to "submitted" so a (different) admin must approve the new
+// amount before it can be paid. A paid expense's amount can still be
+// corrected (handled below via the ledger adjustment), since the money
+// has already moved and blocking the correction would prevent fixing
+// a genuine data-entry mistake after the fact.
+if previousStatus == "approved" && req.Amount != previousAmount {
+expense.ApprovalStatus = "submitted"
+expense.ApprovedByID = nil
+expense.ApprovedAt = nil
+}
+
 expense.Amount = req.Amount
 expense.Category = req.Category
 expense.ExpenseDate = expenseDate
@@ -168,9 +187,29 @@ c.JSON(http.StatusOK, expense)
 
 // DeleteExpense godoc
 // DELETE /api/v1/admin/finance/expenses/:id
+// A paid expense has already been posted to the general ledger
+// (PostExpenseLedgerEntry, called from PayExpense) - hard-deleting it
+// would leave that ledger entry orphaned, pointing at an expense record
+// that no longer exists, with no way to trace or reconcile it (Bug
+// FINANCE-06/#06: violates the audit trail the same way an unvalidated
+// vendor-bill void would). Same rule VoidVendorBill already enforces for
+// paid bills: a paid financial record must have its effect reversed
+// through a proper accounting entry first, never silently deleted out
+// from under posted ledger activity.
 func DeleteExpense(c *gin.Context) {
 id := c.Param("id")
-if err := database.DB.Delete(&models.Expense{}, id).Error; err != nil {
+
+var expense models.Expense
+if err := database.DB.First(&expense, id).Error; err != nil {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
+if expense.ApprovalStatus == "paid" {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete a paid expense - it has already been posted to the general ledger. Reverse it with an adjusting entry instead."})
+return
+}
+
+if err := database.DB.Delete(&expense).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete expense"})
 return
 }
@@ -278,24 +317,51 @@ c.JSON(http.StatusOK, expense)
 // Only an approved expense can be paid. This is the point where the
 // expense is actually recorded to the ledger (moved out of CreateExpense,
 // which now only creates a draft - see 12.13/12.25 maker-checker workflow).
+var errNotApproved = errors.New("expense is not in approved status")
+
 func PayExpense(c *gin.Context) {
 id := c.Param("id")
+
+// The status check, "approved" -> "paid" transition, and ledger posting
+// must all be serialized under a single row lock (Bug #12, same class
+// as FINANCE-09's vendor-bill fix and Bug #10's ApproveReturn fix).
+// Without this, two concurrent PayExpense calls on the same expense can
+// both read ApprovalStatus == "approved" before either commits, both
+// flip it to "paid", and both attempt to post to the ledger -
+// PostExpenseLedgerEntry's own existing-entry check is a plain read
+// with no lock behind it, so it does not by itself prevent two
+// concurrent callers from both passing that check before either's
+// insert commits.
 var expense models.Expense
-if err := database.DB.First(&expense, id).Error; err != nil {
-c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
-return
+txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&expense, id).Error; err != nil {
+return err
 }
 if expense.ApprovalStatus != "approved" {
-c.JSON(http.StatusBadRequest, gin.H{"error": "Only approved expenses can be paid"})
-return
+return errNotApproved
 }
 now := time.Now()
 expense.ApprovalStatus = "paid"
 expense.PaidAt = &now
-if err := database.DB.Save(&expense).Error; err != nil {
+return tx.Save(&expense).Error
+})
+
+if txErr != nil {
+if txErr == errNotApproved {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Only approved expenses can be paid"})
+return
+}
+if txErr == gorm.ErrRecordNotFound {
+c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+return
+}
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark expense paid"})
 return
 }
+
+// Only ever reached once per expense, since the row lock above
+// serializes concurrent callers and only the one that actually
+// performed the approved->paid transition gets here.
 if err := services.PostExpenseLedgerEntry(expense.ID); err != nil {
 log.Printf("failed to post expense ledger entry for expense %d: %v", expense.ID, err)
 }

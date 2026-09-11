@@ -30,6 +30,12 @@ type Config struct {
 	CloudinaryAPISecret     string
 	RedisURL                string
 
+	// PublicBaseURL is this server's own public https origin, used to
+	// build absolute URLs for files saved to local disk (the Cloudinary
+	// fallback path) so links work correctly from other domains like the
+	// admin panel (which is hosted separately on CloudFront/S3).
+	PublicBaseURL string
+
 	// Seller/invoice details. All blank by default - never invented. Set
 	// these env vars to the real registered business details before
 	// invoices need to be GST-compliant; until then the PDF/API clearly
@@ -99,6 +105,7 @@ func LoadConfig() *Config {
 		CloudinaryAPIKey:                 getEnv("CLOUDINARY_API_KEY", ""),
 		CloudinaryAPISecret:              getEnv("CLOUDINARY_API_SECRET", ""),
 		RedisURL:                         getEnv("REDIS_URL", ""),
+		PublicBaseURL:                    getEnv("PUBLIC_BASE_URL", "https://32-196-3-31.sslip.io"),
 		SellerCompanyName:                getEnv("SELLER_COMPANY_NAME", ""),
 		SellerAddress:                    getEnv("SELLER_ADDRESS", ""),
 		SellerGSTIN:                      getEnv("SELLER_GSTIN", ""),
@@ -111,7 +118,7 @@ func LoadConfig() *Config {
 		DeliveryAssignmentTimeoutMinutes: getEnvInt("DELIVERY_ASSIGNMENT_TIMEOUT_MINUTES", 5),
 		DeliveryOTPExpiryMinutes:         getEnvInt("DELIVERY_OTP_EXPIRY_MINUTES", 15),
 		DeliveryOTPMaxAttempts:           getEnvInt("DELIVERY_OTP_MAX_ATTEMPTS", 5),
-		DeliveryGeofenceRadiusMeters:     getEnvFloat("DELIVERY_GEOFENCE_RADIUS_METERS", 200),
+		DeliveryGeofenceRadiusMeters:     getEnvFloat("DELIVERY_GEOFENCE_RADIUS_METERS", 350),
 	}
 
 	if cfg.CloudinaryCloudName == "" || cfg.CloudinaryAPIKey == "" || cfg.CloudinaryAPISecret == "" {

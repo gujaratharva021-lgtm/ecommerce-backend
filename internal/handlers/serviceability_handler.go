@@ -3,6 +3,7 @@ package handlers
 import (
 "math"
 "net/http"
+"sort"
 "strconv"
 
 "github.com/gin-gonic/gin"
@@ -80,7 +81,7 @@ c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lng"})
 return
 }
 
-nearest, distance, err := FindNearestWarehouse(lat, lng)
+nearest, _, err := FindNearestWarehouse(lat, lng)
 if err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load warehouses"})
 return
@@ -93,36 +94,79 @@ c.JSON(http.StatusOK, gin.H{
 return
 }
 
-var hasPolygon bool
-var containsPoint bool
-row := database.DB.Raw(
-`SELECT service_area IS NOT NULL, CASE WHEN service_area IS NOT NULL THEN ST_Contains(service_area, ST_SetSRID(ST_MakePoint(?, ?), 4326)) ELSE false END FROM warehouses WHERE id = ?`,
-lng, lat, nearest.ID,
-).Row()
-if err := row.Scan(&hasPolygon, &containsPoint); err != nil {
-	log.Printf("serviceability check failed: %v", err)
+// Check every active warehouse in ascending order of distance, not just
+// the single nearest one by center-point - a customer can fall outside
+// the nearest warehouse's polygon while still being genuinely inside a
+// slightly-farther warehouse's actual service area (Bug#10: Euclidean
+// pre-selection wrongly rejected addresses serviceable by another
+// warehouse).
+type whCandidate struct {
+ID              uint
+Name            string
+City            string
+Lat             float64
+Lng             float64
+ServiceRadiusKm float64
+HasPolygon      bool
+ContainsPoint   bool
+}
+var candidates []whCandidate
+if err := database.DB.Raw(
+`SELECT id, name, city, lat, lng, service_radius_km,
+service_area IS NOT NULL AS has_polygon,
+CASE WHEN service_area IS NOT NULL THEN ST_Contains(service_area, ST_SetSRID(ST_MakePoint(?, ?), 4326)) ELSE false END AS contains_point
+FROM warehouses WHERE is_active = ? AND status = ?`,
+lng, lat, true, "open",
+).Scan(&candidates).Error; err != nil {
+log.Printf("serviceability check failed: %v", err)
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check serviceability"})
 return
 }
+if len(candidates) == 0 {
+c.JSON(http.StatusOK, gin.H{
+"serviceable": false,
+"message":     "No active warehouses available",
+})
+return
+}
+
+sort.Slice(candidates, func(i, j int) bool {
+return haversineDistanceKm(lat, lng, candidates[i].Lat, candidates[i].Lng) < haversineDistanceKm(lat, lng, candidates[j].Lat, candidates[j].Lng)
+})
 
 var serviceable bool
 method := "radius"
-if hasPolygon {
-serviceable = containsPoint
-method = "polygon"
+best := candidates[0]
+bestDistance := haversineDistanceKm(lat, lng, best.Lat, best.Lng)
+for _, cand := range candidates {
+d := haversineDistanceKm(lat, lng, cand.Lat, cand.Lng)
+var ok bool
+m := "radius"
+if cand.HasPolygon {
+ok = cand.ContainsPoint
+m = "polygon"
 } else {
-serviceable = distance <= nearest.ServiceRadiusKm
+ok = d <= cand.ServiceRadiusKm
 }
+if ok {
+serviceable = true
+method = m
+best = cand
+bestDistance = d
+break
+}
+}
+
 response := gin.H{
 "serviceable": serviceable,
-"distance_km": math.Round(distance*100) / 100,
+"distance_km": math.Round(bestDistance*100) / 100,
 "nearest_warehouse": gin.H{
-"id":                nearest.ID,
-"name":              nearest.Name,
-"city":              nearest.City,
-"service_radius_km": nearest.ServiceRadiusKm,
+"id":                best.ID,
+"name":              best.Name,
+"city":              best.City,
+"service_radius_km": best.ServiceRadiusKm,
 },
-	"method":      method,
+"method":      method,
 }
 if !serviceable {
 response["message"] = "Sorry, we don't deliver to this location yet"

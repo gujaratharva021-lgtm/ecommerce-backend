@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"log"
@@ -120,11 +120,30 @@ func VerifyPayment(c *gin.Context) {
 	}
 
     var orderWasCancelled bool
+    var alreadyProcessed bool
+    var captureRefundPaymentID uint
+    var captureRefundAmount float64
     txErr := database.DB.Transaction(func(tx *gorm.DB) error {
         // Re-fetch and lock the order inside the transaction so a concurrent
         // cancellation can't race with this payment verification.
         if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, order.ID).Error; err != nil {
             return err
+        }
+
+        // Re-fetch and lock the payment row too, and short-circuit if it has
+        // already been finalized (paid or refunded). Without this, replaying
+        // this endpoint for an order that was cancelled while payment was in
+        // flight would re-run the wallet credit every single time (Bug#2:
+        // infinite wallet credit via replay) - the row lock also closes the
+        // race where two concurrent requests both pass this check before
+        // either has committed.
+        if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&payment, payment.ID).Error; err != nil {
+            return err
+        }
+        if payment.Status == models.PaymentStatusPaid || payment.Status == models.PaymentStatusRefunded {
+            alreadyProcessed = true
+            orderWasCancelled = order.Status == models.OrderStatusCancelled || order.Status == models.OrderStatusReturned
+            return nil
         }
 
         payment.RazorpayPaymentID = req.RazorpayPaymentID
@@ -152,6 +171,8 @@ func VerifyPayment(c *gin.Context) {
             if err := utils.CreditWallet(tx, order.UserID, payment.Amount, models.WalletReasonOrderRefund, "order", &refID, "Refund for payment captured after order was cancelled"); err != nil {
                 return err
             }
+            captureRefundPaymentID = payment.ID
+            captureRefundAmount = payment.Amount
             return nil
         }
 
@@ -167,6 +188,35 @@ func VerifyPayment(c *gin.Context) {
 
     if txErr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Payment was verified but failed to update the order - contact support"})
+        return
+    }
+
+    // Post the Bank/Wallet-Liability ledger entry for a payment captured
+    // after the order was already cancelled (Defect #04). Kept outside the
+    // main transaction, same non-fatal-on-error pattern as the other
+    // ledger postings in this file - the wallet credit already committed
+    // above and is the source of truth for the customer's balance.
+    if captureRefundPaymentID != 0 && captureRefundAmount > 0 {
+        if err := services.PostGatewayCaptureRefundLedgerEntry(captureRefundPaymentID, order.ID, captureRefundAmount); err != nil {
+            log.Printf("failed to post gateway capture-refund ledger entry for payment %d: %v", captureRefundPaymentID, err)
+        }
+    }
+
+    if alreadyProcessed {
+        // Idempotent replay: this payment was already finalized on a
+        // previous call, so don't re-run wallet credit, invoice generation,
+        // ledger posting, or delivery assignment a second time.
+        if orderWasCancelled {
+            c.JSON(http.StatusOK, gin.H{
+                "message": "Payment was captured, but this order was already cancelled. The amount has been refunded to your wallet.",
+                "order":   order,
+            })
+            return
+        }
+        c.JSON(http.StatusOK, gin.H{
+            "message": "Payment already verified",
+            "order":   order,
+        })
         return
     }
 

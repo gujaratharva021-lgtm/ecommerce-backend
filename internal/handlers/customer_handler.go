@@ -1,10 +1,13 @@
-﻿package handlers
+package handlers
 
 import (
+"time"
+"fmt"
 "net/http"
 "strings"
 
 "github.com/gin-gonic/gin"
+"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/cache"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 "github.com/gujaratharva021-lgtm/ecommerce-backend/internal/utils"
@@ -57,34 +60,52 @@ c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch customers
 return
 }
 
+// Aggregate order stats for every customer on this page in a single
+// GROUP BY query instead of firing 3 queries per customer (Defect #09:
+// N+1 that degraded badly as the customer table grew). TotalSpent
+// excludes cancelled/returned orders - a refunded or cancelled order
+// was never actually kept revenue, so counting it inflated the
+// Lifetime Value / Total Spent figure shown on the admin dashboard.
+userIDs := make([]uint, len(users))
+for i, u := range users {
+userIDs[i] = u.ID
+}
+
+type orderAgg struct {
+UserID      uint
+TotalOrders int64
+TotalSpent  float64
+LastOrderAt *time.Time
+}
+var aggs []orderAgg
+if len(userIDs) > 0 {
+database.DB.Model(&models.Order{}).
+Select("user_id, COUNT(*) AS total_orders, "+
+"COALESCE(SUM(CASE WHEN payment_status = 'paid' AND status NOT IN ('cancelled','returned') THEN total_amount ELSE 0 END), 0) AS total_spent, "+
+"MAX(created_at) AS last_order_at").
+Where("user_id IN ?", userIDs).
+Group("user_id").
+Scan(&aggs)
+}
+aggByUserID := make(map[uint]orderAgg, len(aggs))
+for _, a := range aggs {
+aggByUserID[a.UserID] = a
+}
+
 summaries := make([]models.CustomerSummary, 0, len(users))
 for _, u := range users {
-var totalOrders int64
-var totalSpent float64
-var lastOrderAt *string
-
-database.DB.Model(&models.Order{}).Where("user_id = ?", u.ID).Count(&totalOrders)
-database.DB.Model(&models.Order{}).Where("user_id = ? AND payment_status = ?", u.ID, "paid").
-Select("COALESCE(SUM(total_amount), 0)").Scan(&totalSpent)
-
-var lastOrder models.Order
-var lastOrderPtr *models.Order
-if err := database.DB.Where("user_id = ?", u.ID).Order("created_at DESC").First(&lastOrder).Error; err == nil {
-lastOrderPtr = &lastOrder
-}
-_ = lastOrderAt
-
+agg := aggByUserID[u.ID]
 summary := models.CustomerSummary{
 ID:          u.ID,
 Name:        u.Name,
 Phone:       u.Phone,
 IsBlocked:   u.IsBlocked,
 CreatedAt:   u.CreatedAt,
-TotalOrders: totalOrders,
-TotalSpent:  totalSpent,
+TotalOrders: agg.TotalOrders,
+TotalSpent:  agg.TotalSpent,
 }
-if lastOrderPtr != nil {
-summary.LastOrderAt = &lastOrderPtr.CreatedAt
+if agg.LastOrderAt != nil {
+summary.LastOrderAt = agg.LastOrderAt
 }
 summaries = append(summaries, summary)
 }
@@ -126,10 +147,18 @@ if walletPtr != nil {
 database.DB.Where("wallet_id = ?", walletPtr.ID).Order("created_at DESC").Limit(50).Find(&transactions)
 }
 
+// Computed from the orders slice already loaded above instead of a
+// separate query (Defect #09) - also excludes cancelled/returned orders
+// from TotalSpent, since a cancelled or returned order was never
+// actually kept revenue and shouldn't inflate this customer's Total
+// Spent / Lifetime Value figure.
 var totalOrders int64 = int64(len(orders))
 var totalSpent float64
-database.DB.Model(&models.Order{}).Where("user_id = ? AND payment_status = ?", user.ID, "paid").
-Select("COALESCE(SUM(total_amount), 0)").Scan(&totalSpent)
+for _, o := range orders {
+if o.PaymentStatus == models.OrderPaymentStatusPaid && o.Status != models.OrderStatusCancelled && o.Status != models.OrderStatusReturned {
+totalSpent += o.TotalAmount
+}
+}
 
 c.JSON(http.StatusOK, models.CustomerDetail{
 ID:           user.ID,
@@ -160,6 +189,10 @@ if err := database.DB.Save(&user).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to block customer"})
 return
 }
+// Invalidate the AuthMiddleware block-status cache so this takes effect
+// on the user's very next request, not after the cache TTL expires
+// (Bug#20).
+_ = cache.Delete(c.Request.Context(), fmt.Sprintf("auth:blocked:%d", user.ID))
 adminID := c.MustGet("user_id").(uint)
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "block_customer", "customer", id, "blocked")
@@ -180,6 +213,7 @@ if err := database.DB.Save(&user).Error; err != nil {
 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unblock customer"})
 return
 }
+_ = cache.Delete(c.Request.Context(), fmt.Sprintf("auth:blocked:%d", user.ID))
 adminID := c.MustGet("user_id").(uint)
 adminPhone := c.MustGet("phone").(string)
 utils.LogAudit(adminID, adminPhone, "unblock_customer", "customer", id, "unblocked")

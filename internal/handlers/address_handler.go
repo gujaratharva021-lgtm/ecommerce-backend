@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 "net/http"
@@ -38,7 +38,11 @@ return
 }
 
 var existingCount int64
-database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Count(&existingCount)
+// is_deleted = false, matching the filter used everywhere else in this
+// file - without it, a user whose only address was previously
+// soft-deleted would show existingCount > 0 here and never get a new
+// default set, leaving them with zero default addresses (Bug#16).
+database.DB.Model(&models.Address{}).Where("user_id = ? AND is_deleted = false", userID).Count(&existingCount)
 makeDefault := req.IsDefault || existingCount == 0
 
 if makeDefault {
@@ -145,6 +149,13 @@ return
 }
 
 if address.IsDefault {
+// Clear is_default on the address being deleted (Defect #07) - without
+// this, if the user has no other addresses left, the only remaining row
+// in the table still has is_default=true while also being is_deleted=true,
+// and any query for the user's default address that doesn't also filter
+// is_deleted=false (see order_handler.go, cart_handler.go) would resolve
+// straight to this deleted, unusable address.
+database.DB.Model(&address).Update("is_default", false)
 var nextAddress models.Address
 if err := database.DB.
 Where("user_id = ? AND is_deleted = false", userID).
@@ -164,7 +175,11 @@ userID := c.MustGet("user_id").(uint)
 addressID := c.Param("id")
 
 var address models.Address
-if err := database.DB.First(&address, addressID).Error; err != nil {
+// is_deleted = false matches the filter used everywhere else in this
+// file (ListAddresses, DeleteAddress) - without it, a soft-deleted
+// address ID could still be looked up here and promoted to the user's
+// active default shipping destination (Bug#15).
+if err := database.DB.Where("id = ? AND is_deleted = false", addressID).First(&address).Error; err != nil {
 c.JSON(http.StatusNotFound, gin.H{"error": "Address not found"})
 return
 }

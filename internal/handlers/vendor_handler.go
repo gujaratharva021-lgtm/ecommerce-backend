@@ -1,6 +1,7 @@
-﻿package handlers
+package handlers
 
 import (
+"errors"
 "log"
 "net/http"
 "strconv"
@@ -298,12 +299,27 @@ return
 }
 
 var bill models.VendorBill
+errVoided := errors.New("bill is voided")
+errOnHold := errors.New("bill is on hold or disputed")
 txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 // Lock the row for the duration of this transaction so two concurrent
 // payments on the same bill can't both read the same AmountPaid and
 // both pass the remaining-balance check.
 if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&bill, id).Error; err != nil {
 return err
+}
+
+// A voided, on-hold, or disputed bill must never be payable - checked
+// under the same row lock as the balance check below so a concurrent
+// void/hold action can't race past this guard either (Bug FINANCE-09:
+// PayVendorBill previously only checked the remaining balance, letting
+// staff post an irrevocable payment ledger entry against a bill that
+// had already been voided or flagged on_hold/disputed).
+if bill.VoidedAt != nil {
+return errVoided
+}
+if bill.HoldStatus != "" {
+return errOnHold
 }
 
 remaining := bill.Amount - bill.AmountPaid
@@ -316,6 +332,14 @@ return tx.Save(&bill).Error
 })
 
 if txErr != nil {
+if txErr == errVoided {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot pay a voided bill"})
+return
+}
+if txErr == errOnHold {
+c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot pay a bill that is on hold or disputed (status: " + bill.HoldStatus + ") - release the hold first"})
+return
+}
 if txErr == gorm.ErrInvalidData {
 c.JSON(http.StatusBadRequest, gin.H{"error": "Payment exceeds remaining balance of the bill"})
 return

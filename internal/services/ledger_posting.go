@@ -1,4 +1,4 @@
-﻿package services
+package services
 
 import (
 "fmt"
@@ -20,12 +20,82 @@ import (
 //   Debit  Bank/Cash (order total actually collected)
 //   Debit  Customer Wallet Liability (wallet amount redeemed)
 //   Debit  Discount Given (discount amount)
-//   Credit Product Sales (taxable amount)
-//   Credit GST Payable (CGST+SGST+IGST)
-// Debit total = TotalAmount + WalletUsed + DiscountAmount
-// Credit total = TaxableAmount + totalGST
-// These are equal because TaxableAmount + GST = ItemsAmount + DeliveryCharge
-// + PlatformFee = TotalAmount + WalletUsed + DiscountAmount (invoice math).
+//   Credit Product Sales (gross taxable amount, i.e. before discount)
+//   Credit GST Payable (CGST+SGST+IGST, computed on the net/discounted value)
+// Debit total  = TotalAmount + WalletUsed + DiscountAmount
+// Credit total = (TaxableAmount + DiscountAmount) + totalGST
+// These are equal because TaxableAmount + totalGST = TotalAmount + WalletUsed
+// (invoice math), so adding DiscountAmount to both sides keeps it balanced.
+// Product Sales is credited gross (pre-discount) and Discount Given is
+// debited separately - crediting TaxableAmount alone (net/post-discount)
+// would leave Debit exceeding Credit by exactly DiscountAmount on every
+// discounted order.
+// PostWalletTopupLedgerEntry records Debit Bank (1002), Credit Customer
+// Wallet Liability (2005) for a Razorpay-verified wallet top-up. Real
+// money lands in the bank via the payment gateway, and the corresponding
+// increase in what the company owes the customer (their spendable wallet
+// balance) must be recorded as a liability at the same moment - without
+// this, the credit-wallet side of a top-up was invisible to the general
+// ledger entirely, so Account 2005 only ever moved on the debit side
+// (when a wallet balance is later spent/refunded), silently drifting
+// negative over time (Defect #03).
+// Idempotent per top-up via reference_type="wallet_topup", reference_id=topupID.
+func PostWalletTopupLedgerEntry(topupID uint) error {
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "wallet_topup", topupID).First(&existing).Error; err == nil {
+return nil
+}
+
+var topup models.WalletTopup
+if err := database.DB.First(&topup, topupID).Error; err != nil {
+return fmt.Errorf("wallet topup not found: %w", err)
+}
+if topup.Amount <= 0 {
+return nil
+}
+
+var bank, walletLiability models.Account
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+if err := database.DB.Where("code = ?", "2005").First(&walletLiability).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2005 (Customer Wallet Liability): %w", err)
+}
+
+transactionRef := fmt.Sprintf("WALLETTOPUP-%d", topupID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      bank.ID,
+Type:           "debit",
+Amount:         topup.Amount,
+Description:    fmt.Sprintf("Wallet top-up #%d", topupID),
+ReferenceType:  "wallet_topup",
+ReferenceID:    &topupID,
+EntryDate:      now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create debit ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      walletLiability.ID,
+Type:           "credit",
+Amount:         topup.Amount,
+Description:    fmt.Sprintf("Wallet top-up #%d", topupID),
+ReferenceType:  "wallet_topup",
+ReferenceID:    &topupID,
+EntryDate:      now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create credit ledger entry: %w", err)
+}
+return nil
+})
+}
+
 func PostSalesLedgerEntry(orderID uint) error {
 var invoice models.Invoice
 if err := database.DB.Where("order_id = ?", orderID).First(&invoice).Error; err != nil {
@@ -66,7 +136,13 @@ lines = append(lines, line{"2005", "debit", invoice.WalletUsed, fmt.Sprintf("Wal
 if invoice.DiscountAmount > 0 {
 lines = append(lines, line{"5002", "debit", invoice.DiscountAmount, fmt.Sprintf("Discount on order #%d", orderID)})
 }
-lines = append(lines, line{"4001", "credit", invoice.TaxableAmount, fmt.Sprintf("Sale for order #%d", orderID)})
+lines = append(lines, line{"4001", "credit", invoice.TaxableAmount + invoice.DiscountAmount, fmt.Sprintf("Sale for order #%d", orderID)})
+if invoice.DeliveryCharge > 0 {
+lines = append(lines, line{"4002", "credit", invoice.DeliveryCharge, fmt.Sprintf("Delivery fee for order #%d", orderID)})
+}
+if invoice.PlatformFee > 0 {
+lines = append(lines, line{"4003", "credit", invoice.PlatformFee, fmt.Sprintf("Platform fee for order #%d", orderID)})
+}
 if totalGST > 0 {
 lines = append(lines, line{"2002", "credit", totalGST, fmt.Sprintf("GST on order #%d", orderID)})
 }
@@ -327,6 +403,82 @@ return nil
 // UpdateExpense, the ledger is NOT automatically corrected (that requires a
 // proper reversal/adjustment entry, which is out of scope for this phase;
 // tracked separately). Idempotent per expense via reference_type="expense".
+// PostPayrollLedgerEntry records Debit Salary Expense (5006), Credit
+// Cash/Bank (1001/1002 depending on payroll.PaymentMethod - "cash" maps
+// to Cash, "bank"/"upi" both settle through the bank account) for a
+// staff salary payment. Idempotency-checked the same way as
+// PostExpenseLedgerEntry: a payroll record can only ever post once,
+// keyed on reference_type="payroll", reference_id=payrollID (Bug
+// FINANCE-07: payroll payments previously never touched the ledger at
+// all, silently understating total costs on the P&L and trial balance).
+// PostPayrollLedgerEntry takes an existing transaction rather than opening
+// its own (Defect #12) - the caller (UpdatePayroll/CreatePayroll) locks the
+// payroll row for the duration of its own transaction, and the idempotency
+// check + insert here must run inside that same lock. Calling this with
+// database.DB directly (no active lock held) would reopen the exact race
+// this fix closes: two concurrent requests could both pass the idempotency
+// check before either commits, producing duplicate salary debits and bank
+// credits in the general ledger.
+func PostPayrollLedgerEntry(tx *gorm.DB, payrollID uint) error {
+var existing models.LedgerEntry
+if err := tx.Where("reference_type = ? AND reference_id = ?", "payroll", payrollID).First(&existing).Error; err == nil {
+return nil
+}
+
+var payroll models.Payroll
+if err := tx.Preload("Staff").First(&payroll, payrollID).Error; err != nil {
+return fmt.Errorf("payroll record not found: %w", err)
+}
+if payroll.Amount <= 0 {
+return nil
+}
+
+cashOrBankCode := "1002" // Bank (also used for "upi", which settles via bank)
+if payroll.PaymentMethod == "cash" {
+cashOrBankCode = "1001"
+}
+
+var salaryExpense, cashOrBank models.Account
+if err := tx.Where("code = ?", "5006").First(&salaryExpense).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 5006 (Salary Expense): %w", err)
+}
+if err := tx.Where("code = ?", cashOrBankCode).First(&cashOrBank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code %s: %w", cashOrBankCode, err)
+}
+
+transactionRef := fmt.Sprintf("PAYROLL-%d", payrollID)
+staffName := payroll.Staff.Name
+now := time.Now()
+
+debit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      salaryExpense.ID,
+Type:           "debit",
+Amount:         payroll.Amount,
+Description:    fmt.Sprintf("Salary paid to %s for %d/%d", staffName, payroll.Month, payroll.Year),
+ReferenceType:  "payroll",
+ReferenceID:    &payrollID,
+EntryDate:      now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create debit ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      cashOrBank.ID,
+Type:           "credit",
+Amount:         payroll.Amount,
+Description:    fmt.Sprintf("Salary paid to %s for %d/%d", staffName, payroll.Month, payroll.Year),
+ReferenceType:  "payroll",
+ReferenceID:    &payrollID,
+EntryDate:      now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create credit ledger entry: %w", err)
+}
+return nil
+}
+
 func PostExpenseLedgerEntry(expenseID uint) error {
 var existing models.LedgerEntry
 if err := database.DB.Where("reference_type = ? AND reference_id = ?", "expense", expenseID).First(&existing).Error; err == nil {
@@ -390,6 +542,84 @@ return nil
 // Debit Opex / Credit Bank for the increase), negative means it shrank
 // (post the reverse - Debit Bank / Credit Opex - for the decrease).
 // No-op if deltaAmount is zero.
+// PostPayrollAdjustmentLedgerEntry posts a compensating ledger entry
+// when a PAID payroll record's amount is corrected after the fact -
+// mirrors PostExpenseAdjustmentLedgerEntry's increase/decrease-direction
+// swap exactly. Debit Salary Expense (5006) / Credit Cash-or-Bank for an
+// increase; reversed for a decrease. Without this, editing a paid
+// payroll's amount left the general ledger permanently reflecting the
+// old, now-incorrect figure (Bug #09).
+// PostPayrollAdjustmentLedgerEntry takes an existing transaction rather
+// than opening its own (Defect #12), for the same reason as
+// PostPayrollLedgerEntry above - this runs inside UpdatePayroll's locked
+// transaction so amount-correction adjustments can't race either.
+func PostPayrollAdjustmentLedgerEntry(tx *gorm.DB, payrollID uint, deltaAmount float64) error {
+if deltaAmount == 0 {
+return nil
+}
+
+var payroll models.Payroll
+if err := tx.First(&payroll, payrollID).Error; err != nil {
+return fmt.Errorf("payroll record not found: %w", err)
+}
+
+cashOrBankCode := "1002" // Bank (also used for "upi", which settles via bank)
+if payroll.PaymentMethod == "cash" {
+cashOrBankCode = "1001"
+}
+
+var salaryExpense, cashOrBank models.Account
+if err := tx.Where("code = ?", "5006").First(&salaryExpense).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 5006 (Salary Expense): %w", err)
+}
+if err := tx.Where("code = ?", cashOrBankCode).First(&cashOrBank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code %s: %w", cashOrBankCode, err)
+}
+
+amount := deltaAmount
+increased := true
+if amount < 0 {
+amount = -amount
+increased = false
+}
+
+transactionRef := fmt.Sprintf("PAYROLLADJ-%d-%d", payrollID, time.Now().UnixNano())
+now := time.Now()
+
+salaryEntry := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      salaryExpense.ID,
+Type:           "debit",
+Amount:         amount,
+Description:    fmt.Sprintf("Salary adjustment for payroll #%d", payrollID),
+ReferenceType:  "payroll_adjustment",
+ReferenceID:    &payrollID,
+EntryDate:      now,
+}
+cashEntry := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      cashOrBank.ID,
+Type:           "credit",
+Amount:         amount,
+Description:    fmt.Sprintf("Salary adjustment for payroll #%d", payrollID),
+ReferenceType:  "payroll_adjustment",
+ReferenceID:    &payrollID,
+EntryDate:      now,
+}
+if !increased {
+// Payroll amount decreased - reverse the direction: Debit Cash/Bank, Credit Salary Expense.
+salaryEntry.Type = "credit"
+cashEntry.Type = "debit"
+}
+if err := tx.Create(&salaryEntry).Error; err != nil {
+return fmt.Errorf("failed to create salary adjustment ledger entry: %w", err)
+}
+if err := tx.Create(&cashEntry).Error; err != nil {
+return fmt.Errorf("failed to create cash/bank adjustment ledger entry: %w", err)
+}
+return nil
+}
+
 func PostExpenseAdjustmentLedgerEntry(expenseID uint, deltaAmount float64) error {
 if deltaAmount == 0 {
 return nil
@@ -460,6 +690,72 @@ return nil
 // total), so a payment that moves partially_refunded -> refunded twice
 // posts two separate entries, one per incremental amount actually paid
 // out - never a single entry for the full cumulative refund.
+// PostGatewayCaptureRefundLedgerEntry records Debit Bank (1002), Credit
+// Customer Wallet Liability (2005) for the specific case where a Razorpay
+// payment was captured for an order that had already been cancelled/returned
+// while the customer was mid-checkout on the gateway page (VerifyPayment).
+// Real money landed in the bank via the gateway, and it was immediately
+// credited back to the customer as wallet balance rather than kept as
+// revenue - both sides of that must be recorded, or the bank inflow is
+// invisible to the ledger while the wallet liability increase has no
+// matching debit anywhere (Defect #04). Distinct from PostRefundLedgerEntry
+// (which reverses an EXISTING sale entry via Refund Payable/Bank outflow) -
+// this case never became a sale in the first place, so there is nothing to
+// reverse; it is closer in shape to PostWalletTopupLedgerEntry, just keyed
+// off the order/payment instead of a top-up row.
+// Idempotent per payment via reference_type="payment_capture_refund", reference_id=paymentID.
+func PostGatewayCaptureRefundLedgerEntry(paymentID, orderID uint, amount float64) error {
+if amount <= 0 {
+return nil
+}
+
+var existing models.LedgerEntry
+if err := database.DB.Where("reference_type = ? AND reference_id = ?", "payment_capture_refund", paymentID).First(&existing).Error; err == nil {
+return nil
+}
+
+var bank, walletLiability models.Account
+if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
+}
+if err := database.DB.Where("code = ?", "2005").First(&walletLiability).Error; err != nil {
+return fmt.Errorf("chart of accounts missing code 2005 (Customer Wallet Liability): %w", err)
+}
+
+transactionRef := fmt.Sprintf("PAYCAPTUREREFUND-%d", paymentID)
+now := time.Now()
+
+return database.DB.Transaction(func(tx *gorm.DB) error {
+debit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      bank.ID,
+Type:           "debit",
+Amount:         amount,
+Description:    fmt.Sprintf("Payment captured after order #%d was cancelled - refunded to wallet", orderID),
+ReferenceType:  "payment_capture_refund",
+ReferenceID:    &paymentID,
+EntryDate:      now,
+}
+if err := tx.Create(&debit).Error; err != nil {
+return fmt.Errorf("failed to create debit ledger entry: %w", err)
+}
+credit := models.LedgerEntry{
+TransactionRef: transactionRef,
+AccountID:      walletLiability.ID,
+Type:           "credit",
+Amount:         amount,
+Description:    fmt.Sprintf("Payment captured after order #%d was cancelled - refunded to wallet", orderID),
+ReferenceType:  "payment_capture_refund",
+ReferenceID:    &paymentID,
+EntryDate:      now,
+}
+if err := tx.Create(&credit).Error; err != nil {
+return fmt.Errorf("failed to create credit ledger entry: %w", err)
+}
+return nil
+})
+}
+
 func PostRefundLedgerEntry(orderID uint, deltaAmount float64, paymentMethod string) error {
 if deltaAmount <= 0 {
 return nil
@@ -613,14 +909,22 @@ return nil
 // PostRiderPayoutAccrualLedgerEntry recognizes a rider payout as owed
 // (SRS 12.11), the moment it's approved: Debit Rider Delivery Expense,
 // Credit Rider Payable.
-func PostRiderPayoutAccrualLedgerEntry(payoutID uint) error {
+// PostRiderPayoutAccrualLedgerEntry takes an existing transaction rather
+// than opening its own (Defect #12) - the caller (ApproveRiderPayout) locks
+// the payout row for the duration of its own transaction, and the
+// idempotency check + insert here must run inside that same lock. Without
+// this, two concurrent approve requests on the same payout could both pass
+// the "pending" status check before either commits, both flip it to
+// "approved", and both post a separate accrual entry to the ledger -
+// double-counting the rider's owed amount.
+func PostRiderPayoutAccrualLedgerEntry(tx *gorm.DB, payoutID uint) error {
 var existing models.LedgerEntry
-if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_payout_accrual", payoutID).First(&existing).Error; err == nil {
+if err := tx.Where("reference_type = ? AND reference_id = ?", "rider_payout_accrual", payoutID).First(&existing).Error; err == nil {
 return nil
 }
 
 var payout models.RiderPayout
-if err := database.DB.First(&payout, payoutID).Error; err != nil {
+if err := tx.First(&payout, payoutID).Error; err != nil {
 return fmt.Errorf("rider payout not found: %w", err)
 }
 if payout.Amount <= 0 {
@@ -628,17 +932,16 @@ return nil
 }
 
 var expense, payable models.Account
-if err := database.DB.Where("code = ?", "5004").First(&expense).Error; err != nil {
+if err := tx.Where("code = ?", "5004").First(&expense).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 5004 (Rider Delivery Expense): %w", err)
 }
-if err := database.DB.Where("code = ?", "2003").First(&payable).Error; err != nil {
+if err := tx.Where("code = ?", "2003").First(&payable).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 2003 (Rider Payable): %w", err)
 }
 
 transactionRef := fmt.Sprintf("RIDERACCRUAL-%d", payoutID)
 now := time.Now()
 
-return database.DB.Transaction(func(tx *gorm.DB) error {
 debit := models.LedgerEntry{
 TransactionRef: transactionRef, AccountID: expense.ID, Type: "debit", Amount: payout.Amount,
 Description: fmt.Sprintf("Rider payout #%d accrual", payoutID),
@@ -656,20 +959,24 @@ if err := tx.Create(&credit).Error; err != nil {
 return fmt.Errorf("failed to create rider payable ledger entry: %w", err)
 }
 return nil
-})
 }
 
 // PostRiderPayoutSettlementLedgerEntry records actually paying out a rider
 // (SRS 12.11): Debit Rider Payable, Credit Bank. Only meaningful after
 // PostRiderPayoutAccrualLedgerEntry has already run for the same payout.
-func PostRiderPayoutSettlementLedgerEntry(payoutID uint) error {
+// PostRiderPayoutSettlementLedgerEntry takes an existing transaction rather
+// than opening its own (Defect #12), for the same reason as
+// PostRiderPayoutAccrualLedgerEntry above - runs inside PayRiderPayout's
+// locked transaction so a concurrent double-settlement can't slip past the
+// "approved" status check either.
+func PostRiderPayoutSettlementLedgerEntry(tx *gorm.DB, payoutID uint) error {
 var existing models.LedgerEntry
-if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_payout_settlement", payoutID).First(&existing).Error; err == nil {
+if err := tx.Where("reference_type = ? AND reference_id = ?", "rider_payout_settlement", payoutID).First(&existing).Error; err == nil {
 return nil
 }
 
 var payout models.RiderPayout
-if err := database.DB.First(&payout, payoutID).Error; err != nil {
+if err := tx.First(&payout, payoutID).Error; err != nil {
 return fmt.Errorf("rider payout not found: %w", err)
 }
 if payout.Amount <= 0 {
@@ -677,17 +984,16 @@ return nil
 }
 
 var payable, bank models.Account
-if err := database.DB.Where("code = ?", "2003").First(&payable).Error; err != nil {
+if err := tx.Where("code = ?", "2003").First(&payable).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 2003 (Rider Payable): %w", err)
 }
-if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+if err := tx.Where("code = ?", "1002").First(&bank).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
 }
 
 transactionRef := fmt.Sprintf("RIDERPAY-%d", payoutID)
 now := time.Now()
 
-return database.DB.Transaction(func(tx *gorm.DB) error {
 debit := models.LedgerEntry{
 TransactionRef: transactionRef, AccountID: payable.ID, Type: "debit", Amount: payout.Amount,
 Description: fmt.Sprintf("Rider payout #%d settlement", payoutID),
@@ -705,35 +1011,41 @@ if err := tx.Create(&credit).Error; err != nil {
 return fmt.Errorf("failed to create bank ledger entry: %w", err)
 }
 return nil
-})
 }
 
 // PostRiderCODDepositLedgerEntry moves the recorded balance of a verified
 // COD deposit from Cash (where COD sales are already booked, since the
 // rider physically holds the cash) into Bank (SRS 12.9).
-func PostRiderCODDepositLedgerEntry(depositID uint) error {
+//
+// Takes tx rather than opening its own transaction against database.DB
+// (Bug #14): the caller (VerifyRiderCODDeposit) must be able to run the
+// deposit's status update and this ledger posting as one atomic unit, so
+// that if the ledger post fails, the status change rolls back too instead
+// of leaving the deposit permanently marked "verified" with no matching
+// ledger entry - a cash-vs-GL reconciliation gap with no way to detect or
+// recover from it after the fact.
+func PostRiderCODDepositLedgerEntry(tx *gorm.DB, depositID uint) error {
 var existing models.LedgerEntry
-if err := database.DB.Where("reference_type = ? AND reference_id = ?", "rider_cod_deposit", depositID).First(&existing).Error; err == nil {
+if err := tx.Where("reference_type = ? AND reference_id = ?", "rider_cod_deposit", depositID).First(&existing).Error; err == nil {
 return nil
 }
 
 var deposit models.RiderCODDeposit
-if err := database.DB.First(&deposit, depositID).Error; err != nil {
+if err := tx.First(&deposit, depositID).Error; err != nil {
 return fmt.Errorf("rider COD deposit not found: %w", err)
 }
 
 var cash, bank models.Account
-if err := database.DB.Where("code = ?", "1001").First(&cash).Error; err != nil {
+if err := tx.Where("code = ?", "1001").First(&cash).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 1001 (Cash): %w", err)
 }
-if err := database.DB.Where("code = ?", "1002").First(&bank).Error; err != nil {
+if err := tx.Where("code = ?", "1002").First(&bank).Error; err != nil {
 return fmt.Errorf("chart of accounts missing code 1002 (Bank): %w", err)
 }
 
 transactionRef := fmt.Sprintf("CODDEPOSIT-%d", depositID)
 now := time.Now()
 
-return database.DB.Transaction(func(tx *gorm.DB) error {
 debit := models.LedgerEntry{
 TransactionRef: transactionRef, AccountID: bank.ID, Type: "debit", Amount: deposit.Amount,
 Description: fmt.Sprintf("Rider COD deposit #%d", depositID),
@@ -751,5 +1063,4 @@ if err := tx.Create(&credit).Error; err != nil {
 return fmt.Errorf("failed to create cash ledger entry: %w", err)
 }
 return nil
-})
 }

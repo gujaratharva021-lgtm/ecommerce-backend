@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/database"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/models"
 	"github.com/gujaratharva021-lgtm/ecommerce-backend/internal/services"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // getOrCreateCart returns the user's cart, creating one if it doesn't exist yet
@@ -33,7 +36,7 @@ func getOrCreateCart(userID uint) (*models.Cart, error) {
 // knowing which one the user would actually be served from.
 func resolveWarehouseForUser(userID uint) (*models.Warehouse, error) {
 	var address models.Address
-	err := database.DB.Where("user_id = ? AND is_default = ?", userID, true).First(&address).Error
+	err := database.DB.Where("user_id = ? AND is_default = ? AND is_deleted = false", userID, true).First(&address).Error
 	if err != nil || address.Lat == nil || address.Lng == nil {
 		return nil, nil
 	}
@@ -116,13 +119,6 @@ func AddToCart(c *gin.Context) {
 		return
 	}
 
-	var existingItem models.CartItem
-	hasExisting := database.DB.Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).First(&existingItem).Error == nil
-	newQuantity := req.Quantity
-	if hasExisting {
-		newQuantity = existingItem.Quantity + req.Quantity
-	}
-
 	// Resolve the user's nearest warehouse (from their default address) so
 	// the stock check/hold is warehouse-specific and accounts for other
 	// shoppers' active 10-minute reservations. Users without a saved
@@ -137,7 +133,18 @@ func AddToCart(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Please add a delivery address before adding items to your cart"})
 		return
 	}
-	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+
+	addCartItem := func(tx *gorm.DB) error {
+		var existingItem models.CartItem
+		hasExisting := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("cart_id = ? AND product_id = ?", cart.ID, req.ProductID).
+			First(&existingItem).Error == nil
+
+		newQuantity := req.Quantity
+		if hasExisting {
+			newQuantity = existingItem.Quantity + req.Quantity
+		}
+
 		if err := services.ReserveStock(tx, userID, req.ProductID, warehouse.ID, newQuantity); err != nil {
 			return err
 		}
@@ -152,7 +159,24 @@ func AddToCart(c *gin.Context) {
 			Quantity:  newQuantity,
 		}
 		return tx.Create(&newItem).Error
-	})
+	}
+
+	// Lookup+insert now happens inside the transaction under a row lock,
+	// closing the concurrent-update race (two requests both bumping the
+	// same existing item's quantity). A row lock can't stop two
+	// transactions that both see "no existing row" from both inserting
+	// though (a phantom-insert race) - the unique index on
+	// (cart_id, product_id) added alongside this fix is the real backstop
+	// for that case. If we lose that race, retry once: by then the other
+	// transaction's row exists and will be found + locked on the second
+	// attempt (Bug#14).
+	txErr := database.DB.Transaction(addCartItem)
+	if txErr != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(txErr, &pgErr) && pgErr.Code == "23505" {
+			txErr = database.DB.Transaction(addCartItem)
+		}
+	}
 	if txErr != nil {
                 if txErr == services.ErrInsufficientStock {
                         c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for this product"})

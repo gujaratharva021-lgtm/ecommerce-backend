@@ -116,15 +116,6 @@ CouponDiscount    float64          `gorm:"-" json:"coupon_discount"`
 	PaymentMethod     string           `gorm:"default:cod" json:"payment_method"`                                          // cod/online
 	PaymentStatus     string           `gorm:"default:pending" json:"payment_status"`                                      // pending/paid/failed
 	DeliveryPartnerID *uint            `gorm:"index" json:"delivery_partner_id,omitempty"`
-// CancellationReason is set when a fulfillment-stage cancellation
-// (confirmed through ready_for_dispatch) is made via
-// CancelOrderInFulfillment. Left nil for orders cancelled via the
-// plain customer CancelOrder path (pending/confirmed only), which has
-// no reason field - and for orders that were never cancelled.
-CancellationReason *string           `json:"cancellation_reason,omitempty"`
-CancelledByType    *string           `json:"cancelled_by_type,omitempty"` // "admin" or "inventory_manager"
-CancelledByID      *uint             `json:"cancelled_by_id,omitempty"`
-CancelledAt        *time.Time        `json:"cancelled_at,omitempty"`
 	DeliveryPartner   *DeliveryPartner `gorm:"foreignKey:DeliveryPartnerID" json:"delivery_partner,omitempty"`
 	// DeliveryAssignmentStatus is one of the DeliveryAssignmentStatus*
 	// constants above, or empty/nil when no partner has ever been assigned.
@@ -154,6 +145,7 @@ CancelledAt        *time.Time        `json:"cancelled_at,omitempty"`
 	// state (see the DeliveryStatus* constants above). Nil until a partner
 	// is first assigned.
 	DeliveryStatus *string `gorm:"index;size:20" json:"delivery_status,omitempty"`
+	DeliveryProofURL *string `json:"delivery_proof_url,omitempty"`
 	// Delivery-completion OTP fields. Only the bcrypt hash is ever
 	// persisted - the plaintext code is never stored and is never
 	// serialized to JSON (json:"-"), so it can never leak through any
@@ -200,6 +192,9 @@ type CheckoutRequest struct {
 // OrderStatusUpdateRequest is the body for PUT /admin/orders/:id/status (admin only).
 type OrderStatusUpdateRequest struct {
 	Status string `json:"status" binding:"required,oneof=confirmed shipped delivered cancelled"`
+	// Reason is only used when Status is "cancelled" - passed through to
+	// CancelOrderInFulfillment for the audit trail (Bug#18).
+	Reason string `json:"reason"`
 }
 
 // RejectAssignmentRequest is the body for PUT /delivery/orders/:id/reject
